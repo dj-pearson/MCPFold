@@ -1,0 +1,30 @@
+{
+  "name": "mcpfold",
+  "version": "0.0.0",
+  "description": "One source of truth for your MCP servers — fold one config out to every client.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "mcpfold": "./dist/bin.js",
+    "mcpf": "./dist/bin.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "dev": "node --experimental-strip-types src/bin.ts"
+  },
+  "dependencies": {
+    "@mcpfold/core": "workspace:*",
+    "commander": "^12.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -65,3 +65,31 @@ export {
   UnknownProfileError,
   type ResolveDiagnostics,
 } from './resolve.js';
+
+// Error hierarchy (S0.6)
+export {
+  AdapterRenderError,
+  ConfigParseError,
+  ConfigValidationError,
+  DriftError,
+  IoError,
+  isMcpfoldError,
+  McpfoldError,
+  SecretResolutionError,
+  UsageError,
+  type McpfoldErrorCode,
+  type McpfoldErrorOptions,
+} from './errors.js';
+
+// Deterministic serialization (S0.8)
+export { isByteIdentical, serialize, sortKeysDeep, type SerializeOptions } from './serialize.js';
+
+// Drift-check engine (S0.8)
+export {
+  checkRendered,
+  hasDrift,
+  type CheckableFile,
+  type CheckResult,
+  type CheckStatus,
+  type FileReader,
+} from './check.js';

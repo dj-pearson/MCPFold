@@ -1,3 +1,4 @@
+import { McpfoldError, type McpfoldErrorCode } from './errors.js';
 import type { Config, ProfileConfig, ResolvedServer, ServerConfig } from './types.js';
 
 /**
@@ -10,8 +11,8 @@ import type { Config, ProfileConfig, ResolvedServer, ServerConfig } from './type
  */
 
 /** Thrown when a profile name is not present in the config. */
-export class UnknownProfileError extends Error {
-  override readonly name = 'UnknownProfileError';
+export class UnknownProfileError extends McpfoldError {
+  override readonly code: McpfoldErrorCode = 'UNKNOWN_PROFILE';
   constructor(
     readonly profileName: string,
     readonly available: string[],
@@ -20,6 +21,7 @@ export class UnknownProfileError extends Error {
       available.length > 0
         ? `Unknown profile "${profileName}". Available profiles: ${available.join(', ')}.`
         : `Unknown profile "${profileName}". This config defines no profiles.`,
+      { hint: 'Check the profile name against the `profiles` block in your config.' },
     );
   }
 }
