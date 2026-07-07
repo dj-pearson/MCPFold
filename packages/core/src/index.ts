@@ -1,12 +1,67 @@
 /**
  * @mcpfold/core — the pure, I/O-free engine.
  *
- * This package owns the canonical `mcp.config.jsonc` format and all logic that
- * operates on it: the zod schema, JSONC parsing, the secret-reference grammar,
- * profile/tag/scope resolution, drift diffing, and the ClientAdapter /
- * SecretProvider interfaces. It performs no filesystem or network I/O directly —
- * every side effect is injected. See `scripts/check-core-purity.mjs`.
+ * Owns the canonical `mcp.config.jsonc` format and every operation on it: the zod
+ * schema, JSONC loading, the secret-reference grammar, and profile/tag/scope
+ * resolution. Performs no filesystem or network I/O — all side effects are injected.
  */
 
-/** Package version marker; real exports land as E1 stories are implemented. */
 export const CORE_PACKAGE = '@mcpfold/core' as const;
+
+// Schema (S1.1)
+export {
+  AuthSchema,
+  CLIENT_IDS,
+  ConfigSchema,
+  ProfileSchema,
+  SCOPES,
+  SECRET_REF_RE,
+  SECRET_SCHEMES,
+  SecretRef,
+  ServerSchema,
+  ToolsSchema,
+  TRANSPORTS,
+} from './schema.js';
+
+// Inferred types (S1.1, S1.4)
+export type {
+  AuthConfig,
+  ClientId,
+  Config,
+  ProfileConfig,
+  ResolvedServer,
+  Scope,
+  ServerConfig,
+  ToolsDirective,
+  Transport,
+} from './types.js';
+
+// JSONC loader (S1.2)
+export {
+  loadConfig,
+  loadConfigOrThrow,
+  offsetToLineCol,
+  type ConfigErrorCode,
+  type LoadResult,
+  type PositionedError,
+} from './load.js';
+
+// Secret-reference grammar (S1.3)
+export {
+  findSecretRefs,
+  findSecretRefsInString,
+  isSecretRef,
+  parseSecretRef,
+  type LocatedSecretRef,
+  type ParsedSecretRef,
+  type SecretScheme,
+} from './secret-ref.js';
+
+// Resolution engine (S1.4)
+export {
+  resolveAll,
+  resolveProfile,
+  resolveProfileWithDiagnostics,
+  UnknownProfileError,
+  type ResolveDiagnostics,
+} from './resolve.js';
