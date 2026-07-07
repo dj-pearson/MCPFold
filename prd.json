@@ -1,0 +1,1496 @@
+{
+  "$schema": "https://mcpfold.com/ralph/prd.schema.json",
+  "meta": {
+    "product": "mcpfold",
+    "one_liner": "One source of truth for your MCP servers. Write it once, fold it out to every client — secrets never hardcoded, only the tools you need loaded.",
+    "prd_version": "1.0.0",
+    "source_spec": "mcpfold-spec.md",
+    "generated_for": "Ralph / Claude autonomous build loops",
+    "domain": "mcpfold.com",
+    "npm_package": "mcpfold",
+    "cli_binary": "mcpfold",
+    "cli_alias": "mcpf",
+    "license": { "core_and_cli": "MIT", "cloud": "commercial-closed" },
+    "north_star": "Ship the local-first CLI wedge (schema + adapters + sync/diff/import/doctor + secrets) to an OSS launch, then layer the Cloudflare Pages + self-hosted Supabase cloud on top. Own the neutral mcp.config.jsonc format.",
+    "headline_metric": "Cut MCP tool-schema context from ~72% to <20% via server + tool curation.",
+    "non_goals": [
+      "Server-side enterprise gateway features (RBAC, org audit, hosted servers) — that is the Composio/MintMCP space, not ours.",
+      "Naming the CLI binary `fold` (shadows POSIX fold).",
+      "Syncing secret VALUES to the cloud — only config with secret REFERENCES is ever synced.",
+      "Implying official MCP endorsement in any copy."
+    ]
+  },
+
+  "stack": {
+    "language": "TypeScript (strict), Node 20+ for CLI/core, Deno for Supabase edge functions",
+    "package_manager": "pnpm workspaces (monorepo)",
+    "core_libs": ["zod", "jsonc-parser", "commander or clipanion for CLI", "execa", "vitest"],
+    "frontend": "React + TypeScript + Vite, deployed to Cloudflare Pages, served from mcpfold.com",
+    "backend": "Self-hosted Supabase (Postgres + GoTrue + PostgREST + Realtime) on Contabo VPS via Coolify",
+    "edge_functions": "Supabase Edge Functions (Deno) for auth + push/pull, plus a side Docker service to host/run edge functions independently of the managed runtime when needed",
+    "side_docker_service": "A standalone containerized Deno service (deployed in Coolify) that runs mcpfold edge/serverless handlers the self-hosted Supabase runtime does not cover, sharing the same JWT/RLS contract",
+    "ci": "GitHub Actions — lint, typecheck, unit + snapshot + e2e tests, cross-OS matrix (ubuntu/macos/windows), build, changesets release, npm publish",
+    "secrets_providers": ["env", "dotenv", "infisical", "keychain", "1password-cli"],
+    "testing": "vitest (unit + fixture snapshot), playwright (web e2e), tmp-dir integration for CLI, docker-compose for cloud integration"
+  },
+
+  "repo_layout": {
+    "packages/core": "@mcpfold/core — pure, I/O-free engine: zod schema, jsonc parse, secret-ref grammar, profile/tag/scope resolution, drift diff, adapter + provider interfaces + registries. No filesystem or network except through injected adapters/providers.",
+    "packages/adapters": "@mcpfold/adapters — one small module per client (cursor, claude-desktop, claude-code, vscode, windsurf, zed) implementing ClientAdapter. Fixture-driven.",
+    "packages/secrets": "@mcpfold/secrets — SecretProvider implementations (env, dotenv, infisical, keychain, op).",
+    "packages/proxy": "@mcpfold/proxy — local MCP proxy for tool-level curation (tools/list interception).",
+    "packages/cli": "mcpfold — the CLI binary (init/import/add/sync/diff/doctor/secret/run/login/push/pull), wires core + adapters + secrets + proxy.",
+    "packages/schema": "Published JSON Schema for mcp.config.jsonc (editor autocomplete) generated from zod.",
+    "apps/web": "React/TS visual editor + directory + team console, Cloudflare Pages.",
+    "services/edge": "Deno Supabase edge functions (auth, push, pull) + side Docker service.",
+    "supabase": "migrations/, seed.sql, RLS policies, config.toml, coolify compose docs.",
+    "docs": "Format spec, adapter authoring guide, benchmark writeup.",
+    "ralph": "PROMPT.md (loop driver), PROGRESS.md (append-only iteration log), AGENT_NOTES.md."
+  },
+
+  "conventions": {
+    "code_style": "TypeScript strict; prefer pure functions; no default exports in core; zod-first types (infer from schema, never hand-duplicate).",
+    "core_purity": "packages/core must not import node:fs, node:os, or network libs. All I/O flows through injected ClientAdapter / SecretProvider. Enforce with an eslint no-restricted-imports rule and a CI check.",
+    "commits": "Conventional Commits. One story per branch: `story/<id>-<slug>`. Reference the story id in the commit body.",
+    "branching": "Trunk-based; each story is a short-lived branch merged to main via PR that must pass CI.",
+    "testing_rule": "Every story ships tests. Adapters use fixture snapshots (native config in / canonical out and back). No story is `done` until its own acceptance tests pass and the full suite is green.",
+    "error_ux": "Validation and doctor errors must name the exact file, key, and fix (e.g. 'VS Code uses root key \"servers\", not \"mcpServers\"').",
+    "cross_platform": "Every path-resolving function has explicit win32/darwin/linux behavior and tests. Never assume `~` expands.",
+    "security": "Secret values never written to git-tracked files. `inline` strategy refuses to run unless target is gitignored, and warns loudly. Pin `@latest` at fold time when `pin` is present."
+  },
+
+  "commands": {
+    "install": "pnpm install",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test_watch": "pnpm -r test --watch",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "e2e": "pnpm --filter @mcpfold/web e2e",
+    "cli_dev": "pnpm --filter mcpfold dev -- <args>",
+    "verify_all": "pnpm lint && pnpm typecheck && pnpm test && pnpm -r build"
+  },
+
+  "loop_protocol": {
+    "description": "How a Ralph/Claude loop should consume this file on each iteration. One story per iteration. Never work on a story whose dependencies are not all `done`.",
+    "iteration_steps": [
+      "1. Read PROGRESS.md tail and this prd.json. Pick the highest-priority story with status `todo` (or `in_progress` you own) whose every dependency id is `done`. Respect `order` as a tiebreak.",
+      "2. If no story is eligible, stop and report which stories are blocked and by what.",
+      "3. Create/checkout branch `story/<id>-<slug>`. Set the story status to `in_progress` and append a start line to PROGRESS.md.",
+      "4. Implement ONLY that story. Touch only files consistent with `files_hint` unless the story genuinely requires more; note any deviation.",
+      "5. Write the tests named in `tests` first (or alongside). They must fail before implementation and pass after.",
+      "6. Run `verify_all`. Do not proceed until lint, typecheck, tests, and build all pass.",
+      "7. Verify every item in `acceptance_criteria` and `definition_of_done` is objectively satisfied. If a criterion is untestable as written, add a test that makes it testable.",
+      "8. Commit with a Conventional Commit referencing `<id>`. Open/refresh the PR. When CI is green, set status `done` and append a completion line (id, commit sha, summary, follow-ups) to PROGRESS.md.",
+      "9. If blocked (ambiguity, external dependency, failing infra), set status `blocked`, write the reason in PROGRESS.md, and move to the next eligible story rather than guessing.",
+      "10. Never mark `done` with a red suite, a skipped acceptance criterion, or a TODO left in shipped code."
+    ],
+    "global_definition_of_done": [
+      "All acceptance_criteria demonstrably met.",
+      "Tests added and the full suite green on the CI matrix (ubuntu/macos/windows where the story is platform-relevant).",
+      "Typecheck + lint clean; core purity rule not violated.",
+      "Public API changes reflected in exported types and the JSON schema if the canonical format changed.",
+      "No secret values committed; no unpinned @latest introduced where `pin` semantics apply.",
+      "PROGRESS.md updated."
+    ],
+    "status_values": ["todo", "in_progress", "blocked", "done"],
+    "priority_values": ["p0", "p1", "p2", "p3"]
+  },
+
+  "epics": [
+    { "id": "E0", "title": "Foundation & repo scaffolding", "goal": "A green monorepo with CI, release tooling, and the Ralph loop harness so every later story lands on solid ground." },
+    { "id": "E0.5", "title": "OSS hygiene & contracts", "goal": "The things that are cheap on day 1 and expensive to retrofit after adoption: contribution/governance scaffolding, a redaction-safe error+diagnostics layer, schema versioning + migrate, deterministic output, an offline/degraded-mode contract, and a stable --json + exit-code contract. These are foundational contracts later stories must honor." },
+    { "id": "E1", "title": "Canonical format — @mcpfold/core schema & resolution", "goal": "Own mcp.config.jsonc: zod schema, jsonc parsing, secret-ref grammar, profile/tag/scope resolution, drift diff, JSON schema export." },
+    { "id": "E2", "title": "Adapter framework & client adapters", "goal": "One tested module per client that renders canonical → native and parses native → canonical." },
+    { "id": "E3", "title": "CLI surface", "goal": "The wedge: init/import/add/sync/diff/doctor with backups and great error UX, distributed via npx." },
+    { "id": "E4", "title": "Secrets", "goal": "Plaintext tokens never touch disk: provider interface, env/dotenv/infisical/keychain/op, and the three per-adapter strategies incl. the shim launcher." },
+    { "id": "E5", "title": "Tool-level curation proxy", "goal": "The moat: a thin local proxy that trims tools/list to the allow/deny set, plus a published before/after context benchmark." },
+    { "id": "E6", "title": "Cloud backend — self-hosted Supabase + edge", "goal": "Coolify Supabase, versioned append-only config store with RLS, device-code OAuth, push/pull edge functions, side Docker service." },
+    { "id": "E7", "title": "Cloud frontend — Cloudflare Pages web app", "goal": "Visual config editor, profiles, server directory, per-machine sync status, team + audit console at mcpfold.com." },
+    { "id": "E8", "title": "Launch, docs, QA & release", "goal": "Docs site, JSON schema publishing, cross-platform e2e, security review, telemetry opt-in, npm release, awesome-mcp." },
+    { "id": "E9", "title": "Security & integrity", "goal": "Prove the ref-only invariant on every path, treat config as executable code (trust + integrity), redact all output, and harden the self-hosted at-rest + session surfaces. Decision: server-side-at-rest (TLS + volume/DB encryption + RLS); no end-to-end config encryption — the server stays able to read config for the visual editor, directory, and audit-diff." }
+  ],
+
+  "stories": [
+    {
+      "id": "S0.1",
+      "epic": "E0",
+      "order": 1,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Initialize pnpm monorepo and shared tooling",
+      "user_story": "As a maintainer, I want a pnpm-workspace monorepo with shared TS, lint, format, and test config so every package is consistent and CI-ready from commit one.",
+      "context": "Foundational. Sets packages/* and apps/* layout, tsconfig.base, eslint (incl. the core-purity no-restricted-imports rule), prettier, vitest workspace, and a root README.",
+      "acceptance_criteria": [
+        "pnpm-workspace.yaml declares packages/*, apps/*, services/*.",
+        "tsconfig.base.json with strict:true, noUncheckedIndexedAccess:true; each package extends it.",
+        "eslint + prettier configured at root; `pnpm lint` and `pnpm format:check` run clean on an empty scaffold.",
+        "vitest configured as a workspace; `pnpm test` runs (0 tests) green.",
+        "A no-restricted-imports eslint rule forbids node:fs/node:os/net-libs inside packages/core.",
+        "Root package.json exposes the scripts listed in prd.commands."
+      ],
+      "files_hint": ["pnpm-workspace.yaml", "package.json", "tsconfig.base.json", ".eslintrc.cjs", ".prettierrc", "vitest.workspace.ts", "README.md"],
+      "tests": ["A trivial smoke test in packages/core proving vitest + tsconfig resolve."],
+      "definition_of_done": ["verify_all passes on the empty scaffold across the CI matrix."]
+    },
+    {
+      "id": "S0.2",
+      "epic": "E0",
+      "order": 2,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S0.1"],
+      "title": "GitHub Actions CI pipeline",
+      "user_story": "As a maintainer, I want CI that lints, typechecks, tests, and builds on a Windows/macOS/Linux matrix so cross-platform path bugs are caught before merge.",
+      "context": "Path resolution differs per OS and is central to this product; the matrix is non-negotiable.",
+      "acceptance_criteria": [
+        ".github/workflows/ci.yml runs on push + PR.",
+        "Matrix: {ubuntu-latest, macos-latest, windows-latest} x node 20.",
+        "Steps: pnpm install (cached), lint, typecheck, test (with coverage), build.",
+        "A separate job asserts core purity (grep/eslint that packages/core has no forbidden imports).",
+        "Branch protection docs note CI must be green to merge.",
+        "Fails the build on any lint/type/test error."
+      ],
+      "files_hint": [".github/workflows/ci.yml"],
+      "tests": ["CI itself is the test; include a deliberately-failing local check to confirm the gate works, then remove."],
+      "definition_of_done": ["A PR shows all matrix jobs green."]
+    },
+    {
+      "id": "S0.3",
+      "epic": "E0",
+      "order": 3,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S0.1"],
+      "title": "Ralph loop harness: PROMPT.md, PROGRESS.md, AGENT_NOTES.md",
+      "user_story": "As an autonomous agent, I want a driver prompt and an append-only progress log so loops are resumable and never redo completed work.",
+      "context": "Encodes loop_protocol from this PRD into ralph/ so a fresh loop can bootstrap from files alone.",
+      "acceptance_criteria": [
+        "ralph/PROMPT.md instructs the agent to read prd.json + PROGRESS.md, pick the next eligible story, and follow iteration_steps.",
+        "ralph/PROGRESS.md exists with a header and append-only convention documented.",
+        "ralph/AGENT_NOTES.md captures cross-cutting decisions (path conventions, fixture format).",
+        "PROMPT.md references verify_all and the global_definition_of_done.",
+        "A README section explains how to run a loop (`while :; do claude -p ralph/PROMPT.md; done` style)."
+      ],
+      "files_hint": ["ralph/PROMPT.md", "ralph/PROGRESS.md", "ralph/AGENT_NOTES.md"],
+      "tests": ["N/A (docs) — a markdown-lint check that files exist and are non-empty."],
+      "definition_of_done": ["A dry-run loop can identify S1.1 as the next story from files alone."]
+    },
+    {
+      "id": "S0.4",
+      "epic": "E0",
+      "order": 4,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S0.2"],
+      "title": "Release tooling with Changesets + npm publish workflow",
+      "user_story": "As a maintainer, I want versioning and an automated publish so `npx mcpfold` reflects merged work without manual release steps.",
+      "context": "MIT core/CLI to npm; cloud packages private. Set up before first publishable code exists.",
+      "acceptance_criteria": [
+        "Changesets configured; packages/core, packages/adapters, packages/secrets, packages/proxy, packages/cli, packages/schema are publishable; apps/web + services/edge are private.",
+        ".github/workflows/release.yml publishes to npm on merge to main when changesets exist, using an NPM_TOKEN secret.",
+        "packages/cli declares the `mcpfold` bin and `mcpf` alias bin.",
+        "provenance/publint check runs pre-publish.",
+        "Dry-run publish succeeds in CI (no actual publish)."
+      ],
+      "files_hint": [".changeset/config.json", ".github/workflows/release.yml", "packages/cli/package.json"],
+      "tests": ["publint + arethetypeswrong check in CI."],
+      "definition_of_done": ["A dry-run release job passes."]
+    },
+
+    {
+      "id": "S0.5",
+      "epic": "E0.5",
+      "order": 4.1,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S0.1"],
+      "title": "Governance & contribution scaffolding + adapter on-ramp",
+      "user_story": "As a would-be contributor, I want clear licensing, contribution norms, a private security-disclosure path, and a one-command way to scaffold a new client adapter, so the community can add clients as PRs without friction.",
+      "context": "The whole spec bets on new clients arriving as community PRs — that only happens if the on-ramp exists from commit one. Retrofitting community norms onto an active repo is disruptive; seeding them is a folder of markdown plus one generator command.",
+      "acceptance_criteria": [
+        "LICENSE (MIT) on core+CLI; a NOTICE clarifying no implied MCP endorsement.",
+        "CONTRIBUTING.md, CODE_OF_CONDUCT.md, and SECURITY.md with a private disclosure path (mcpfold handles secrets-adjacent config — expect reports).",
+        "GitHub issue + PR templates, including an 'adapter request' template.",
+        "docs/adapters.md tutorial 'add a new client in one PR' (ties to S8.1) exists as a stub referenced here.",
+        "`mcpfold scaffold-adapter <name>` generates a new adapter module + test + fixture skeleton that compiles and is picked up by the registry.",
+        "CODEOWNERS routes adapter dirs for review."
+      ],
+      "files_hint": ["LICENSE", "NOTICE", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", ".github/ISSUE_TEMPLATE/*", ".github/PULL_REQUEST_TEMPLATE.md", "CODEOWNERS", "packages/cli/src/commands/scaffold-adapter.ts"],
+      "tests": ["scaffold-adapter produces a compiling, registered adapter skeleton in a tmp checkout; required governance files exist."],
+      "definition_of_done": ["A new contributor can scaffold an adapter and open a PR guided entirely by repo files."]
+    },
+    {
+      "id": "S0.6",
+      "epic": "E0.5",
+      "order": 4.2,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S0.1"],
+      "title": "Error hierarchy + redaction-safe diagnostics (debug mode + bundle)",
+      "user_story": "As a user filing a bug, I want a verbose debug mode and a 'copy sanitized diagnostic bundle' command that never leaks secrets or ref paths, so I can report issues without exposing my setup.",
+      "context": "A single typed error hierarchy and a redaction-safe diagnostics layer must exist BEFORE any error-reporting sink (Sentry — which you already run) ships its first event, or ref paths leak into your error tracker. The redaction rule here is the same one S9.3 enforces for CLI output.",
+      "acceptance_criteria": [
+        "A base McpfoldError hierarchy with codes; all thrown errors carry a code + actionable message.",
+        "`--debug` / MCPFOLD_DEBUG=1 enables verbose, still-redacted logging.",
+        "`mcpfold diagnose` (or `--bundle`) emits a sanitized diagnostic bundle: versions, detected clients, config with secret VALUES and provider ref paths redacted.",
+        "A redaction module is shared with S9.3 and, when wired, with any telemetry/Sentry sink (S8.3) so no event can contain a secret or ref path.",
+        "Test proves the bundle and debug logs contain no sentinel secret and no ref path."
+      ],
+      "files_hint": ["packages/core/src/errors.ts", "packages/cli/src/commands/diagnose.ts", "packages/cli/src/util/redact.ts"],
+      "tests": ["Bundle/debug output scrubbed of sentinel secret + ref path; each command maps failures to a coded error."],
+      "definition_of_done": ["Diagnostics are useful and provably leak-free before any reporting sink is added."]
+    },
+    {
+      "id": "S0.7",
+      "epic": "E0.5",
+      "order": 4.3,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S1.1"],
+      "title": "Config schema versioning + `mcpfold migrate`",
+      "user_story": "As a user, I want my first breaking format change to be a `mcpfold migrate`, not a support fire, so the config format can evolve without stranding anyone.",
+      "context": "`version: 1` is in the schema but nothing defines what happens at version 2. Ship the migration-runner skeleton BEFORE v1 is widely adopted so the path is proven when you actually need it.",
+      "acceptance_criteria": [
+        "A migration registry maps version N→N+1 transforms; a runner applies them in sequence.",
+        "`mcpfold migrate` detects an outdated `version`, backs up, applies migrations, and writes the upgraded config (comments preserved best-effort).",
+        "loadConfig detects a newer-than-supported version and errors with a clear 'upgrade mcpfold' message.",
+        "A no-op 1→1 identity migration + one worked example (a hypothetical 1→2) prove the pipeline end to end.",
+        "Migrations are covered by round-trip tests."
+      ],
+      "files_hint": ["packages/core/src/migrate/index.ts", "packages/core/src/migrate/migrations.ts", "packages/cli/src/commands/migrate.ts", "packages/core/test/migrate.test.ts"],
+      "tests": ["Identity migration no-ops; example 1→2 transforms fixtures; newer-version config errors clearly."],
+      "definition_of_done": ["A format bump ships as a migration, not a breaking change."]
+    },
+    {
+      "id": "S0.8",
+      "epic": "E0.5",
+      "order": 4.4,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S0.1"],
+      "title": "Deterministic, reproducible output + `--check` mode",
+      "user_story": "As a user, I want mcpfold's rendered files to be byte-stable given the same input so diffs are clean, snapshot tests don't thrash, and I can gate CI on 'is everything synced'.",
+      "context": "A determinism invariant every adapter (S2.*) and sync (S3.5) must honor: stable key ordering, consistent indentation, trailing newline. Without it, every diff is noisy from day 1.",
+      "acceptance_criteria": [
+        "A shared serializer guarantees stable key order, fixed indentation, and a trailing newline for all rendered output.",
+        "Rendering the same canonical input twice is byte-identical.",
+        "`mcpfold sync --check` exits nonzero if on-disk files differ from what would be written (prettier --check style), writing nothing — CI-gateable.",
+        "The determinism invariant is documented so adapter authors follow it.",
+        "A property/fuzz-style test asserts idempotent, stable serialization across shuffled input."
+      ],
+      "files_hint": ["packages/core/src/serialize.ts", "packages/cli/src/commands/sync.ts", "packages/adapters/test/determinism.test.ts"],
+      "tests": ["Double-render byte-equality; --check trips on drift and passes when clean; shuffled-key input yields identical output."],
+      "definition_of_done": ["Output is reproducible and CI can gate on sync freshness."]
+    },
+    {
+      "id": "S0.9",
+      "epic": "E0.5",
+      "order": 4.5,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S0.1"],
+      "title": "Offline / degraded-mode contract for resolution and sync",
+      "user_story": "As a user, I want defined, predictable behavior when a secret provider or the network is unavailable, so a flaky Infisical or lost connection produces a clear failure, not a corrupt config.",
+      "context": "A secrets-resolving, cloud-syncing CLI must define what happens when Infisical is down, the network is gone, or a provider times out. Deciding the contract now shapes the resolver interface (S4.1), which is hard to change once providers depend on it.",
+      "acceptance_criteria": [
+        "A documented contract: provider resolution failures fail closed (no partial/blank secret ever injected), with a specific exit code and message naming the provider + ref.",
+        "Configurable per-provider timeouts; a hung provider aborts cleanly rather than blocking indefinitely.",
+        "Operations that need no secrets/network (validate, diff of ref-only fields, doctor structural checks) still work fully offline.",
+        "Cloud commands (push/pull) degrade to a clear 'offline' error, never a silent no-op.",
+        "The resolver interface (consumed by S4.1) reflects this contract from the start.",
+        "Tests simulate provider timeout, provider error, and full offline."
+      ],
+      "files_hint": ["docs/offline-contract.md", "packages/secrets/src/resolver.ts", "packages/secrets/test/degraded.test.ts"],
+      "tests": ["Timeout/error/offline each produce the defined exit code + message; offline validate/diff/doctor still succeed."],
+      "definition_of_done": ["Degraded behavior is defined, implemented, and tested before providers proliferate."]
+    },
+    {
+      "id": "S0.10",
+      "epic": "E0.5",
+      "order": 4.6,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S0.1"],
+      "title": "Stable `--json` output + exit-code contract across all commands",
+      "user_story": "As someone scripting mcpfold in CI, I want a documented, versioned machine-readable output shape and consistent exit codes on every command, so my pipelines don't break when mcpfold updates.",
+      "context": "People will script this tool; breaking their pipelines is how OSS CLIs lose trust. Lock the contract before the audience exists. Every command (S3.*, S6.6) must conform.",
+      "acceptance_criteria": [
+        "A documented exit-code convention: 0 = success/clean, 1 = actionable difference (e.g. drift), 2 = error/misuse; applied uniformly.",
+        "`--json` is supported on every command with a stable, versioned envelope ({ ok, command, data, warnings, errors }).",
+        "The JSON envelope has its own schema + snapshot tests so accidental shape changes fail CI.",
+        "Human vs JSON output paths are separated so formatting changes can't alter machine output.",
+        "A conformance test iterates all commands asserting they honor the exit-code + envelope contract."
+      ],
+      "files_hint": ["docs/cli-contract.md", "packages/cli/src/output/envelope.ts", "packages/cli/src/output/exit-codes.ts", "packages/cli/test/contract.test.ts"],
+      "tests": ["Per-command exit codes + JSON envelope conform; envelope schema snapshot guards against drift."],
+      "definition_of_done": ["The scripting contract is stable, documented, and enforced across every command."]
+    },
+
+    {
+      "id": "S1.1",
+      "epic": "E1",
+      "order": 5,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S0.1"],
+      "title": "Zod canonical schema for mcp.config.jsonc",
+      "user_story": "As a config author, I want a strict, well-errored schema for version/servers/profiles so invalid configs fail loudly with actionable messages.",
+      "context": "Mirrors spec §4. Server refine: stdio needs command, http/sse needs url. SecretRef regex ^\\$\\{[a-z0-9_-]+:.+\\}$. Profile client enum of the six clients; scope user/project/workspace; path required for project/workspace.",
+      "acceptance_criteria": [
+        "Config = { version: literal(1), servers: record(Server), profiles: record(Profile) }.",
+        "Server supports transport(stdio|http|sse), command, args, url, auth(type bearer|header|none, token:SecretRef, headers), env, pin, tools({mode:allow|deny, list}), tags(default []).",
+        "Refine enforces command↔stdio and url↔http/sse with a clear message.",
+        "Profile refine requires `path` when scope is project|workspace.",
+        "All exported types are z.infer-derived (no hand-duplicated interfaces).",
+        "Parsing a valid spec-§4 example passes; each malformed variant returns a specific error."
+      ],
+      "files_hint": ["packages/core/src/schema.ts", "packages/core/src/types.ts", "packages/core/src/index.ts"],
+      "tests": ["packages/core/test/schema.test.ts covering valid config + one failing case per rule (missing command, bad secret ref, missing path, bad version)."],
+      "definition_of_done": ["Schema exported from @mcpfold/core public API with inferred types."]
+    },
+    {
+      "id": "S1.2",
+      "epic": "E1",
+      "order": 6,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S1.1"],
+      "title": "JSONC loader with comment-preserving parse and located errors",
+      "user_story": "As a config author, I want to keep comments in mcp.config.jsonc and get errors with line/column so editing by hand is pleasant.",
+      "context": "Use jsonc-parser to tolerate comments/trailing commas. Map zod issues back to source positions where possible.",
+      "acceptance_criteria": [
+        "loadConfig(text) parses JSONC (comments, trailing commas) then validates via the zod schema.",
+        "Parse errors report line/column and the offending token.",
+        "Validation errors include the JSON path (e.g. servers.github.auth.token) and a fix hint.",
+        "Round-trip helper preserves comments when writing back edits that don't touch commented regions (best-effort, documented).",
+        "Reading the spec §4 example (with its // comments) succeeds."
+      ],
+      "files_hint": ["packages/core/src/load.ts", "packages/core/test/load.test.ts"],
+      "tests": ["JSONC with comments loads; malformed JSONC returns positioned error; invalid-but-parseable returns pathed zod error."],
+      "definition_of_done": ["loadConfig is the single entry point used by all consumers."]
+    },
+    {
+      "id": "S1.3",
+      "epic": "E1",
+      "order": 7,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S1.1"],
+      "title": "Secret-reference grammar and parser",
+      "user_story": "As the engine, I want to parse ${provider:path} references so the secret resolver knows which provider and path to fetch, without resolving values yet.",
+      "context": "Grammar: ${scheme:path} where scheme in [env,dotenv,infisical,keychain,op] and path is provider-specific (e.g. dev/mcp/GITHUB_PAT). Pure parsing only — resolution is E4.",
+      "acceptance_criteria": [
+        "parseSecretRef(str) → { scheme, path } or null for non-refs.",
+        "findSecretRefs(server) enumerates every ref in auth.token, auth.headers, and env.",
+        "Unknown scheme yields a validation-time warning surfaced to doctor, not a hard parse crash.",
+        "A string that is partly a ref (e.g. 'Bearer ${env:X}') is handled or explicitly disallowed and documented.",
+        "No network or fs access in this module."
+      ],
+      "files_hint": ["packages/core/src/secret-ref.ts", "packages/core/test/secret-ref.test.ts"],
+      "tests": ["Valid refs across schemes parse; non-refs return null; enumeration finds refs in nested headers/env."],
+      "definition_of_done": ["Exported from core; consumed by resolver (E4) and doctor (E3)."]
+    },
+    {
+      "id": "S1.4",
+      "epic": "E1",
+      "order": 8,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S1.1"],
+      "title": "Profile / tag / scope resolution engine",
+      "user_story": "As the engine, I want to resolve a profile into the concrete set of servers (tag-filtered) with scope/path context so an adapter receives exactly what to render.",
+      "context": "The 'fold': profiles.include filters servers by tags. Produces ResolvedServer[] carrying name, transport, resolved fields, scope, projectPath, and tools directive. Pure; secrets stay as refs at this stage.",
+      "acceptance_criteria": [
+        "resolveProfile(config, profileName) → ResolvedServer[] containing only servers whose tags intersect profile.include.",
+        "Each ResolvedServer carries name, scope, projectPath (from profile.path), and the raw tools directive.",
+        "Unknown profile name or a profile referencing a tag no server has → descriptive error/warning.",
+        "resolveAll(config) yields the map of every profile → ResolvedServer[] for `sync` without --profile.",
+        "Deterministic ordering (stable by server key) for reproducible output."
+      ],
+      "files_hint": ["packages/core/src/resolve.ts", "packages/core/src/types.ts", "packages/core/test/resolve.test.ts"],
+      "tests": ["Spec §4 profiles resolve to expected server subsets; empty-intersection profile flagged."],
+      "definition_of_done": ["ResolvedServer type exported and consumed by the adapter interface."]
+    },
+    {
+      "id": "S1.5",
+      "epic": "E1",
+      "order": 9,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S1.1"],
+      "title": "Generate and publish JSON Schema from zod",
+      "user_story": "As a config author, I want editor autocomplete and inline validation in my mcp.config.jsonc via a $schema URL.",
+      "context": "packages/schema. Generate JSON Schema from the zod Config and expose it for hosting at mcpfold.com/schema/v1.json. Keep neutral/un-branded in the file itself.",
+      "acceptance_criteria": [
+        "A build step emits mcp.config.schema.json from the zod schema.",
+        "A CI check fails if the committed JSON schema drifts from the zod source.",
+        "The schema validates the spec §4 example and rejects the malformed variants.",
+        "README documents adding \"$schema\": \"https://mcpfold.com/schema/v1.json\" to a config."
+      ],
+      "files_hint": ["packages/schema/src/generate.ts", "packages/schema/mcp.config.schema.json", "packages/schema/test/schema.test.ts"],
+      "tests": ["Generated schema round-trips valid/invalid fixtures; drift check trips on manual edits."],
+      "definition_of_done": ["Schema artifact built in CI and ready to host."]
+    },
+    {
+      "id": "S1.6",
+      "epic": "E1",
+      "order": 10,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S1.2", "S1.4"],
+      "title": "Drift-diff engine (canonical rendered vs on-disk)",
+      "user_story": "As a user, I want to see how each client's actual file differs from what mcpfold would write so I can trust sync and catch manual edits.",
+      "context": "Engine-level diff that takes a rendered canonical output and an on-disk native file (parsed via adapter) and returns a structured, human-renderable diff. Adapter-agnostic; adapters supply parse().",
+      "acceptance_criteria": [
+        "diffRendered(expected: RenderedFile, actualContents: string, adapter) → structured diff (added/removed/changed servers + field-level changes).",
+        "Ignores insignificant formatting (whitespace/key order) — compares semantic config, not bytes.",
+        "Reports 'file missing' and 'file present but unmanaged servers found' distinctly.",
+        "Output is data (not a string) so CLI can format and web can render it.",
+        "Deterministic and pure."
+      ],
+      "files_hint": ["packages/core/src/diff.ts", "packages/core/test/diff.test.ts"],
+      "tests": ["Identical → empty diff; changed token → field change; extra on-disk server → unmanaged flag; missing file → missing."],
+      "definition_of_done": ["Consumed by `mcpfold diff` (S3.6)."]
+    },
+
+    {
+      "id": "S2.1",
+      "epic": "E2",
+      "order": 11,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S1.4", "S0.8"],
+      "title": "ClientAdapter interface, registry, and shared shape helpers",
+      "user_story": "As an adapter author, I want a stable interface plus shared helpers so a new client is one small module with no engine changes.",
+      "context": "Mirrors spec §5. Interface: id, resolvePath(scope, projectPath), render(ResolvedServer[]) → RenderedFile, parse(contents) → Partial<CanonicalConfig>, secretStrategy. Shared fromMcpServersShape/ toMcpServersShape helpers for the common mcpServers-style clients.",
+      "acceptance_criteria": [
+        "ClientAdapter and RenderedFile types exported (RenderedFile: path, contents, needsRestart).",
+        "A registry maps client id → adapter and is the single lookup used by the CLI.",
+        "fromMcpServersShape(obj) and a stdio/http entry serializer are shared and unit-tested.",
+        "Cross-platform path helpers (expandHome, OS-specific user-profile paths) live here with win32/darwin/linux branches + tests.",
+        "secretStrategy is one of inline|native-input|shim."
+      ],
+      "files_hint": ["packages/adapters/src/types.ts", "packages/adapters/src/registry.ts", "packages/adapters/src/shared.ts", "packages/adapters/src/paths.ts", "packages/adapters/test/shared.test.ts"],
+      "tests": ["Shared shape round-trips; path helpers return correct per-OS paths (mock process.platform)."],
+      "definition_of_done": ["Registry ready for concrete adapters to self-register."]
+    },
+    {
+      "id": "S2.2",
+      "epic": "E2",
+      "order": 12,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S2.1"],
+      "title": "Cursor adapter",
+      "user_story": "As a Cursor user, I want mcpfold to write ~/.cursor/mcp.json (or .cursor/mcp.json) with root key mcpServers, hot-reload aware.",
+      "context": "Spec §5 concrete example. secretStrategy shim by default. needsRestart false.",
+      "acceptance_criteria": [
+        "resolvePath: user → ~/.cursor/mcp.json; project → <projectPath>/.cursor/mcp.json (per-OS correct).",
+        "render emits { mcpServers: {...} } with stdio→{command,args,env?} and http→{url,headers?}.",
+        "parse reads mcpServers back to a canonical partial.",
+        "needsRestart=false; secretStrategy='shim'.",
+        "Snapshot fixture: canonical → cursor json matches golden file and parses back losslessly."
+      ],
+      "files_hint": ["packages/adapters/src/cursor.ts", "packages/adapters/test/cursor.test.ts", "packages/adapters/test/fixtures/cursor/*"],
+      "tests": ["Render snapshot + parse round-trip against fixtures."],
+      "definition_of_done": ["Registered in the adapter registry."]
+    },
+    {
+      "id": "S2.3",
+      "epic": "E2",
+      "order": 13,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S2.1"],
+      "title": "Claude Desktop adapter",
+      "user_story": "As a Claude Desktop user, I want mcpfold to write the OS-specific claude_desktop_config.json with mcpServers and flag that a restart is needed.",
+      "context": "User scope only (no project). needsRestart=true. secretStrategy shim.",
+      "acceptance_criteria": [
+        "resolvePath returns the correct claude_desktop_config.json per OS (macOS ~/Library/Application Support/Claude/..., Windows %APPDATA%\\Claude\\..., Linux ~/.config/Claude/...).",
+        "render/parse use the mcpServers shape.",
+        "needsRestart=true is surfaced so sync can tell the user.",
+        "Fixture snapshot + round-trip pass."
+      ],
+      "files_hint": ["packages/adapters/src/claude-desktop.ts", "packages/adapters/test/claude-desktop.test.ts", "packages/adapters/test/fixtures/claude-desktop/*"],
+      "tests": ["Per-OS path resolution (mocked platform) + render/parse snapshot."],
+      "definition_of_done": ["Registered; restart flag consumed by sync."]
+    },
+    {
+      "id": "S2.4",
+      "epic": "E2",
+      "order": 14,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S2.1"],
+      "title": "Claude Code adapter (mcpServers + explicit type)",
+      "user_story": "As a Claude Code user, I want mcpfold to manage ~/.claude.json (user) and .mcp.json (project) including the explicit type: http|stdio field.",
+      "context": "Claude Code adds `type`. New session (not app restart) to pick up changes.",
+      "acceptance_criteria": [
+        "resolvePath: user → ~/.claude.json; project → <projectPath>/.mcp.json.",
+        "render includes type:'http'|'stdio' per server.",
+        "parse tolerates both explicit type and inferred (command vs url).",
+        "needsRestart reflects 'new session'.",
+        "Fixture snapshot + round-trip pass."
+      ],
+      "files_hint": ["packages/adapters/src/claude-code.ts", "packages/adapters/test/claude-code.test.ts", "packages/adapters/test/fixtures/claude-code/*"],
+      "tests": ["type field emitted; parse handles both forms."],
+      "definition_of_done": ["Registered."]
+    },
+    {
+      "id": "S2.5",
+      "epic": "E2",
+      "order": 15,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S2.1"],
+      "title": "VS Code adapter (root key `servers` + `${input:}` secrets)",
+      "user_story": "As a VS Code user, I want mcpfold to write .vscode/mcp.json (or user profile) with the correct `servers` root key and native ${input:} prompts for tokens.",
+      "context": "Spec §5. This is the classic silent-failure trap: root key is `servers`, not `mcpServers`. secretStrategy native-input; emit an `inputs` array.",
+      "acceptance_criteria": [
+        "render emits { servers: {...}, inputs: [...] } — never mcpServers.",
+        "Tokens are converted to ${input:<id>} entries with matching input prompt definitions.",
+        "resolvePath: workspace → <projectPath>/.vscode/mcp.json; user → OS user profile mcp path.",
+        "parse reads the `servers` key back to canonical.",
+        "A test explicitly asserts the root key is `servers` (regression guard for the trap).",
+        "Fixture snapshot + round-trip pass."
+      ],
+      "files_hint": ["packages/adapters/src/vscode.ts", "packages/adapters/test/vscode.test.ts", "packages/adapters/test/fixtures/vscode/*"],
+      "tests": ["Root key assertion; input generation; round-trip."],
+      "definition_of_done": ["Registered; native-input strategy honored by secrets layer."]
+    },
+    {
+      "id": "S2.6",
+      "epic": "E2",
+      "order": 16,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S2.1"],
+      "title": "Windsurf adapter (mcp-remote wrapper for authed remotes)",
+      "user_story": "As a Windsurf user, I want mcpfold to wrap authenticated remote servers in an npx mcp-remote launcher since Windsurf can't do authed remotes natively.",
+      "context": "Windsurf uses mcpServers but cannot natively call authenticated remote servers; rewrite http+auth servers to a stdio mcp-remote invocation. needsRestart=true.",
+      "acceptance_criteria": [
+        "Plain stdio and unauthenticated servers render normally.",
+        "http/sse servers with auth are rewritten to { command:'npx', args:['-y','mcp-remote', url, ...auth headers] } (or documented equivalent).",
+        "resolvePath returns the Windsurf settings location per OS.",
+        "parse recognizes an mcp-remote wrapper and reverses it to a canonical http server on import.",
+        "Fixture snapshot covers a wrapped authed server and a plain stdio server."
+      ],
+      "files_hint": ["packages/adapters/src/windsurf.ts", "packages/adapters/test/windsurf.test.ts", "packages/adapters/test/fixtures/windsurf/*"],
+      "tests": ["Wrapping + un-wrapping round-trip; plain server untouched."],
+      "definition_of_done": ["Registered."]
+    },
+    {
+      "id": "S2.7",
+      "epic": "E2",
+      "order": 17,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S2.1"],
+      "title": "Zed adapter (root key `context_servers`)",
+      "user_story": "As a Zed user, I want mcpfold to write Zed settings with the `context_servers` root key.",
+      "context": "Zed diverges on the root key. secretStrategy shim; needsRestart=false.",
+      "acceptance_criteria": [
+        "render emits { context_servers: {...} } in the Zed settings shape.",
+        "parse reads context_servers back to canonical.",
+        "resolvePath returns Zed settings per OS.",
+        "A test asserts the root key is context_servers (regression guard).",
+        "Fixture snapshot + round-trip pass."
+      ],
+      "files_hint": ["packages/adapters/src/zed.ts", "packages/adapters/test/zed.test.ts", "packages/adapters/test/fixtures/zed/*"],
+      "tests": ["Root key assertion; round-trip."],
+      "definition_of_done": ["Registered — all six adapters now in the registry."]
+    },
+    {
+      "id": "S2.8",
+      "epic": "E2",
+      "order": 18,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S2.2", "S2.3", "S2.4", "S2.5", "S2.6", "S2.7"],
+      "title": "Cross-adapter fixture snapshot harness",
+      "user_story": "As a maintainer, I want a shared fixture harness so every adapter is tested identically and format drift is caught by snapshot regressions.",
+      "context": "One canonical input fixture folded through all six adapters, each producing a golden output; parse() must reconstruct the canonical subset.",
+      "acceptance_criteria": [
+        "A single canonical fixture drives all adapters via a table-driven test.",
+        "Each adapter has a committed golden native file; snapshot mismatch fails CI.",
+        "A round-trip invariant test (render → parse → semantically-equal canonical) runs for every adapter.",
+        "Updating goldens is a documented, explicit command (no accidental --update in CI)."
+      ],
+      "files_hint": ["packages/adapters/test/matrix.test.ts", "packages/adapters/test/fixtures/canonical.jsonc"],
+      "tests": ["Table-driven render + round-trip across all adapters."],
+      "definition_of_done": ["All six adapters pass the shared matrix."]
+    },
+
+    {
+      "id": "S3.1",
+      "epic": "E3",
+      "order": 19,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S2.1", "S0.6", "S0.10"],
+      "title": "CLI skeleton: binary, arg parsing, help, mcpf alias",
+      "user_story": "As a user, I want `npx mcpfold` (and `mcpf`) to run with a clear help surface and subcommand routing.",
+      "context": "Spec §8 surface. Set up the command framework, global flags (--profile, --dry-run, --json, --cwd), version, and both bins.",
+      "acceptance_criteria": [
+        "`mcpfold --help` lists init/import/add/sync/diff/doctor/secret/run and (stubbed) login/push/pull.",
+        "`mcpf` alias behaves identically.",
+        "Global flags parsed and threaded: --profile, --dry-run, --json, --cwd.",
+        "Unknown command prints help + nonzero exit.",
+        "`--version` reflects package version."
+      ],
+      "files_hint": ["packages/cli/src/main.ts", "packages/cli/src/commands/index.ts", "packages/cli/bin/mcpfold.js", "packages/cli/bin/mcpf.js"],
+      "tests": ["CLI integration tests spawn the built bin in a tmp dir and assert help/version/unknown-command."],
+      "definition_of_done": ["`npx .` runs from the built package."]
+    },
+    {
+      "id": "S3.2",
+      "epic": "E3",
+      "order": 20,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S3.1", "S1.2"],
+      "title": "`mcpfold init` — scaffold config + detect installed clients",
+      "user_story": "As a new user, I want `mcpfold init` to create a starter mcp.config.jsonc and detect which clients I have installed so I start productive.",
+      "context": "Writes a commented starter config (with $schema line) and reports detected clients by probing known config paths.",
+      "acceptance_criteria": [
+        "Creates mcp.config.jsonc with $schema, a sample server, and profiles, only if absent (never clobbers).",
+        "Detects installed clients by checking each adapter's resolvePath existence and prints a summary.",
+        "Refuses to overwrite an existing config without --force.",
+        "--dry-run prints what it would write.",
+        "Works in an empty tmp dir and in a repo."
+      ],
+      "files_hint": ["packages/cli/src/commands/init.ts", "packages/cli/test/init.test.ts"],
+      "tests": ["Init in tmp dir creates valid config that loadConfig accepts; re-init without --force is a no-op error."],
+      "definition_of_done": ["Output config passes S1.2 loadConfig."]
+    },
+    {
+      "id": "S3.3",
+      "epic": "E3",
+      "order": 21,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S3.1", "S2.8"],
+      "title": "`mcpfold import` — reverse-fold existing client configs",
+      "user_story": "As a user with scattered configs, I want `mcpfold import` to read my existing client files and merge them into one canonical mcp.config.jsonc in seconds.",
+      "context": "Spec §8: the zero-friction onboarding path. Parse each detected client via its adapter, merge servers (dedupe by URL/command), and infer tags from which client they came from.",
+      "acceptance_criteria": [
+        "Scans all detected clients, parses each via adapter.parse, and produces a merged canonical config.",
+        "Deduplicates identical servers across clients; conflicting definitions are reported for the user to resolve, not silently merged.",
+        "Generates initial profiles mapping each source client to an include set.",
+        "Detected plaintext tokens are flagged and (optionally, with a prompt) rewritten to ${env:...} placeholders rather than copied verbatim.",
+        "--dry-run shows the merge plan; writing respects --force for an existing canonical file."
+      ],
+      "files_hint": ["packages/cli/src/commands/import.ts", "packages/cli/test/import.test.ts", "packages/cli/test/fixtures/*"],
+      "tests": ["Import from cursor+vscode fixtures yields one merged config; conflict surfaced; plaintext token flagged."],
+      "definition_of_done": ["Imported config passes loadConfig and re-syncs cleanly (diff empty on the source clients modulo secret strategy)."]
+    },
+    {
+      "id": "S3.4",
+      "epic": "E3",
+      "order": 22,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": ["S3.2"],
+      "title": "`mcpfold add <name>` — interactive guided server entry",
+      "user_story": "As a user, I want to paste a URL or npm package and be guided to a valid server entry so I don't hand-write JSON.",
+      "context": "Interactive prompts detect http URL vs stdio package, ask for auth/tags, and append to the canonical file with a secret reference (never a raw token).",
+      "acceptance_criteria": [
+        "Given a URL → creates an http server; given an npm spec → creates a stdio npx server with optional pin.",
+        "Prompts for auth type and stores tokens as ${provider:path} refs, never raw values.",
+        "Prompts for tags and updates the config in place, preserving comments where feasible.",
+        "Non-interactive flags allow scripted use (--url/--package/--transport/--tag/--token-ref).",
+        "Resulting config re-validates."
+      ],
+      "files_hint": ["packages/cli/src/commands/add.ts", "packages/cli/test/add.test.ts"],
+      "tests": ["Scripted add of an http server and a stdio package both produce valid config with ref-only tokens."],
+      "definition_of_done": ["Added entries validate and render across adapters."]
+    },
+    {
+      "id": "S3.5",
+      "epic": "E3",
+      "order": 23,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S3.1", "S2.8", "S1.4"],
+      "title": "`mcpfold sync [--profile p]` — fold canonical to client files with backups",
+      "user_story": "As a user, I want one command to write my canonical config out to every (or one) client, backing up existing files first.",
+      "context": "The core value loop. Resolves profiles, renders via adapters, backs up existing target files (timestamped), writes atomically, and reports restart-needed clients.",
+      "acceptance_criteria": [
+        "Without --profile, syncs all profiles; with --profile, syncs one.",
+        "Backs up any existing target file to <path>.mcpfold.bak.<timestamp> before writing.",
+        "Writes atomically (temp file + rename); never leaves a half-written config.",
+        "Reports per-client result including needsRestart hints.",
+        "--dry-run prints the diff of what would change (uses S1.6) and writes nothing.",
+        "At this stage secrets remain unresolved refs unless a strategy is chosen (E4 wires strategies); document current behavior."
+      ],
+      "files_hint": ["packages/cli/src/commands/sync.ts", "packages/cli/src/io/atomic-write.ts", "packages/cli/src/io/backup.ts", "packages/cli/test/sync.test.ts"],
+      "tests": ["Sync into tmp HOME writes expected files + backups; dry-run writes nothing; atomic write leaves no temp on failure."],
+      "definition_of_done": ["Round trip: init → sync → diff shows no drift."]
+    },
+    {
+      "id": "S3.6",
+      "epic": "E3",
+      "order": 24,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S3.5", "S1.6"],
+      "title": "`mcpfold diff` — show drift between canonical and on-disk",
+      "user_story": "As a user, I want to see exactly how my live client configs differ from my canonical source so I trust what sync will do.",
+      "context": "Uses the S1.6 diff engine; renders a readable colored diff and supports --json for tooling/CI.",
+      "acceptance_criteria": [
+        "Shows per-client added/removed/changed servers and field changes.",
+        "Distinguishes unmanaged servers present on disk but absent from canonical.",
+        "--json emits the structured diff for CI use.",
+        "Exit code nonzero when drift exists (so CI can gate), zero when clean.",
+        "Handles missing target files gracefully."
+      ],
+      "files_hint": ["packages/cli/src/commands/diff.ts", "packages/cli/test/diff.test.ts"],
+      "tests": ["Clean state → exit 0; modified on-disk file → exit nonzero + shown change; --json shape stable."],
+      "definition_of_done": ["Usable as a CI drift gate."]
+    },
+    {
+      "id": "S3.7",
+      "epic": "E3",
+      "order": 25,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S3.1", "S1.3", "S2.8"],
+      "title": "`mcpfold doctor` — validate + catch the silent failures",
+      "user_story": "As a user, I want a health check that catches bad JSON, the VS Code `servers` mistake, hardcoded tokens, and unpinned @latest so I stop losing hours to silent failures.",
+      "context": "Spec §8 retention hook. Lints canonical config and each on-disk client file for known footguns; each finding names the file, the issue, and the fix.",
+      "acceptance_criteria": [
+        "Validates canonical config and reports pathed errors.",
+        "Flags any on-disk VS Code file using mcpServers instead of servers.",
+        "Flags plaintext secrets in git-tracked files and any inline token that isn't gitignored.",
+        "Flags unpinned @latest stdio servers where a pin is recommended.",
+        "Flags unknown secret-ref schemes and missing providers.",
+        "Each finding: {severity, file, message, fix}. Exit nonzero on error-severity findings; --json supported."
+      ],
+      "files_hint": ["packages/cli/src/commands/doctor.ts", "packages/cli/src/checks/*.ts", "packages/cli/test/doctor.test.ts"],
+      "tests": ["Each footgun has a fixture that doctor flags with the right fix message; clean config passes."],
+      "definition_of_done": ["Covers every silent-failure class in the spec."]
+    },
+
+    {
+      "id": "S4.1",
+      "epic": "E4",
+      "order": 26,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S1.3", "S0.9"],
+      "title": "SecretProvider interface + resolver pipeline",
+      "user_story": "As the engine, I want a provider interface and a resolver that turns ${scheme:path} refs into values at fold time, with caching and clear failures.",
+      "context": "Spec §6. SecretProvider { scheme, resolve(ref) }. A resolver registry selects the provider by scheme and resolves all refs in a ResolvedServer set, memoizing within a run.",
+      "acceptance_criteria": [
+        "SecretProvider interface + a registry keyed by scheme.",
+        "resolveSecrets(servers, providers) returns servers with values injected, or a structured error naming the unresolved ref.",
+        "Per-run memoization avoids re-fetching the same ref.",
+        "Missing provider for a used scheme is a clear, actionable error.",
+        "This lives in packages/secrets (may touch env/fs/network per provider) and is injected into core — core stays pure."
+      ],
+      "files_hint": ["packages/secrets/src/types.ts", "packages/secrets/src/resolver.ts", "packages/secrets/test/resolver.test.ts"],
+      "tests": ["Resolve with a fake provider; missing scheme errors; memoization proven by call count."],
+      "definition_of_done": ["Resolver consumed by sync + shim launcher."]
+    },
+    {
+      "id": "S4.2",
+      "epic": "E4",
+      "order": 27,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S4.1"],
+      "title": "env and dotenv secret providers (day-1 providers)",
+      "user_story": "As a user, I want ${env:VAR} and ${dotenv:path/VAR} to resolve from my environment and .env files immediately.",
+      "context": "Ship first per spec ordering. dotenv provider loads a specified .env without leaking it to the process env globally.",
+      "acceptance_criteria": [
+        "env provider resolves ${env:NAME} from process.env; missing var → clear error.",
+        "dotenv provider resolves from a designated .env file with a documented path convention.",
+        "Neither writes secret values anywhere.",
+        "Registered in the provider registry by default."
+      ],
+      "files_hint": ["packages/secrets/src/providers/env.ts", "packages/secrets/src/providers/dotenv.ts", "packages/secrets/test/env.test.ts"],
+      "tests": ["Env resolves + errors on missing; dotenv reads a fixture .env."],
+      "definition_of_done": ["`mcpfold sync` can resolve env/dotenv refs end to end."]
+    },
+    {
+      "id": "S4.3",
+      "epic": "E4",
+      "order": 28,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S4.1"],
+      "title": "Infisical secret provider (dogfood)",
+      "user_story": "As the maintainer who already runs Infisical, I want ${infisical:path} to resolve via my existing Infisical setup so I can dogfood on my real servers.",
+      "context": "Spec §6 example. Parse the path (e.g. dev/mcp/GITHUB_PAT) and fetch via the Infisical client/CLI; support machine identity auth.",
+      "acceptance_criteria": [
+        "${infisical:env/path/KEY} resolves against a configured Infisical project.",
+        "Auth via Infisical machine identity / token from env, documented and never hardcoded.",
+        "Clear error when a path/secret is missing or auth fails.",
+        "Network calls isolated + mockable for tests."
+      ],
+      "files_hint": ["packages/secrets/src/providers/infisical.ts", "packages/secrets/test/infisical.test.ts"],
+      "tests": ["Mocked Infisical client resolves a path; auth-failure surfaces a clear error."],
+      "definition_of_done": ["Dogfood: maintainer's real config resolves through it."]
+    },
+    {
+      "id": "S4.4",
+      "epic": "E4",
+      "order": 29,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": ["S4.1"],
+      "title": "OS keychain secret provider (macOS/Windows/libsecret)",
+      "user_story": "As a user, I want ${keychain:service/account} to resolve from my OS credential store so tokens live in the platform vault.",
+      "context": "Per-OS: macOS Keychain, Windows Credential Manager, Linux libsecret.",
+      "acceptance_criteria": [
+        "Resolves via the correct backend per OS with a unified ref grammar.",
+        "Documented setup command to store a secret (or defer to `mcpfold secret set`).",
+        "Graceful, actionable error when the backend is unavailable.",
+        "Backend calls mockable for tests."
+      ],
+      "files_hint": ["packages/secrets/src/providers/keychain.ts", "packages/secrets/test/keychain.test.ts"],
+      "tests": ["Mocked per-OS backend resolves; unavailable backend errors clearly."],
+      "definition_of_done": ["Works on all three OSes (mocked in CI, manually verified once)."]
+    },
+    {
+      "id": "S4.5",
+      "epic": "E4",
+      "order": 30,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": ["S4.1"],
+      "title": "1Password CLI secret provider",
+      "user_story": "As a 1Password user, I want ${op:vault/item/field} to resolve via the `op` CLI.",
+      "context": "Shell out to the `op` CLI (must be installed + signed in). Last in provider order per spec.",
+      "acceptance_criteria": [
+        "Resolves ${op:...} via the op CLI read command.",
+        "Detects missing/locked op CLI and gives an actionable message.",
+        "No secret values logged.",
+        "op invocation mocked for tests."
+      ],
+      "files_hint": ["packages/secrets/src/providers/op.ts", "packages/secrets/test/op.test.ts"],
+      "tests": ["Mocked op read resolves; missing CLI errors clearly."],
+      "definition_of_done": ["Registered as an optional provider."]
+    },
+    {
+      "id": "S4.6",
+      "epic": "E4",
+      "order": 31,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S4.2", "S2.8"],
+      "title": "Per-adapter secret strategies: inline / native-input / shim rendering",
+      "user_story": "As a user, I want each client to receive secrets the safest way it supports so plaintext tokens ideally never touch disk.",
+      "context": "Spec §6. native-input → emit client indirection (VS Code ${input:}); shim → rewrite launch to `mcpfold run <name>`; inline → resolve+write but only if target gitignored, with a loud warning.",
+      "acceptance_criteria": [
+        "sync honors each adapter's secretStrategy.",
+        "native-input adapters emit the client's own secret indirection and never a raw token.",
+        "shim adapters emit { command:'mcpfold', args:['run', name] } instead of the real launch, with no token on disk.",
+        "inline strategy resolves + writes the value only when the target file is gitignored; otherwise refuses with a clear error, and always prints a loud warning.",
+        "A test proves no raw secret value appears in any rendered file for native-input/shim strategies."
+      ],
+      "files_hint": ["packages/cli/src/sync/strategy.ts", "packages/cli/test/strategy.test.ts"],
+      "tests": ["For each strategy, assert the rendered file contents (grep for the secret value must fail on shim/native-input; inline gated on gitignore)."],
+      "definition_of_done": ["Secrets never leak to git-tracked files under any strategy."]
+    },
+    {
+      "id": "S4.7",
+      "epic": "E4",
+      "order": 32,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S4.6", "S4.1"],
+      "title": "`mcpfold run <name>` — shim launcher (resolve, inject, exec)",
+      "user_story": "As a client launching a shimmed server, I want `mcpfold run <name>` to resolve the secret at runtime, inject it, and exec the real server so tokens stay off disk.",
+      "context": "Spec §6/§8. Reads canonical, resolves the named server's secrets via providers, sets env/headers, then execs the real command or proxies the remote. Later also filters tools (E5).",
+      "acceptance_criteria": [
+        "`mcpfold run github` resolves refs, injects them, and execs the real server transparently (stdio passthrough).",
+        "For http/sse servers, launches the appropriate remote client/bridge with resolved auth headers.",
+        "Nonzero exit + clear message if resolution fails; never prints the secret.",
+        "Startup latency is minimal (resolve is memoized/fast).",
+        "Signal handling forwards SIGINT/SIGTERM to the child."
+      ],
+      "files_hint": ["packages/cli/src/commands/run.ts", "packages/cli/test/run.test.ts"],
+      "tests": ["run with a fake provider + fake server binary passes stdio through and injects env; failure path errors without leaking."],
+      "definition_of_done": ["A shimmed Cursor entry launches a working server with no token on disk."]
+    },
+    {
+      "id": "S4.8",
+      "epic": "E4",
+      "order": 33,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S4.2"],
+      "title": "`mcpfold secret set|test` — wire up and verify providers",
+      "user_story": "As a user, I want to configure a secret provider and test that a ref resolves before I rely on it.",
+      "context": "Spec §8. `secret set` stores provider config / (for keychain) stores a value; `secret test <ref>` resolves and reports success without printing the value.",
+      "acceptance_criteria": [
+        "`secret test ${scheme:path}` resolves and prints success/failure (value masked).",
+        "`secret set` configures a provider (or stores a keychain value) with the right per-OS/backend behavior.",
+        "Never echoes secret values to stdout or logs.",
+        "Actionable errors for misconfiguration."
+      ],
+      "files_hint": ["packages/cli/src/commands/secret.ts", "packages/cli/test/secret.test.ts"],
+      "tests": ["secret test resolves a mocked ref; value never appears in output."],
+      "definition_of_done": ["Users can validate secret setup before sync."]
+    },
+
+    {
+      "id": "S5.1",
+      "epic": "E5",
+      "order": 34,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S4.7"],
+      "title": "mcpfold-proxy core: transparent MCP passthrough (stdio + http)",
+      "user_story": "As a user, I want a local proxy that sits between a client and a real MCP server and passes JSON-RPC through untouched by default.",
+      "context": "Spec §7. Foundation for tool curation: correct bidirectional MCP proxying first, filtering second. Opt-in, sequenced last in OSS phase.",
+      "acceptance_criteria": [
+        "Proxies a stdio server: forwards initialize, tools/list, tools/call, notifications in both directions with no semantic change.",
+        "Proxies an http/sse server equivalently.",
+        "Preserves request ids, capabilities, and errors faithfully.",
+        "Clean shutdown + signal forwarding.",
+        "Behind an opt-in flag; off by default."
+      ],
+      "files_hint": ["packages/proxy/src/proxy.ts", "packages/proxy/src/transport/*.ts", "packages/proxy/test/passthrough.test.ts"],
+      "tests": ["Against a mock MCP server, a full initialize→list→call cycle round-trips identically through the proxy."],
+      "definition_of_done": ["Transparent proxy verified against a real reference MCP server manually once."]
+    },
+    {
+      "id": "S5.2",
+      "epic": "E5",
+      "order": 35,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S5.1"],
+      "title": "Tool allow/deny filtering on tools/list",
+      "user_story": "As a user, I want the proxy to trim tools/list to just my allow-listed (or minus deny-listed) tools so my agent's context isn't bloated.",
+      "context": "Spec §7. Intercept tools/list responses and filter per the server's `tools` directive; pass tools/call through unchanged (optionally reject calls to filtered tools).",
+      "acceptance_criteria": [
+        "mode:allow returns only listed tools; mode:deny returns all but listed.",
+        "tools/call to a filtered-out tool is rejected with a clear MCP error (configurable).",
+        "No filtering when no tools directive is present.",
+        "Filtering is order-stable and does not corrupt schemas of surviving tools.",
+        "A count assertion proves reduction (e.g. 20 tools → 3)."
+      ],
+      "files_hint": ["packages/proxy/src/filter.ts", "packages/proxy/test/filter.test.ts"],
+      "tests": ["allow + deny fixtures; filtered call rejected; unfiltered passthrough unchanged."],
+      "definition_of_done": ["Filtering correct and lossless for surviving tools."]
+    },
+    {
+      "id": "S5.3",
+      "epic": "E5",
+      "order": 36,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S5.2", "S4.7"],
+      "title": "Wire proxy filtering into the shim run path",
+      "user_story": "As a user, I want tool curation to work with zero extra config: if a server has a `tools` directive, `mcpfold run` filters automatically.",
+      "context": "Spec §7. The shim already in the launch path also filters tools/list — no separate proxy setup for the user.",
+      "acceptance_criteria": [
+        "When a server has a tools directive, `mcpfold run <name>` routes through the proxy filter automatically.",
+        "When absent, run remains a plain passthrough (no proxy overhead).",
+        "Behavior identical across stdio and http servers.",
+        "End-to-end test: a client launching the shim sees only the allowed tools."
+      ],
+      "files_hint": ["packages/cli/src/commands/run.ts", "packages/cli/test/run-filter.test.ts"],
+      "tests": ["run with tools:allow exposes only the allowed set to a mock client."],
+      "definition_of_done": ["Zero-config tool curation works through the shim."]
+    },
+    {
+      "id": "S5.4",
+      "epic": "E5",
+      "order": 37,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": ["S5.3"],
+      "title": "Context-window benchmark harness + writeup",
+      "user_story": "As a launch, I want a reproducible before/after benchmark showing schema-token reduction so the headline claim is credible.",
+      "context": "Spec §7 headline. Measure tool-schema token footprint with and without curation across a representative multi-server setup.",
+      "acceptance_criteria": [
+        "A script measures total tools/list schema token count for a fixture server set, unfiltered vs filtered.",
+        "Outputs a table and a percentage reduction; reproducible via one command.",
+        "docs/benchmark.md explains method + results with the actual numbers.",
+        "Token counting method documented (which tokenizer)."
+      ],
+      "files_hint": ["packages/proxy/bench/context-benchmark.ts", "docs/benchmark.md"],
+      "tests": ["Benchmark runs deterministically on fixtures and reports a reduction."],
+      "definition_of_done": ["A publishable before/after number exists."]
+    },
+
+    {
+      "id": "S6.1",
+      "epic": "E6",
+      "order": 38,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S0.2"],
+      "title": "Self-hosted Supabase in Coolify + migration tooling",
+      "user_story": "As the operator, I want reproducible self-hosted Supabase on the Contabo VPS via Coolify plus a migrations workflow so schema changes are versioned and repeatable.",
+      "context": "Spec §9 stack. Document the Coolify compose/config, wire supabase CLI migrations, and a local docker-compose for CI integration tests.",
+      "acceptance_criteria": [
+        "supabase/ holds config.toml, a migrations dir, and seed.sql.",
+        "A documented Coolify deployment (compose + env) stands up Postgres/GoTrue/PostgREST/Realtime.",
+        "`supabase db push`-style migration workflow documented and scripted.",
+        "A local docker-compose brings up Supabase for CI integration tests.",
+        "Secrets (JWT secret, DB password) sourced from env/Infisical, never committed."
+      ],
+      "files_hint": ["supabase/config.toml", "supabase/migrations/", "supabase/seed.sql", "services/edge/docker-compose.ci.yml", "docs/coolify-supabase.md"],
+      "tests": ["CI spins up the compose and runs migrations to a clean, queryable DB."],
+      "definition_of_done": ["A migration applies cleanly in CI from zero."]
+    },
+    {
+      "id": "S6.2",
+      "epic": "E6",
+      "order": 39,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S6.1"],
+      "title": "Database schema + RLS: users, configs (versioned), machines, teams, team_members",
+      "user_story": "As a multi-tenant SaaS, I want an append-only versioned config store with row-level security so tenants are isolated and history is auditable.",
+      "context": "Spec §9. configs are append-only (version history like the GradeThread certificate pattern). RLS enforces per-user/per-team access. Secret values never stored — only config with refs.",
+      "acceptance_criteria": [
+        "Tables: users, configs (append-only, versioned, JSONB canonical config with refs only), machines, teams, team_members.",
+        "RLS policies isolate rows by owner/team membership; a test proves user A cannot read user B's configs.",
+        "A CHECK/trigger enforces configs immutability (insert-new-version, no in-place update).",
+        "An audit view surfaces 'who changed the team config, when' from the version history.",
+        "A migration test asserts no column can hold a resolved secret value (config stores refs only, documented + enforced by convention/check)."
+      ],
+      "files_hint": ["supabase/migrations/0002_core_schema.sql", "supabase/migrations/0003_rls.sql", "supabase/test/rls.test.ts"],
+      "tests": ["RLS cross-tenant denial; append-only enforcement; audit view returns change history."],
+      "definition_of_done": ["Cross-tenant isolation proven by test."]
+    },
+    {
+      "id": "S6.3",
+      "epic": "E6",
+      "order": 40,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S6.2"],
+      "title": "Auth: device-code OAuth edge function",
+      "user_story": "As a CLI user, I want `mcpfold login` to use device-code OAuth so I authenticate in the browser and the CLI gets a token.",
+      "context": "Spec §9. Deno edge function issuing/verifying device codes against Supabase GoTrue; returns a session the CLI stores securely.",
+      "acceptance_criteria": [
+        "A device-code start endpoint returns a user code + verification URL.",
+        "A poll endpoint exchanges an approved device code for a session token.",
+        "Tokens are scoped and expirable; refresh handled or documented.",
+        "The CLI stores the token in the OS keychain, not plaintext.",
+        "Integration test covers the full device-code round trip against the compose stack."
+      ],
+      "files_hint": ["services/edge/functions/auth-device/index.ts", "services/edge/test/auth.test.ts"],
+      "tests": ["Device-code start→approve→poll yields a valid session; expired code rejected."],
+      "definition_of_done": ["Round-trip auth works against local Supabase."]
+    },
+    {
+      "id": "S6.4",
+      "epic": "E6",
+      "order": 41,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S6.3"],
+      "title": "push/pull sync edge functions (config-only, refs preserved)",
+      "user_story": "As a user, I want push/pull edge functions that sync my canonical config (with secret references intact) across machines, appending a new version on push.",
+      "context": "Spec §9. push writes a new append-only config version tied to a machine; pull returns the latest (or a requested version). Server rejects any payload containing resolved secret values.",
+      "acceptance_criteria": [
+        "push validates the payload against the canonical schema and rejects anything that looks like a resolved secret (only ${...} refs allowed in secret positions).",
+        "push appends a new version row; never overwrites.",
+        "pull returns latest by default, or a specific version.",
+        "All endpoints enforce the JWT + RLS from S6.2/S6.3.",
+        "Conflict strategy documented (last-write-wins with version history; client can diff)."
+      ],
+      "files_hint": ["services/edge/functions/push/index.ts", "services/edge/functions/pull/index.ts", "services/edge/test/sync.test.ts"],
+      "tests": ["push appends version; pull returns it; payload with a raw token is rejected; cross-tenant push/pull denied."],
+      "definition_of_done": ["Config round-trips machine→cloud→machine with refs intact and no secret values ever stored."]
+    },
+    {
+      "id": "S6.5",
+      "epic": "E6",
+      "order": 42,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": ["S6.4"],
+      "title": "Side Docker service for edge functions in Coolify",
+      "user_story": "As the operator, I want a standalone Dockerized Deno service running the mcpfold edge handlers so I can host functions Coolify/Supabase's managed runtime doesn't cover, sharing the same JWT/RLS contract.",
+      "context": "Spec stack: 'a side Docker service to run any needed edge functions'. Same code as services/edge, packaged as its own container, deployed in Coolify, verifying Supabase JWTs and honoring RLS via the service/anon keys appropriately.",
+      "acceptance_criteria": [
+        "A Dockerfile builds a Deno service exposing the same auth/push/pull handlers over HTTP.",
+        "It verifies Supabase-issued JWTs and enforces the same access rules (no privilege bypass).",
+        "Health check endpoint + graceful shutdown.",
+        "Coolify deployment documented with env/secret wiring (no secrets in the image).",
+        "An integration test hits the container in CI (docker-compose) for a push/pull cycle."
+      ],
+      "files_hint": ["services/edge/Dockerfile", "services/edge/src/server.ts", "services/edge/docker-compose.ci.yml", "docs/coolify-edge-service.md"],
+      "tests": ["Container starts, health check passes, authenticated push/pull works, unauthenticated is rejected."],
+      "definition_of_done": ["Side service reaches feature parity with the edge functions and passes CI integration."]
+    },
+    {
+      "id": "S6.6",
+      "epic": "E6",
+      "order": 43,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": ["S6.4", "S3.6"],
+      "title": "CLI login / push / pull commands",
+      "user_story": "As a user, I want `mcpfold login`, `push`, and `pull` so my canonical config syncs across machines from the CLI.",
+      "context": "Spec §8/§9. login runs device-code OAuth (S6.3) and stores the token in keychain; push/pull call the edge/side service; pull can diff before applying.",
+      "acceptance_criteria": [
+        "`mcpfold login` completes device-code flow and stores the session in the OS keychain.",
+        "`mcpfold push` uploads the local canonical config (refs only) as a new version, tagged with this machine.",
+        "`mcpfold pull` fetches latest, shows a diff vs local (reusing S1.6), and applies on confirmation (or --yes).",
+        "All commands fail clearly when not logged in or when the endpoint is unreachable.",
+        "Never uploads resolved secret values (client-side guard mirrors the server guard)."
+      ],
+      "files_hint": ["packages/cli/src/commands/login.ts", "packages/cli/src/commands/push.ts", "packages/cli/src/commands/pull.ts", "packages/cli/test/cloud.test.ts"],
+      "tests": ["Against a mocked endpoint: login stores token; push sends refs-only; pull diffs + applies; logged-out errors."],
+      "definition_of_done": ["Two-machine sync works end to end against the local stack."]
+    },
+
+    {
+      "id": "S7.1",
+      "epic": "E7",
+      "order": 44,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": ["S6.3"],
+      "title": "Web app scaffold on Cloudflare Pages + Supabase auth",
+      "user_story": "As a user, I want to log into mcpfold.com and see my account so the web console has a foundation.",
+      "context": "Spec §9. React + TS + Vite on Cloudflare Pages; Supabase auth (session from GoTrue). Shared canonical types imported from @mcpfold/core.",
+      "acceptance_criteria": [
+        "apps/web builds with Vite and deploys to Cloudflare Pages (documented + a preview deploy in CI).",
+        "Supabase auth login/logout works against the self-hosted instance.",
+        "Authenticated routes gated; unauthenticated redirected to login.",
+        "Reuses @mcpfold/core types (no duplicated config types in the frontend).",
+        "Basic responsive shell + theme."
+      ],
+      "files_hint": ["apps/web/vite.config.ts", "apps/web/src/main.tsx", "apps/web/src/auth/*", "apps/web/wrangler.toml", ".github/workflows/pages.yml"],
+      "tests": ["Playwright: login flow and gated route redirect."],
+      "definition_of_done": ["A user can log in on a Pages preview deploy."]
+    },
+    {
+      "id": "S7.2",
+      "epic": "E7",
+      "order": 45,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": ["S7.1", "S6.4"],
+      "title": "Visual canonical-config editor",
+      "user_story": "As a user, I want to edit my mcp.config.jsonc visually — add/edit servers, auth refs, tags — with validation, and push it.",
+      "context": "Spec §9. Form + JSON views backed by the shared zod schema; edits validate client-side; save pushes a new version. Secret fields accept refs only.",
+      "acceptance_criteria": [
+        "CRUD servers with transport-aware fields (stdio vs http/sse) validated by the shared schema.",
+        "Auth/token fields accept ${provider:path} refs only; raw values blocked with guidance.",
+        "Live validation surfaces the same errors as the CLI (shared schema).",
+        "Save creates a new config version via push (S6.4) and shows version history.",
+        "Optimistic UI with error rollback."
+      ],
+      "files_hint": ["apps/web/src/editor/*", "apps/web/test/editor.spec.ts"],
+      "tests": ["Playwright: add a server, invalid token blocked, save creates a version."],
+      "definition_of_done": ["Edits persist as new versions and validate identically to the CLI."]
+    },
+    {
+      "id": "S7.3",
+      "epic": "E7",
+      "order": 46,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": ["S7.2"],
+      "title": "Profile management UI",
+      "user_story": "As a user, I want to create and edit profiles (client + scope + tag include set) visually so I control what folds where.",
+      "context": "Spec §4/§9. Editor for profiles with client/scope/path/include; previews which servers a profile resolves to (reusing resolve logic).",
+      "acceptance_criteria": [
+        "Create/edit/delete profiles with client, scope, path, include tags.",
+        "Live preview lists the servers a profile would resolve to (server-level curation visualization).",
+        "Validation mirrors the schema (path required for project/workspace).",
+        "Changes persist via push."
+      ],
+      "files_hint": ["apps/web/src/profiles/*", "apps/web/test/profiles.spec.ts"],
+      "tests": ["Playwright: create a profile, preview resolves the expected servers."],
+      "definition_of_done": ["Profiles editable and their fold preview is correct."]
+    },
+    {
+      "id": "S7.4",
+      "epic": "E7",
+      "order": 47,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": ["S7.1"],
+      "title": "Curated server directory",
+      "user_story": "As a user, I want a browsable directory of known MCP servers so I can add them to my config with one click.",
+      "context": "Spec §9 monetizable surface (public directory now; private registry later). Directory entries prefill the add flow with transport, url/package, and suggested tools.",
+      "acceptance_criteria": [
+        "Browse/search a seeded directory of MCP servers.",
+        "'Add to config' prefills the editor with a valid server entry (token as a ref placeholder).",
+        "Directory data is seeded and versioned; adding new entries is a documented process.",
+        "Respects the 'no implied endorsement' copy rule."
+      ],
+      "files_hint": ["apps/web/src/directory/*", "supabase/seed/directory.sql", "apps/web/test/directory.spec.ts"],
+      "tests": ["Playwright: search + add-to-config prefills a valid entry."],
+      "definition_of_done": ["Directory browse + one-click add works."]
+    },
+    {
+      "id": "S7.5",
+      "epic": "E7",
+      "order": 48,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": ["S7.1", "S6.6"],
+      "title": "Per-machine sync status dashboard",
+      "user_story": "As a user with multiple machines, I want to see each machine's last sync, version, and drift so I know everything is consistent.",
+      "context": "Spec §9. Reads machines + configs history to show which version each machine last pushed/pulled.",
+      "acceptance_criteria": [
+        "Lists registered machines with last-seen, last pushed/pulled version.",
+        "Flags machines behind the latest version.",
+        "Shows recent version history with author + timestamp.",
+        "Data scoped by RLS to the current user/team."
+      ],
+      "files_hint": ["apps/web/src/machines/*", "apps/web/test/machines.spec.ts"],
+      "tests": ["Playwright: dashboard shows machines and highlights an out-of-date one."],
+      "definition_of_done": ["Sync status reflects real push/pull activity."]
+    },
+    {
+      "id": "S7.6",
+      "epic": "E7",
+      "order": 49,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": ["S7.2", "S6.2"],
+      "title": "Team console + change-audit trail",
+      "user_story": "As a team lead, I want shared team configs and an audit trail of who changed what, when, so governance is clear — the paid surface.",
+      "context": "Spec §9 monetization. Team-shared configs with member management and the append-only audit view ('who added the Stripe server, when').",
+      "acceptance_criteria": [
+        "Create a team, invite/manage members (roles), share a team config.",
+        "Audit trail lists every config change with author, timestamp, and a diff.",
+        "RLS enforces team-scoped access; non-members cannot read team configs.",
+        "Billing gate stub marks this as a paid feature (integration deferred).",
+        "Member removal revokes access immediately."
+      ],
+      "files_hint": ["apps/web/src/teams/*", "supabase/migrations/0004_teams_audit.sql", "apps/web/test/teams.spec.ts"],
+      "tests": ["Playwright + RLS: member sees team config, non-member denied, audit shows a change diff."],
+      "definition_of_done": ["Team sharing + audit trail work with enforced access control."]
+    },
+
+    {
+      "id": "S8.1",
+      "epic": "E8",
+      "order": 50,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S3.7", "S1.5"],
+      "title": "Docs site, README, and hosted JSON schema",
+      "user_story": "As a prospective user, I want clear docs — the format spec, quickstart, adapter authoring guide — and a hosted $schema URL so onboarding is frictionless.",
+      "context": "Spec §2/§10. Publish the neutral mcp.config.jsonc format spec, the CLI quickstart (init→import→sync loop), and host the generated JSON schema.",
+      "acceptance_criteria": [
+        "docs/ covers: format spec, quickstart, secrets, adapter authoring, benchmark.",
+        "README leads with the context-window benchmark, not sync.",
+        "The generated JSON schema is hosted at a stable URL and referenced by init's scaffold.",
+        "An 'add a new client adapter in one PR' guide exists.",
+        "Docs build in CI."
+      ],
+      "files_hint": ["docs/format.md", "docs/quickstart.md", "docs/adapters.md", "docs/secrets.md", "README.md"],
+      "tests": ["Docs build + link-check pass in CI; schema URL resolves."],
+      "definition_of_done": ["A newcomer can go init→import→sync from docs alone."]
+    },
+    {
+      "id": "S8.2",
+      "epic": "E8",
+      "order": 51,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S3.5", "S3.6", "S3.7", "S2.8"],
+      "title": "Cross-platform end-to-end test suite",
+      "user_story": "As a maintainer, I want e2e tests exercising the real init→import→sync→diff loop in temp dirs on all three OSes so path bugs never ship.",
+      "context": "Spec §10 format-drift risk. Full CLI lifecycle against fixture client files in isolated tmp HOME dirs, on the CI matrix.",
+      "acceptance_criteria": [
+        "e2e: init → add fixture client files → import → sync → diff (clean) → mutate on-disk → diff (drift) in a tmp HOME.",
+        "Runs on ubuntu/macos/windows with correct per-OS paths.",
+        "Backups verified created before overwrite.",
+        "Secret strategies verified to leave no secret values on disk.",
+        "Suite is stable (no flakes) and reasonably fast."
+      ],
+      "files_hint": ["e2e/lifecycle.test.ts", "e2e/fixtures/*"],
+      "tests": ["The lifecycle test itself, green on all three OSes."],
+      "definition_of_done": ["Full loop green on the matrix."]
+    },
+    {
+      "id": "S8.3",
+      "epic": "E8",
+      "order": 52,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S4.6", "S6.4", "S0.6"],
+      "title": "Security review, telemetry opt-in, and hardening",
+      "user_story": "As a security-conscious user, I want assurance that mcpfold never leaks secrets, pins supply-chain risk, and only collects telemetry I opt into.",
+      "context": "Spec §6/§10. Audit secret handling end to end, enforce pin-at-fold, and make any telemetry strictly opt-in with a documented payload.",
+      "acceptance_criteria": [
+        "A documented audit confirms no code path writes a resolved secret to a git-tracked file or logs it.",
+        "`pin` rewrites @latest to the pinned version at fold time; a test proves an unpinned @latest is flagged by doctor.",
+        "Telemetry (if any) is opt-in only, with a documented, minimal, non-secret payload and an easy opt-out.",
+        "Dependency + secret-scanning checks run in CI (e.g. gitleaks + npm audit).",
+        "A threat-model note covers the shim launcher and proxy surfaces."
+      ],
+      "files_hint": ["docs/security.md", ".github/workflows/security.yml", "packages/cli/src/telemetry.ts"],
+      "tests": ["Secret-leak grep test across rendered outputs; doctor flags unpinned; gitleaks clean."],
+      "definition_of_done": ["Security posture documented and enforced in CI."]
+    },
+    {
+      "id": "S8.4",
+      "epic": "E8",
+      "order": 53,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S8.1", "S8.2", "S8.3", "S0.4"],
+      "title": "OSS launch: npm publish + awesome-mcp + Show HN readiness",
+      "user_story": "As the maintainer, I want the v0.x packages published and launch surfaces prepped so I can post and gather traction.",
+      "context": "Spec §10 launch. Publish MIT core+CLI, submit to awesome-mcp lists, prep Show HN/dev.to/r/mcp with the benchmark headline, and open the WG config-portability thread with running code.",
+      "acceptance_criteria": [
+        "`npx mcpfold` installs and runs the init→import→sync loop from the published package.",
+        "Semver + changelog generated via changesets; release notes reference the benchmark.",
+        "awesome-mcp PR drafted; Show HN / dev.to draft prepared with the context-window numbers.",
+        "A WG discussion thread draft references the shipping reference implementation and neutral format.",
+        "Post-install smoke test in CI verifies the published tarball works."
+      ],
+      "files_hint": ["CHANGELOG.md", "docs/launch.md", ".github/workflows/release.yml"],
+      "tests": ["CI installs the packed tarball and runs a smoke lifecycle."],
+      "definition_of_done": ["A real `npx mcpfold` run works from npm; launch collateral ready."]
+    },
+
+    {
+      "id": "S9.1",
+      "epic": "E9",
+      "order": 54,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S4.6", "S3.5"],
+      "title": "Ref-only invariant: suite-wide secret-leak assertion harness",
+      "user_story": "As a security-conscious maintainer, I want an automated harness that proves no resolved secret value ever lands in a rendered client file, a backup, a temp file, a log line, or a pushed payload, so the core promise is continuously enforced, not just claimed.",
+      "context": "The single most important control. Seed every test path with a known sentinel secret value (e.g. SENTINEL_TOKEN_deadbeef), exercise sync/run/diff/doctor/push across all adapters and strategies, then assert the sentinel appears in ZERO artifacts except where an explicitly gitignored `inline` target legitimately holds it. Resolution must be memory-only — no cache-to-disk of values, ever.",
+      "acceptance_criteria": [
+        "A shared harness injects a sentinel value via a fake provider and scans all rendered files, backups, temp dirs, stdout/stderr, and push payloads for it.",
+        "Passes for env/dotenv/infisical/keychain/op providers and shim + native-input strategies (sentinel must NOT appear).",
+        "For `inline`, the sentinel may appear only in the target file AND only when that file is gitignored; the harness asserts both.",
+        "A client-side guard rejects a push payload containing any non-ref value in a secret position (mirrors the server guard in S6.4); test proves rejection.",
+        "Asserts no resolved value is written to any on-disk cache/temp (resolution is memory-only).",
+        "Runs on the CI matrix; a deliberately introduced leak fails the build."
+      ],
+      "files_hint": ["security/leak-harness.ts", "security/leak.test.ts", "packages/secrets/src/resolver.ts"],
+      "tests": ["Sentinel-scan across all strategies/providers; inline gated on gitignore; push guard rejects raw value; injected leak fails."],
+      "definition_of_done": ["The ref-only invariant is machine-verified on every relevant path in CI."]
+    },
+    {
+      "id": "S9.2",
+      "epic": "E9",
+      "order": 55,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S3.5", "S6.6"],
+      "title": "Config-as-code: trust-on-first-use + version integrity signing",
+      "user_story": "As a user syncing config across machines, I want any new or changed executable command to require my confirmation and every pushed version to be integrity-verified, so a tampered or malicious synced config cannot silently execute code on my machines.",
+      "context": "`mcpfold run` execs command/args from the config, and `pull` writes that config from the cloud — a code-execution channel. Combine TOFU (like SSH host keys) with signed versions. Same threat class as the unpinned-stdio-RCE lesson, but via the sync path.",
+      "acceptance_criteria": [
+        "sync/pull detect any new or changed `command`, `args`, or `pin` and require explicit confirmation before those entries become runnable; a local trust store records approved entries.",
+        "`--yes` (CI) can pre-approve, and is documented as reducing this protection.",
+        "Each pushed config version is signed (HMAC with a per-user key or Ed25519); pull verifies the signature and refuses/warns on mismatch.",
+        "A tampered version row (unsigned or bad signature) is rejected by the client.",
+        "`pin` may carry an optional integrity hash for the stdio package; a mismatch is flagged.",
+        "Trust prompts and signature failures are covered by tests using a mocked endpoint."
+      ],
+      "files_hint": ["packages/cli/src/trust/tofu.ts", "packages/cli/src/trust/signing.ts", "packages/cli/src/commands/pull.ts", "packages/cli/test/trust.test.ts"],
+      "tests": ["Changed command triggers prompt; approved entry runs without re-prompt; bad signature rejected; hash mismatch flagged."],
+      "definition_of_done": ["Cloud-synced config cannot execute new commands without explicit trust, and version integrity is verified."]
+    },
+    {
+      "id": "S9.3",
+      "epic": "E9",
+      "order": 56,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": ["S3.6", "S3.7", "S3.5"],
+      "title": "Output redaction + backup hardening for the inline path",
+      "user_story": "As a user, I want all CLI output and any backup files to never expose a secret, so diagnostics and the inline fallback can't leak what the ref-only design otherwise protects.",
+      "context": "diff/doctor print file contents and sync backs up prior files (.mcpfold.bak) — both can capture or echo an inlined secret. Redact output and harden backups.",
+      "acceptance_criteria": [
+        "All diff/doctor/log output masks values that resolve through a provider and any high-entropy token-shaped string.",
+        "Backups of a file that could contain an inlined secret are created gitignored and chmod 600 (0600) on POSIX, ACL-restricted on Windows — or the backup is refused with a clear message.",
+        "`inline` strategy refuses to write unless the target is gitignored AND emits a loud warning (reaffirms S4.6) — regression-tested here.",
+        "A redaction unit test proves masked output for each output command.",
+        "No secret-shaped string survives in any command's stdout/stderr in the leak harness (ties to S9.1)."
+      ],
+      "files_hint": ["packages/cli/src/util/redact.ts", "packages/cli/src/io/backup.ts", "packages/cli/test/redact.test.ts"],
+      "tests": ["diff/doctor mask a token; backup perms/gitignore enforced or refused; inline refusal path."],
+      "definition_of_done": ["No CLI output or backup can expose a secret value."]
+    },
+    {
+      "id": "S9.4",
+      "epic": "E9",
+      "order": 57,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S6.1", "S6.2"],
+      "title": "Self-hosted at-rest hardening: volume encryption, encrypted backups, TLS/HSTS",
+      "user_story": "As the operator of self-hosted Supabase on Contabo, I want documented + verified volume encryption, encrypted DB backups, and enforced TLS so at-rest and in-transit protection match a managed provider's baseline.",
+      "context": "Self-hosting means YOU own disk encryption — managed Supabase gives it free. Because configs are refs-only, a DB dump leaks topology + ref paths (per the chosen server-side-at-rest model), never secret values; document that explicitly as a design property.",
+      "acceptance_criteria": [
+        "A runbook enables volume/disk encryption (LUKS or equivalent) for the Postgres data volume in the Coolify deployment.",
+        "Automated Postgres backups are encrypted at rest and their restore is tested.",
+        "TLS is enforced end to end (Pages→edge→DB where applicable); HSTS set on web/API responses.",
+        "A documented threat statement: 'DB compromise exposes config metadata (server names, URLs, ref paths), never secret values.'",
+        "A verification step (script or checklist) confirms encryption + TLS are actually on, not just configured."
+      ],
+      "files_hint": ["docs/security-at-rest.md", "docs/coolify-supabase.md", "supabase/backup/encrypt-backup.sh"],
+      "tests": ["Backup encrypt+restore round-trip test; TLS/HSTS header assertion against the running stack in CI."],
+      "definition_of_done": ["At-rest + in-transit protections verified on the self-hosted stack."]
+    },
+    {
+      "id": "S9.5",
+      "epic": "E9",
+      "order": 58,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S6.3", "S7.5"],
+      "title": "Session & device-code hardening + machine revocation",
+      "user_story": "As a user, I want short-lived rotated sessions, a phishing-resistant device-code flow, and the ability to revoke any machine, so a stolen token or intercepted code has minimal blast radius.",
+      "context": "Device-code flows are phishable and long-lived tokens are dangerous. Harden the flow from S6.3 and expose revocation in the sync dashboard (S7.5).",
+      "acceptance_criteria": [
+        "Access tokens are short-lived with refresh rotation; refresh reuse is detected and revokes the chain.",
+        "Device-code: high-entropy user code, short expiry, poll-endpoint rate limiting, and binding to the requesting machine id.",
+        "Per-machine token revocation from the sync dashboard immediately invalidates that machine's sessions.",
+        "All sync/auth endpoints enforce JWT + RLS and rate-limit abusive callers.",
+        "Tests cover expiry, refresh rotation/reuse-detection, rate-limit, and revocation."
+      ],
+      "files_hint": ["services/edge/functions/auth-device/index.ts", "services/edge/src/session.ts", "apps/web/src/machines/revoke.ts", "services/edge/test/session.test.ts"],
+      "tests": ["Expired/rotated/reused tokens handled; rate limit trips; revoked machine denied."],
+      "definition_of_done": ["Session + device-code surfaces hardened and revocation works end to end."]
+    },
+    {
+      "id": "S9.6",
+      "epic": "E9",
+      "order": 59,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": ["S9.1"],
+      "title": "Web app security headers + dependency/secret scanning gate",
+      "user_story": "As a user of mcpfold.com, I want standard web hardening (CSP, HSTS, anti-CSRF) and a CI gate that blocks leaked secrets and known-vulnerable dependencies, so the cloud surface meets a baseline OWASP posture.",
+      "context": "Consolidates web + supply-chain hygiene into an enforced gate (extends the lighter S8.3). Team-invite and share tokens must be high-entropy; access revocation on member removal is already required in S7.6.",
+      "acceptance_criteria": [
+        "apps/web sets CSP, HSTS, X-Content-Type-Options, Referrer-Policy, and frame protections; anti-CSRF on state-changing requests.",
+        "Team-invite / share tokens are high-entropy and single-use/expiring.",
+        "CI runs gitleaks + dependency audit (npm audit / OSV) and fails on high-severity findings or any detected secret.",
+        "A threat-model doc covers the shim launcher, proxy, and sync channel surfaces.",
+        "Header presence asserted by an automated test against the deployed preview."
+      ],
+      "files_hint": ["apps/web/src/security/headers.ts", ".github/workflows/security.yml", "docs/threat-model.md", "apps/web/test/headers.spec.ts"],
+      "tests": ["Header assertions on the running app; CI security gate trips on a planted secret / vulnerable dep."],
+      "definition_of_done": ["Web hardening in place and the security gate enforced in CI."]
+    }
+  ],
+
+  "milestones": [
+    { "name": "Alpha", "spec_ref": "§10", "stories": ["S0.1", "S0.2", "S0.3", "S0.6", "S0.8", "S0.10", "S1.1", "S1.2", "S1.3", "S1.4", "S2.1", "S2.2", "S2.3", "S3.1", "S3.2", "S3.5", "S3.6", "S4.1", "S4.2"], "goal": "Zod schema + Claude Desktop + Cursor adapters + sync/diff + env/dotenv secrets, on the error/determinism/CLI contracts. npx mcpfold." },
+    { "name": "v0.1 public", "spec_ref": "§10", "stories": ["S2.4", "S2.5", "S2.6", "S2.7", "S2.8", "S3.3", "S3.7", "S1.5", "S1.6", "S0.4", "S0.5", "S0.7", "S0.9"], "goal": "All six adapters, import + doctor, backups + drift, hosted JSON schema, governance + migrate + offline contract." },
+    { "name": "v0.2", "spec_ref": "§10", "stories": ["S4.3", "S4.4", "S4.5", "S4.6", "S4.7", "S4.8", "S3.4"], "goal": "Infisical + keychain + 1Password, shim launcher (secrets off disk), profiles/tags fully wired." },
+    { "name": "v0.3", "spec_ref": "§10", "stories": ["S5.1", "S5.2", "S5.3", "S5.4", "S8.1", "S8.2", "S8.3", "S9.1", "S9.3"], "goal": "Optional proxy for tool-level curation + published context-window benchmark; docs, e2e, security (ref-only leak harness + output/backup redaction)." },
+    { "name": "v1.0 cloud", "spec_ref": "§10", "stories": ["S6.1", "S6.2", "S6.3", "S6.4", "S6.5", "S6.6", "S7.1", "S7.2", "S7.3", "S7.4", "S7.5", "S7.6", "S8.4", "S9.2", "S9.4", "S9.5", "S9.6"], "goal": "Cloudflare Pages editor + Supabase edge sync API + login/push/pull + teams; config-integrity/TOFU, at-rest hardening, session hardening, web security gate; OSS launch." }
+  ]
+}
