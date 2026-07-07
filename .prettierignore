@@ -1,0 +1,10 @@
+dist/
+build/
+coverage/
+node_modules/
+pnpm-lock.yaml
+**/fixtures/**
+CHANGELOG.md
+prd.json
+mcpfold-spec.md
+
