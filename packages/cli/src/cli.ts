@@ -3,6 +3,7 @@ import { diagnose } from './commands/diagnose.js';
 import { runSync, runSyncWatch } from './commands/sync.js';
 import { runDiff } from './commands/diff.js';
 import { runInit } from './commands/init.js';
+import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
 import { runStatus } from './commands/status.js';
 import { runImport } from './commands/import.js';
@@ -162,9 +163,24 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     program
       .command('init')
       .description('scaffold mcp.config.jsonc and detect installed clients')
-      .option('-f, --force', 'overwrite an existing config', false),
-  ).action(async (opts: GlobalFlags & { force?: boolean }) => {
+      .option('-f, --force', 'overwrite an existing config', false)
+      .option('--guided', 'walk through detect → import → fix → sync → savings', false)
+      .option('--yes', 'accept all guided prompts (non-interactive / CI)', false),
+  ).action(async (opts: GlobalFlags & { force?: boolean; guided?: boolean; yes?: boolean }) => {
     const ctx = resolve(opts);
+    if (opts.guided) {
+      // Interactive golden path (not a --json command). Non-interactive with --yes or no TTY.
+      const w = writer ?? processWriter;
+      const prompt =
+        opts.yes || !process.stdin.isTTY
+          ? autoPrompter(opts.yes ? true : undefined)
+          : ttyPrompter();
+      await runGuided(
+        { cwd: ctx.cwd, dryRun: ctx.dryRun },
+        { prompt, write: (line) => w.out(`${line}\n`) },
+      );
+      return;
+    }
     setExit(
       await runCommand(
         'init',

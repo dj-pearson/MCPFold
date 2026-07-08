@@ -43,6 +43,16 @@ export {
 export { type FsWatcher, nodeFsWatcher, watchWithDebounce, type WatchHandle } from './io/watch.js';
 export { runDiff, type ClientDiff, type DiffData, type DiffOptions } from './commands/diff.js';
 export { runInit, starterConfig, type InitData, type InitOptions } from './commands/init.js';
+export {
+  applySafeFixes,
+  autoPrompter,
+  type GuidedOptions,
+  type GuidedResult,
+  type Prompter,
+  runGuided,
+  scriptedPrompter,
+  ttyPrompter,
+} from './onboarding/guided.js';
 export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';
 export {
   runStatus,
