@@ -105,10 +105,10 @@ services:
   # HS256 access tokens interoperate with GoTrue/PostgREST + the S6.2 RLS policies. Nothing secret
   # is committed; all values come from Coolify env / Infisical, same as the services above.
   #
-  # Routing: point api.mcpfold.com/{auth-device,push,pull,teams,status} at this service's :8000 in
-  # Coolify (Traefik), while every other api path keeps hitting Kong (deployment.md §3). It is
-  # `expose`d (not host-published) to avoid colliding with Kong on :8000; the proxy routes to it by
-  # container name on the internal network.
+  # Routing: Kong path-splits api.mcpfold.com — the /auth-device, /push, /pull, /teams, /status
+  # prefixes proxy to this `edge` container (see kong.yml), while /auth/v1, /rest/v1, /realtime/v1
+  # keep hitting the Supabase backends. So only Kong is host-published (:8000); the edge is reachable
+  # internally by name (`edge:8000`) and needs no domain/route of its own in Coolify.
   edge:
     build:
       context: ../services/edge

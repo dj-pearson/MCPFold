@@ -30,3 +30,16 @@ services:
         paths: ['/realtime/v1']
     plugins:
       - name: cors
+
+  # Side edge service (S6.5) — the mcpfold sync/auth API. Kong path-splits api.mcpfold.com so the
+  # CLI + web app reach a single origin: Supabase paths above go to Kong's backends, while these
+  # prefixes proxy to the `edge` container (same compose network). strip_path is FALSE — the edge
+  # matches the full path (e.g. /auth-device/start), so Kong must forward it verbatim.
+  - name: edge
+    url: http://edge:8000/
+    routes:
+      - name: edge
+        strip_path: false
+        paths: ['/auth-device', '/push', '/pull', '/teams', '/status']
+    plugins:
+      - name: cors
