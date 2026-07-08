@@ -26,7 +26,7 @@ export interface CloudApi {
   revokeMachine(name: string): Promise<void>;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'https://api.mcpfold.com';
+const API_BASE = import.meta.env.VITE_API_URL ?? 'https://functions.mcpfold.com';
 
 function httpCloudApi(base: string, getToken: () => string | null): CloudApi {
   const authHeader = (): Record<string, string> => {

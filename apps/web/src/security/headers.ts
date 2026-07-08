@@ -9,8 +9,9 @@
  * additionally prevent clickjacking of any state-changing UI.
  */
 
-/** The API origin the app talks to (Supabase GoTrue + the edge functions). */
-const API_ORIGIN = 'https://api.mcpfold.com';
+/** Origins the app talks to: Supabase (GoTrue/PostgREST) on api., and the edge API on functions. */
+const SUPABASE_ORIGIN = 'https://api.mcpfold.com';
+const EDGE_ORIGIN = 'https://functions.mcpfold.com';
 
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -18,7 +19,7 @@ export const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self'",
-  `connect-src 'self' ${API_ORIGIN}`,
+  `connect-src 'self' ${SUPABASE_ORIGIN} ${EDGE_ORIGIN}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

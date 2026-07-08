@@ -7,9 +7,10 @@ import {
   saveSession,
 } from './token-store.js';
 
-/** The cloud API base URL — overridable for self-hosted / dev via MCPFOLD_API_URL. */
+/** The cloud (edge) API base URL — overridable for self-hosted / dev via MCPFOLD_API_URL.
+ * The hosted edge service lives on its own host; Supabase owns api.mcpfold.com. */
 export function resolveEndpoint(env: NodeJS.ProcessEnv = process.env): string {
-  return env.MCPFOLD_API_URL ?? 'https://api.mcpfold.com';
+  return env.MCPFOLD_API_URL ?? 'https://functions.mcpfold.com';
 }
 
 /** Load the stored session or fail with a clear "log in first" error. */

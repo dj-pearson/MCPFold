@@ -33,7 +33,7 @@ export interface TeamsApi {
   audit(teamId: string): Promise<AuditEntry[]>;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'https://api.mcpfold.com';
+const API_BASE = import.meta.env.VITE_API_URL ?? 'https://functions.mcpfold.com';
 
 function httpTeamsApi(base: string, getToken: () => string | null): TeamsApi {
   const headers = (json = false): Record<string, string> => {
