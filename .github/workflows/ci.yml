@@ -108,3 +108,30 @@ jobs:
 
       - name: Build docs (link-check + schema staging)
         run: pnpm docs:build
+
+  # Database integration gate (S6.1): stand up the CI Supabase database from the same
+  # compose developers use, apply the migrations with the psql runner, and smoke-test the
+  # result (which also asserts the runner is idempotent). A broken migration fails here
+  # before it can reach the Coolify deployment.
+  db:
+    name: db integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Supabase database
+        run: docker compose -f supabase/docker-compose.ci.yml up -d --wait
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:54322/postgres
+        run: bash supabase/scripts/migrate.sh
+
+      - name: Smoke test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:54322/postgres
+        run: bash supabase/scripts/smoke-test.sh
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f supabase/docker-compose.ci.yml down -v

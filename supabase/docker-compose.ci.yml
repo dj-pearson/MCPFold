@@ -1,0 +1,31 @@
+# docker-compose.ci.yml (S6.1) — the minimal Supabase database for CI integration tests
+# and local schema work. It brings up Postgres (the layer our migrations + RLS live in)
+# so `scripts/migrate.sh` and the schema tests (S6.2) run identically on a laptop and in
+# GitHub Actions, without the weight of the full auth/rest/realtime stack (that's
+# docker-compose.coolify.yml, for the real deployment).
+#
+#   docker compose -f supabase/docker-compose.ci.yml up -d
+#   DATABASE_URL=postgres://postgres:postgres@localhost:54322/postgres \
+#     supabase/scripts/migrate.sh
+#
+# The password here is a throwaway CI/dev value; real deployments source it from env.
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: postgres
+    ports:
+      - '54322:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d postgres']
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:

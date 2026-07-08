@@ -17,6 +17,11 @@ CI runs on every push and pull request via [`.github/workflows/ci.yml`](../.gith
   docs site and **fails on any broken internal link, missing required page, or invalid
   hosted schema**. The same build backs the Pages deploy, so a green `docs` job means the
   site is publishable.
+- **`db integration`** — stands up the CI Supabase database
+  (`supabase/docker-compose.ci.yml`), applies the migrations with
+  `supabase/scripts/migrate.sh`, and runs `supabase/scripts/smoke-test.sh` (which also
+  asserts the runner is idempotent). A broken migration fails here before it can reach the
+  Coolify deployment. See [Self-hosting](./self-hosting.md).
 
 ## Docs deployment (GitHub Pages)
 
@@ -39,6 +44,7 @@ GitHub → Settings → Branches → Branch protection rules for `main`:
   - `verify (windows-latest · node 20)`
   - `core purity`
   - `docs`
+  - `db integration`
 - ✅ Require branches to be up to date before merging.
 - ✅ Do not allow bypassing the above settings.
 

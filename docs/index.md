@@ -58,6 +58,7 @@ The full walkthrough is in the [Quickstart](./quickstart.md).
 - **[Benchmark](./benchmark.md)** — the context-window measurement, reproduced.
 - **[CLI contract](./cli-contract.md)** — exit codes, `--json` envelope, redaction.
 - **[Offline contract](./offline-contract.md)** — fail-closed behavior when providers are down.
+- **[Self-hosting](./self-hosting.md)** — deploy the optional cloud (Supabase + Coolify).
 - **[CI](./ci.md)** — the cross-OS matrix and branch-protection setup.
 
 ## JSON schema
