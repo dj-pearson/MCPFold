@@ -68,9 +68,10 @@ Deeper reference docs (optional): [self-hosting](self-hosting.md) ·
 - An **npm account** with publish rights to the `mcpfold` name — for the CLI.
 - *(Optional)* a **GitHub OAuth app** — only if you want "Sign in with GitHub."
 
-**Tools on your local machine.** Run these checks; install anything that's missing:
+**Tools on your local machine.** Commands in this guide are written for **PowerShell** on Windows.
+Run these checks; install anything that's missing:
 
-```bash
+```powershell
 git --version        # any recent
 node --version       # v20 or newer
 corepack enable      # turns on pnpm (ships with Node)
@@ -80,9 +81,13 @@ psql --version       # PostgreSQL client — used to run DB migrations
 docker --version     # to build/run containers locally if needed
 ```
 
+> A couple of steps run the repo's `.sh` helper scripts (they're written in bash). On Windows those
+> run through **Git Bash**, which installs with Git for Windows — you invoke them from PowerShell with
+> `bash <script>`, shown below. Everything else is native PowerShell.
+
 Clone the repo and install dependencies once:
 
-```bash
+```powershell
 git clone https://github.com/dj-pearson/MCPFold.git
 cd MCPFold
 pnpm install
@@ -95,9 +100,10 @@ pnpm install
 ## Step 1 — Generate all your secrets
 
 The cloud needs several random secrets and two special login keys. Instead of making them by hand,
-run the generator — it creates everything and prints ready-to-paste blocks for each surface:
+run the generator — it creates everything and prints ready-to-paste blocks for each surface. It's a
+bash script, so invoke it through Git Bash (the `>` redirect is native PowerShell):
 
-```bash
+```powershell
 bash scripts/gen-cloud-env.sh > cloud.env
 ```
 
@@ -135,8 +141,12 @@ In Cloudflare's DNS settings for `mcpfold.com`, create these records. (You can a
 Note: `api.` and `functions.` both point at the **same server IP** — Coolify tells them apart by
 hostname and gives each its own HTTPS certificate.
 
-✅ **Check:** `dig api.mcpfold.com +short` and `dig functions.mcpfold.com +short` both return your VPS
-IP (may take a few minutes to propagate).
+✅ **Check:** both resolve to your VPS IP (may take a few minutes to propagate):
+
+```powershell
+Resolve-DnsName api.mcpfold.com -Type A
+Resolve-DnsName functions.mcpfold.com -Type A
+```
 
 ---
 
@@ -160,7 +170,7 @@ The easiest path is Coolify's built-in one-click Supabase.
 > **If you ever rebuild Supabase from scratch, it generates NEW keys.** You must then re-copy the new
 > `JWT_SECRET` / `ANON_KEY` into the edge service and web console (Steps 5 and 7).
 
-✅ **Check:** `curl https://api.mcpfold.com/rest/v1/` returns a small JSON response from PostgREST
+✅ **Check:** `curl.exe https://api.mcpfold.com/rest/v1/` returns a small JSON response from PostgREST
 (not a connection error).
 
 ---
@@ -168,11 +178,12 @@ The easiest path is Coolify's built-in one-click Supabase.
 ## Step 4 — Set up the database tables (migrations)
 
 Supabase gives you an empty database; mcpfold's tables + security rules live in `supabase/migrations/`.
-Apply them with the migrate script, pointing it at your live database:
+Apply them with the migrate script (bash script → run via Git Bash), pointing it at your live
+database. In PowerShell you set the variable first, then run it:
 
-```bash
-DATABASE_URL='postgres://postgres:YOUR_POSTGRES_PASSWORD@YOUR_DB_HOST:5432/postgres' \
-  supabase/scripts/migrate.sh
+```powershell
+$env:DATABASE_URL = "postgres://postgres:YOUR_POSTGRES_PASSWORD@YOUR_DB_HOST:5432/postgres"
+bash supabase/scripts/migrate.sh
 ```
 
 - `YOUR_POSTGRES_PASSWORD` — from `cloud.env`.
@@ -182,12 +193,16 @@ DATABASE_URL='postgres://postgres:YOUR_POSTGRES_PASSWORD@YOUR_DB_HOST:5432/postg
 
 To also load the public server directory the website shows:
 
-```bash
-SEED=1 DATABASE_URL='...' supabase/scripts/migrate.sh
+```powershell
+$env:SEED = "1"
+bash supabase/scripts/migrate.sh
 ```
 
-✅ **Check:** connect with `psql "$DATABASE_URL" -c '\dt public.*'` — you should see mcpfold's tables
-and a `schema_migrations` ledger.
+✅ **Check:** you should see mcpfold's tables and a `schema_migrations` ledger:
+
+```powershell
+psql $env:DATABASE_URL -c '\dt public.*'
+```
 
 ---
 
@@ -216,17 +231,19 @@ its own container and gets its **own** host, `functions.mcpfold.com`.
 5. **Deploy.** Coolify uses the image's health check (`/health`) for zero-downtime restarts.
 
 ✅ **Check 1 (service is up):**
-```bash
-curl https://functions.mcpfold.com/health
+```powershell
+curl.exe https://functions.mcpfold.com/health
 # → {"ok":true,"service":"mcpfold-edge"}
 ```
 
 ✅ **Check 2 (it can actually reach the database — this is the important one):**
-```bash
-curl -X POST https://functions.mcpfold.com/auth-device/start \
-  -H 'content-type: application/json' -d '{"machine_name":"test"}'
+```powershell
+curl.exe -X POST https://functions.mcpfold.com/auth-device/start -H "content-type: application/json" -d '{\"machine_name\":\"test\"}'
 # → a JSON device code
 ```
+> Use `curl.exe` (not `curl`) — in PowerShell plain `curl` is an alias for `Invoke-WebRequest` with
+> different syntax. Keep it on **one line**; PowerShell doesn't use `\` for line continuation.
+
 `/health` passing does **not** prove the database works — it doesn't touch Postgres. The
 `/auth-device/start` call writes a row, so a device code back means the `DATABASE_URL` and network are
 correct. A `500` here means the DB connection is wrong — see
@@ -389,6 +406,10 @@ If you want browser sign-in via GitHub for device-code login:
 
 ## Troubleshooting
 
+> The `docker …` commands below run **on your server** — in an SSH session or Coolify's built-in
+> terminal — where the shell is Linux/bash, so `grep` and `--tail` work as written. Everything you run
+> from your own machine stays PowerShell.
+
 ### Supabase won't start (analytics unhealthy)
 
 Symptom: the deploy log ends with `dependency failed to start: container supabase-analytics-… is
@@ -408,7 +429,7 @@ Fix:
 
 ### Edge can't reach the database
 
-Symptom: `curl https://functions.mcpfold.com/health` is fine, but `POST /auth-device/start` returns a
+Symptom: `curl.exe https://functions.mcpfold.com/health` is fine, but `POST /auth-device/start` returns a
 `500`.
 
 Fix — read the edge logs: `docker logs <edge-container> --tail 40`:
@@ -437,9 +458,8 @@ Almost always a key mismatch:
 
 The CLI defaults to `https://functions.mcpfold.com`. To test against a different endpoint (or before a
 release ships the new default), override it:
-```bash
-export MCPFOLD_API_URL="https://functions.mcpfold.com"   # bash
-$env:MCPFOLD_API_URL = "https://functions.mcpfold.com"   # PowerShell
+```powershell
+$env:MCPFOLD_API_URL = "https://functions.mcpfold.com"
 ```
 
 ---
@@ -448,9 +468,9 @@ $env:MCPFOLD_API_URL = "https://functions.mcpfold.com"   # PowerShell
 
 | Surface | Quick check |
 | ------- | ----------- |
-| Supabase | `curl https://api.mcpfold.com/rest/v1/` → PostgREST JSON |
-| Database | `psql "$DATABASE_URL" -c '\dt public.*'` shows tables + `schema_migrations` |
-| Edge (up) | `curl https://functions.mcpfold.com/health` → `{"ok":true,...}` |
+| Supabase | `curl.exe https://api.mcpfold.com/rest/v1/` → PostgREST JSON |
+| Database | `psql $env:DATABASE_URL -c '\dt public.*'` shows tables + `schema_migrations` |
+| Edge (up) | `curl.exe https://functions.mcpfold.com/health` → `{"ok":true,...}` |
 | Edge (DB) | `POST /auth-device/start` → a device code (proves Postgres write) |
 | Marketing site | `mcpfold.com` loads; `/docs` + `/schema/v1.json` resolve |
 | Web console | `app.mcpfold.com` signs in; a cross-tenant read is denied |
