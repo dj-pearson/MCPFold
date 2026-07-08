@@ -41,6 +41,13 @@ export {
 export { runDiff, type ClientDiff, type DiffData, type DiffOptions } from './commands/diff.js';
 export { runInit, starterConfig, type InitData, type InitOptions } from './commands/init.js';
 export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';
+export {
+  runStatus,
+  type StatusClient,
+  type StatusCloud,
+  type StatusData,
+  type StatusOptions,
+} from './commands/status.js';
 export { runMigrate, type MigrateData, type MigrateOptions } from './commands/migrate.js';
 export {
   scaffoldAdapter,

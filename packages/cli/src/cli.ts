@@ -4,6 +4,7 @@ import { runSync } from './commands/sync.js';
 import { runDiff } from './commands/diff.js';
 import { runInit } from './commands/init.js';
 import { runDoctor } from './commands/doctor.js';
+import { runStatus } from './commands/status.js';
 import { runImport } from './commands/import.js';
 import { runAdd } from './commands/add.js';
 import { runRun } from './commands/run.js';
@@ -181,6 +182,15 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   ).action(async (opts: GlobalFlags) => {
     const ctx = resolve(opts);
     setExit(await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer));
+  });
+
+  addGlobalFlags(
+    program
+      .command('status')
+      .description('at-a-glance health: detected clients, drift, config health, cloud state'),
+  ).action(async (opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('status', ctx.json, () => runStatus({ cwd: ctx.cwd }), writer));
   });
 
   addGlobalFlags(

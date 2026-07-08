@@ -2258,7 +2258,7 @@
       "epic": "E10",
       "order": 60,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S3.6",
         "S3.7",
