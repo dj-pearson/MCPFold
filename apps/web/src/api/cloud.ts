@@ -23,6 +23,7 @@ export interface CloudApi {
   saveConfig(config: Config): Promise<{ version: number }>;
   getMachines(): Promise<{ machines: MachineStatus[]; latestVersion: number }>;
   getVersionHistory(): Promise<VersionRecord[]>;
+  revokeMachine(name: string): Promise<void>;
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'https://api.mcpfold.com';
@@ -63,6 +64,14 @@ function httpCloudApi(base: string, getToken: () => string | null): CloudApi {
       if (!res.ok) throw new Error(`Could not load history (${res.status}).`);
       return (await res.json()) as VersionRecord[];
     },
+    async revokeMachine(name) {
+      const res = await fetch(`${base}/revoke`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...authHeader() },
+        body: JSON.stringify({ machine_name: name }),
+      });
+      if (!res.ok) throw new Error(`Could not revoke ${name} (${res.status}).`);
+    },
   };
 }
 
@@ -71,6 +80,10 @@ let mockSingleton: CloudApi | null = null;
 function mockCloudApi(): CloudApi {
   let config: Config = { version: 1, servers: {}, profiles: {} };
   let version = 0;
+  let machines: MachineStatus[] = [
+    { name: 'laptop', lastSeen: '2026-07-08T10:00:00Z', lastVersion: 3 },
+    { name: 'desktop', lastSeen: '2026-07-07T09:00:00Z', lastVersion: 2 },
+  ];
   return {
     getConfig: () => Promise.resolve(version > 0 ? { config, version } : null),
     saveConfig: (next) => {
@@ -78,14 +91,11 @@ function mockCloudApi(): CloudApi {
       version += 1;
       return Promise.resolve({ version });
     },
-    getMachines: () =>
-      Promise.resolve({
-        latestVersion: 3,
-        machines: [
-          { name: 'laptop', lastSeen: '2026-07-08T10:00:00Z', lastVersion: 3 },
-          { name: 'desktop', lastSeen: '2026-07-07T09:00:00Z', lastVersion: 2 },
-        ],
-      }),
+    getMachines: () => Promise.resolve({ latestVersion: 3, machines: [...machines] }),
+    revokeMachine: (name) => {
+      machines = machines.filter((m) => m.name !== name);
+      return Promise.resolve();
+    },
     getVersionHistory: () =>
       Promise.resolve([
         { version: 3, author: 'dev@mcpfold.com', at: '2026-07-08T10:00:00Z' },

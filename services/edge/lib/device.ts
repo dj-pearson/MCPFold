@@ -59,14 +59,10 @@ export type PollResult =
     expires_in: number;
   }
   | { status: "pending"; interval: number }
-  | { status: "error"; error: "expired_token" | "invalid_grant" };
-
-export type RefreshResult =
-  | { ok: true; access_token: string; token_type: "Bearer"; expires_in: number }
-  | { ok: false; error: "invalid_grant" | "expired" | "revoked" };
+  | { status: "error"; error: "expired_token" | "invalid_grant" | "slow_down" };
 
 /** Mint an access token PostgREST + RLS will accept exactly like a GoTrue-issued one. */
-async function mintAccessToken(
+export async function mintAccessToken(
   cfg: DeviceAuthConfig,
   userId: string,
   machineName: string | null,
@@ -153,7 +149,8 @@ export async function pollDeviceAuth(
   const hash = await sha256Hex(opts.deviceCode);
 
   const [row] = await sql`
-    select status, expires_at from public.device_codes where device_code_hash = ${hash}
+    select status, expires_at, interval_seconds, last_polled_at
+    from public.device_codes where device_code_hash = ${hash}
   `;
   if (!row) return { status: "error", error: "invalid_grant" };
 
@@ -166,10 +163,18 @@ export async function pollDeviceAuth(
   }
 
   if (row.status === "pending") {
+    // Rate-limit polling (RFC 8628 slow_down): refuse a poll that arrives faster than the
+    // advertised interval, so a client can't hammer the endpoint brute-forcing user codes.
+    const interval = (row.interval_seconds as number) ?? cfg.pollIntervalSeconds;
+    if (
+      row.last_polled_at && now.getTime() - new Date(row.last_polled_at).getTime() < interval * 1000
+    ) {
+      return { status: "error", error: "slow_down" };
+    }
     await sql`
       update public.device_codes set last_polled_at = ${now} where device_code_hash = ${hash}
     `;
-    return { status: "pending", interval: cfg.pollIntervalSeconds };
+    return { status: "pending", interval };
   }
 
   // 'claimed' (already redeemed — device codes are single-use) or 'expired'.
@@ -190,11 +195,13 @@ export async function pollDeviceAuth(
   const refreshToken = generateDeviceCode(opts.random);
   const refreshHash = await sha256Hex(refreshToken);
   const refreshExpiresAt = new Date(now.getTime() + cfg.refreshTtlSeconds * 1000);
+  // A new session opens a new refresh-token family (S9.5) for rotation + reuse detection.
+  const familyId = crypto.randomUUID();
   await sql`
     insert into public.sessions
-      (user_id, refresh_token_hash, machine_name, created_at, expires_at)
+      (user_id, refresh_token_hash, machine_name, family_id, created_at, expires_at)
     values
-      (${userId}, ${refreshHash}, ${machineName}, ${now}, ${refreshExpiresAt})
+      (${userId}, ${refreshHash}, ${machineName}, ${familyId}, ${now}, ${refreshExpiresAt})
   `;
 
   return {
@@ -206,40 +213,4 @@ export async function pollDeviceAuth(
   };
 }
 
-/**
- * Step 4 — exchange a refresh token for a fresh access token. Rotation + reuse-detection
- * are hardened in S9.5; here the presented refresh credential is looked up, its expiry and
- * revocation are checked, and `last_used_at` is recorded.
- */
-export async function refreshSession(
-  sql: Sql,
-  cfg: DeviceAuthConfig,
-  opts: { refreshToken: string; now?: Date },
-): Promise<RefreshResult> {
-  const now = opts.now ?? new Date();
-  const hash = await sha256Hex(opts.refreshToken);
-
-  const [row] = await sql`
-    select user_id, machine_name, expires_at, revoked_at
-    from public.sessions where refresh_token_hash = ${hash}
-  `;
-  if (!row) return { ok: false, error: "invalid_grant" };
-  if (row.revoked_at) return { ok: false, error: "revoked" };
-  if (new Date(row.expires_at) <= now) return { ok: false, error: "expired" };
-
-  await sql`
-    update public.sessions set last_used_at = ${now} where refresh_token_hash = ${hash}
-  `;
-  const accessToken = await mintAccessToken(
-    cfg,
-    row.user_id as string,
-    (row.machine_name as string | null) ?? null,
-    now,
-  );
-  return {
-    ok: true,
-    access_token: accessToken,
-    token_type: "Bearer",
-    expires_in: cfg.accessTtlSeconds,
-  };
-}
+// Refresh rotation + reuse detection + per-machine revocation live in src/session.ts (S9.5).

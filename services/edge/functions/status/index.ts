@@ -4,8 +4,9 @@
 //   GET …/history  → [{ version, author, at }]   (recent personal-config versions)
 
 import type { DeviceAuthConfig, Sql } from "../../lib/device.ts";
-import { authenticate, json } from "../../lib/http.ts";
+import { authenticate, json, readJson } from "../../lib/http.ts";
 import { asUser } from "../../lib/rls.ts";
+import { revokeMachine } from "../../src/session.ts";
 
 export interface StatusDeps {
   sql: Sql;
@@ -63,5 +64,23 @@ export function createHistoryHandler(deps: StatusDeps): (req: Request) => Promis
     return json(
       rows.map((r) => ({ version: Number(r.version), author: r.author ?? "", at: r.at })),
     );
+  };
+}
+
+/** POST …/revoke { machine_name } → revoke all of the caller's sessions for that machine (S9.5). */
+export function createRevokeHandler(deps: StatusDeps): (req: Request) => Promise<Response> {
+  const now = deps.now ?? (() => new Date());
+  return async (req) => {
+    if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+    const at = now();
+    const userId = await authenticate(req, deps.cfg.jwtSecret, at);
+    if (!userId) return json({ error: "unauthorized" }, 401);
+
+    const body = await readJson(req);
+    const machineName = typeof body.machine_name === "string" ? body.machine_name : "";
+    if (!machineName) return json({ error: "invalid_request" }, 400);
+
+    const { revoked } = await revokeMachine(deps.sql, { userId, machineName, now: at });
+    return json({ revoked });
   };
 }

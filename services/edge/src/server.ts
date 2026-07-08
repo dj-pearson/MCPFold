@@ -7,7 +7,11 @@ import postgres from "postgres";
 import { createHandler } from "../functions/auth-device/index.ts";
 import { createPushHandler } from "../functions/push/index.ts";
 import { createPullHandler } from "../functions/pull/index.ts";
-import { createHistoryHandler, createMachinesHandler } from "../functions/status/index.ts";
+import {
+  createHistoryHandler,
+  createMachinesHandler,
+  createRevokeHandler,
+} from "../functions/status/index.ts";
 import { DEFAULT_CONFIG, type DeviceAuthConfig, type Sql } from "../lib/device.ts";
 import { json } from "../lib/http.ts";
 
@@ -18,6 +22,7 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
   const pull = createPullHandler({ sql, cfg });
   const machines = createMachinesHandler({ sql, cfg });
   const history = createHistoryHandler({ sql, cfg });
+  const revoke = createRevokeHandler({ sql, cfg });
   return (req) => {
     const path = new URL(req.url).pathname.replace(/\/+$/, "");
     if (path.endsWith("/health") || path === "") {
@@ -27,6 +32,7 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
     if (path.endsWith("/pull")) return pull(req);
     if (path.endsWith("/machines")) return machines(req);
     if (path.endsWith("/history")) return history(req);
+    if (path.endsWith("/revoke")) return revoke(req);
     return auth(req);
   };
 }

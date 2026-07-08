@@ -25,3 +25,12 @@ test('sync dashboard lists machines and highlights an out-of-date one', async ({
   await expect(page.getByTestId('history-3')).toContainText('dev@mcpfold.com');
   await expect(page.getByTestId('history-1')).toBeVisible();
 });
+
+test('revoking a machine removes it from the dashboard (S9.5)', async ({ page }) => {
+  await login(page);
+  await page.goto('/machines');
+  await expect(page.getByTestId('machine-desktop')).toBeVisible();
+  await page.getByTestId('revoke-desktop').click();
+  await expect(page.getByTestId('machine-desktop')).toHaveCount(0);
+  await expect(page.getByTestId('machine-laptop')).toBeVisible();
+});

@@ -20,10 +20,10 @@ import {
   approveDeviceAuth,
   type DeviceAuthConfig,
   pollDeviceAuth,
-  refreshSession,
   type Sql,
   startDeviceAuth,
 } from "../../lib/device.ts";
+import { rotateRefresh } from "../../src/session.ts";
 import { verifyJwt } from "../../lib/jwt.ts";
 import { json, readJson, segment } from "../../lib/http.ts";
 
@@ -113,10 +113,13 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
           const refreshToken = typeof body.refresh_token === "string" ? body.refresh_token : "";
           if (!refreshToken) return json({ error: "invalid_request" }, 400);
 
-          const result = await refreshSession(deps.sql, deps.cfg, { refreshToken, now: now() });
+          // Rotate the refresh token (S9.5): the response carries a NEW refresh token the client
+          // must store; replaying the old one trips reuse detection and revokes the family.
+          const result = await rotateRefresh(deps.sql, deps.cfg, { refreshToken, now: now() });
           if (!result.ok) return json({ error: result.error }, 400);
           return json({
             access_token: result.access_token,
+            refresh_token: result.refresh_token,
             token_type: result.token_type,
             expires_in: result.expires_in,
           }, 200);

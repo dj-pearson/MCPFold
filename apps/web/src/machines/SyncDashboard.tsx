@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { createCloudApi, type MachineStatus, type VersionRecord } from '../api/cloud';
+import { revokeMachine } from './revoke';
 
 /**
  * Per-machine sync status dashboard (S7.5). Lists each machine with its last-seen time and last
@@ -23,21 +24,33 @@ export function SyncDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  async function load(): Promise<void> {
+    const [m, h] = await Promise.all([api.getMachines(), api.getVersionHistory()]);
+    setMachines(m.machines);
+    setLatestVersion(m.latestVersion);
+    setHistory(h);
+  }
+
   useEffect(() => {
     let active = true;
-    Promise.all([api.getMachines(), api.getVersionHistory()])
-      .then(([m, h]) => {
-        if (!active) return;
-        setMachines(m.machines);
-        setLatestVersion(m.latestVersion);
-        setHistory(h);
-      })
+    load()
       .catch((e) => active && setError(e instanceof Error ? e.message : 'Failed to load.'))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
+
+  async function handleRevoke(name: string): Promise<void> {
+    setError(null);
+    try {
+      await revokeMachine(api, name);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Revoke failed.');
+    }
+  }
 
   if (loading) return <div className="center muted">Loading…</div>;
 
@@ -75,6 +88,13 @@ export function SyncDashboard() {
                       behind
                     </span>
                   )}
+                  <button
+                    className="link"
+                    data-testid={`revoke-${m.name}`}
+                    onClick={() => void handleRevoke(m.name)}
+                  >
+                    revoke
+                  </button>
                 </li>
               );
             })}

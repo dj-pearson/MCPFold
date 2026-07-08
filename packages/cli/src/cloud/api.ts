@@ -23,6 +23,8 @@ export type PollResponse =
 export interface RefreshResponse {
   access_token: string;
   expires_in: number;
+  /** The rotated refresh token (S9.5) — the client must store it; the old one is now invalid. */
+  refresh_token?: string;
 }
 
 export interface PushResponse {

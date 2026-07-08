@@ -40,6 +40,9 @@ export async function getAccessToken(
     const updated: CloudSession = {
       ...session,
       accessToken: refreshed.access_token,
+      // The server rotates the refresh token (S9.5) — persist the new one, or reuse detection
+      // will revoke the session on the next refresh.
+      refreshToken: refreshed.refresh_token ?? session.refreshToken,
       expiresAt: Math.floor(nowMs / 1000) + refreshed.expires_in,
     };
     await saveSession(updated, backend);
