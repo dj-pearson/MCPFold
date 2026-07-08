@@ -117,25 +117,28 @@ jobs:
       - run: pnpm -r build
       - name: Build standalone binaries + checksums
         run: pnpm build:binaries -- ${{ matrix.targets }}
-      - name: Attach binaries to the release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+      # Upload as artifacts; a single downstream job attaches them all to the release. Attaching
+      # directly from three parallel matrix jobs races on the same release (404 on asset update).
+      - name: Upload binaries artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: |
-            build/mcpfold-*-*
-            build/mcpfold-*.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: binaries-${{ matrix.platform }}
+          path: build/mcpfold-*
+          if-no-files-found: error
+          retention-days: 1
 
-  # Homebrew + Scoop: render the concrete formula/manifest from the release's binaries + checksums
-  # and push them to the tap/bucket repos so `brew upgrade` / `scoop update` track every release.
-  # One-time user setup: create dj-pearson/homebrew-tap and dj-pearson/scoop-bucket repos, and a
-  # HOMEBREW_TAP_TOKEN secret (a PAT with write access to both). Absent the token, this is skipped.
-  packaging:
-    name: publish homebrew + scoop
+  # Single job (no matrix) that collects all built binaries, attaches them to the release once, and
+  # publishes the Homebrew formula + Scoop manifest. Doing the attach here — not in the parallel
+  # matrix jobs — avoids the concurrent-asset-update race. Homebrew/Scoop push needs a one-time
+  # HOMEBREW_TAP_TOKEN (PAT with write access to dj-pearson/homebrew-tap + scoop-bucket); without it
+  # the manifests are rendered but the push is skipped (the release still succeeds).
+  publish-assets:
+    name: attach binaries + publish homebrew/scoop
     if: github.event_name == 'release'
     needs: binaries
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       TAG: ${{ github.event.release.tag_name }}
@@ -144,12 +147,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Download release checksums
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: build
+          pattern: binaries-*
+          merge-multiple: true
+      - name: Attach binaries to the release (once, no race)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          files: |
+            build/mcpfold-*-*
+            build/mcpfold-*.sha256
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p build
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.sha256' --dir build
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Render Homebrew formula + Scoop manifest
         run: node scripts/render-packaging.mjs "$TAG"
       - name: Push to homebrew-tap + scoop-bucket
