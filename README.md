@@ -1,4 +1,9 @@
-# mcpfold
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/logo-readme-dark.png" />
+    <img src="./assets/logo-readme-light.png" alt="mcpfold" width="380" />
+  </picture>
+</h1>
 
 **Connect every MCP server without paying the context-window tax.** `mcpfold` keeps one
 canonical config and folds it out to every client — loading only the tools each agent

@@ -29,7 +29,24 @@ export function Layout() {
         <Container
           style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-6)', height: 60 }}
         >
-          <a href="/" style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--fg)' }}>
+          <a
+            href="/"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              fontWeight: 800,
+              fontSize: '1.15rem',
+              color: 'var(--fg)',
+            }}
+          >
+            <img
+              src="/logo-mark.png"
+              alt="mcpfold logo"
+              width={28}
+              height={28}
+              style={{ borderRadius: 6, display: 'block' }}
+            />
             mcpfold
           </a>
           <nav style={{ display: 'flex', gap: 'var(--space-6)', marginLeft: 'auto' }}>

@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0b0d12" />
 
+    <!-- Brand icons (from assets/icon.png) -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
     <!-- SEO baseline (S13.1) — the Seo component keeps these in sync per route on client nav. -->
     <title>mcpfold — one config for every MCP client</title>
     <meta
@@ -23,7 +30,9 @@
       content="Connect every MCP server without paying the context-window tax."
     />
     <meta property="og:url" content="https://mcpfold.com/" />
-    <meta property="og:image" content="https://mcpfold.com/og.svg" />
+    <meta property="og:image" content="https://mcpfold.com/og.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -32,7 +41,7 @@
       name="twitter:description"
       content="Connect every MCP server without paying the context-window tax."
     />
-    <meta name="twitter:image" content="https://mcpfold.com/og.svg" />
+    <meta name="twitter:image" content="https://mcpfold.com/og.png" />
 
     <!-- Privacy-friendly analytics (S13.1): cookieless, no PII. Enabled only when the site is
          built with VITE_ANALYTICS_SRC + VITE_ANALYTICS_DOMAIN (see src/analytics.ts + docs). -->
