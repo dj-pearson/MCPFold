@@ -132,6 +132,11 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost:54322/postgres
         run: bash supabase/scripts/smoke-test.sh
 
+      - name: RLS + immutability + reference-only tests
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:54322/postgres
+        run: bash supabase/scripts/test-rls.sh
+
       - name: Tear down
         if: always()
         run: docker compose -f supabase/docker-compose.ci.yml down -v

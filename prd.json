@@ -1559,7 +1559,7 @@
       "epic": "E6",
       "order": 39,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S6.1"
       ],

@@ -19,9 +19,11 @@ CI runs on every push and pull request via [`.github/workflows/ci.yml`](../.gith
   site is publishable.
 - **`db integration`** — stands up the CI Supabase database
   (`supabase/docker-compose.ci.yml`), applies the migrations with
-  `supabase/scripts/migrate.sh`, and runs `supabase/scripts/smoke-test.sh` (which also
-  asserts the runner is idempotent). A broken migration fails here before it can reach the
-  Coolify deployment. See [Self-hosting](./self-hosting.md).
+  `supabase/scripts/migrate.sh`, then runs `smoke-test.sh` (bootstrap + idempotency) and
+  `test-rls.sh` (tenant isolation — user A cannot read user B's configs — append-only
+  immutability, reference-only enforcement, and the audit trail). A broken migration or a
+  security-policy regression fails here before it can reach the Coolify deployment. See
+  [Self-hosting](./self-hosting.md).
 
 ## Docs deployment (GitHub Pages)
 
