@@ -23,6 +23,7 @@
   "dependencies": {
     "@mcpfold/adapters": "workspace:*",
     "@mcpfold/core": "workspace:*",
+    "@mcpfold/secrets": "workspace:*",
     "commander": "^12.1.0"
   },
   "publishConfig": {

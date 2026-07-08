@@ -6,6 +6,9 @@ import { runDiff } from './commands/diff.js';
 import { runInit } from './commands/init.js';
 import { runDoctor } from './commands/doctor.js';
 import { runImport } from './commands/import.js';
+import { runRun } from './commands/run.js';
+import { runSecretSet, runSecretTest } from './commands/secret.js';
+import { toEnvelopeError } from './output/envelope.js';
 import { runCommand, type Writer } from './output/render.js';
 import { EXIT, type ExitCode } from './output/exit-codes.js';
 import { enableDebug } from './util/debug.js';
@@ -169,6 +172,58 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     setExit(await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer));
   });
 
+  // run <name> — the shim launcher. Its exit code is the child server's, so it bypasses the
+  // envelope and writes only coded errors (never a secret) to stderr.
+  const errWrite = (text: string): void =>
+    (writer?.err ?? ((t: string) => process.stderr.write(t)))(text);
+  addGlobalFlags(
+    program
+      .command('run')
+      .description('internal shim launcher (resolve secrets, inject, exec the server)')
+      .argument('<name>', 'server name from the canonical config'),
+  ).action(async (name: string, opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    try {
+      setExit((await runRun({ cwd: ctx.cwd, name })) as ExitCode);
+    } catch (error) {
+      const enorm = toEnvelopeError(error);
+      errWrite(`error: ${enorm.message}\n`);
+      if (enorm.hint) errWrite(`  → ${enorm.hint}\n`);
+      setExit(EXIT.ERROR);
+    }
+  });
+
+  // secret set|test
+  const secretCmd = program.command('secret').description('wire up and verify secret providers');
+  addGlobalFlags(
+    secretCmd
+      .command('test')
+      .description('resolve a ${scheme:path} reference and report success (value hidden)')
+      .argument('<ref>', 'a ${scheme:path} secret reference'),
+  ).action(async (ref: string, opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand('secret test', ctx.json, () => runSecretTest({ cwd: ctx.cwd, ref }), writer),
+    );
+  });
+  addGlobalFlags(
+    secretCmd
+      .command('set')
+      .description('store a secret value for a backend that supports it (dotenv)')
+      .argument('<ref>', 'a ${scheme:path} secret reference')
+      .requiredOption('--value <value>', 'the value to store (never echoed)'),
+  ).action(async (ref: string, opts: GlobalFlags & { value: string }) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'secret set',
+        ctx.json,
+        () => runSecretSet({ cwd: ctx.cwd, ref, value: opts.value }),
+        writer,
+      ),
+    );
+  });
+
   // ---- Stubbed commands (implemented in later stories) ------------------------
 
   const stub = (name: string, description: string, story: string): void => {
@@ -192,8 +247,6 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   };
 
   stub('add', 'interactive: add a server by URL/package', 'S3.4');
-  stub('secret', 'wire up and verify a secret provider', 'S4.8');
-  stub('run', 'internal shim launcher (resolve secret, filter tools, exec server)', 'S4.7');
   stub('login', 'authenticate to the mcpfold cloud (device-code OAuth)', 'S6.6');
   stub('push', 'push the canonical config to the cloud', 'S6.6');
   stub('pull', 'pull the canonical config from the cloud', 'S6.6');

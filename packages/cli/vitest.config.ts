@@ -6,12 +6,14 @@ import { defineConfig } from 'vitest/config';
 // real dist via node_modules, and pnpm builds core before cli topologically.
 const coreSrc = fileURLToPath(new URL('../core/src/index.ts', import.meta.url));
 const adaptersSrc = fileURLToPath(new URL('../adapters/src/index.ts', import.meta.url));
+const secretsSrc = fileURLToPath(new URL('../secrets/src/index.ts', import.meta.url));
 
 export default defineConfig({
   resolve: {
     alias: {
       '@mcpfold/core': coreSrc,
       '@mcpfold/adapters': adaptersSrc,
+      '@mcpfold/secrets': secretsSrc,
     },
   },
   test: {

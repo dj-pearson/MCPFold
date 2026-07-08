@@ -1,7 +1,15 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { diffRendered, resolveProfile, UnknownProfileError, type ConfigDiff } from '@mcpfold/core';
+import {
+  diffRendered,
+  resolveProfile,
+  UnknownProfileError,
+  type ConfigDiff,
+  type ResolvedServer,
+} from '@mcpfold/core';
 import { realOsContext, registerAll, requireAdapter, type OsContext } from '@mcpfold/adapters';
+import { defaultProviders, resolveSecrets } from '@mcpfold/secrets';
 import { loadConfigFromDisk } from '../util/config.js';
+import { renderWithStrategy } from '../sync/strategy.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
 
@@ -30,7 +38,7 @@ export interface DiffOptions {
   osContext?: OsContext;
 }
 
-export function runDiff(options: DiffOptions): CommandOutput<DiffData> {
+export async function runDiff(options: DiffOptions): Promise<CommandOutput<DiffData>> {
   registerAll();
   const ctx = options.osContext ?? realOsContext();
   const { config } = loadConfigFromDisk(options.cwd);
@@ -40,12 +48,18 @@ export function runDiff(options: DiffOptions): CommandOutput<DiffData> {
   }
   const profileNames = options.profile ? [options.profile] : Object.keys(config.profiles).sort();
 
+  const resolve = (servers: ResolvedServer[]): Promise<ResolvedServer[]> =>
+    resolveSecrets(servers, { providers: defaultProviders(options.cwd) });
+
   const clients: ClientDiff[] = [];
   let drift = false;
   for (const name of profileNames) {
     const profile = config.profiles[name]!;
     const adapter = requireAdapter(profile.client);
-    const file = adapter.render(resolveProfile(config, name), ctx);
+    const file = await renderWithStrategy(adapter, resolveProfile(config, name), {
+      osContext: ctx,
+      resolve,
+    });
     const onDisk = existsSync(file.path) ? readFileSync(file.path, 'utf8') : undefined;
     const diff = diffRendered(file, onDisk, adapter);
     if (diff.hasDrift) drift = true;

@@ -44,6 +44,20 @@ export {
 export { detectClients, type DetectedClient } from './util/detect-clients.js';
 export type { Finding, Severity } from './checks/types.js';
 
+// Secret strategies + shim launcher + secret command (E4)
+export {
+  renderWithStrategy,
+  InlineNotIgnoredError,
+  type StrategyOptions,
+} from './sync/strategy.js';
+export { runRun, type RunOptions, type Spawner } from './commands/run.js';
+export {
+  runSecretSet,
+  runSecretTest,
+  type SecretSetData,
+  type SecretTestData,
+} from './commands/secret.js';
+
 // IO helpers (S3.5)
 export { atomicWrite } from './io/atomic-write.js';
 export { backupIfExists } from './io/backup.js';

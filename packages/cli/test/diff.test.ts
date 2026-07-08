@@ -31,22 +31,22 @@ afterEach(() => {
 });
 
 describe('runDiff (S3.6)', () => {
-  it('missing target → drift with exit DIFF, reported gracefully', () => {
-    const result = runDiff({ cwd, osContext: ctx });
+  it('missing target → drift with exit DIFF, reported gracefully', async () => {
+    const result = await runDiff({ cwd, osContext: ctx });
     expect(result.exit).toBe(EXIT.DIFF);
     expect(result.data.drift).toBe(true);
     expect(result.data.clients[0]?.diff.fileMissing).toBe(true);
   });
 
-  it('after sync, clean state → exit 0, no drift', () => {
-    runSync({ cwd, osContext: ctx });
-    const result = runDiff({ cwd, osContext: ctx });
+  it('after sync, clean state → exit 0, no drift', async () => {
+    await runSync({ cwd, osContext: ctx });
+    const result = await runDiff({ cwd, osContext: ctx });
     expect(result.exit).toBe(EXIT.SUCCESS);
     expect(result.data.drift).toBe(false);
   });
 
-  it('a modified on-disk file → exit DIFF and a shown change', () => {
-    runSync({ cwd, osContext: ctx });
+  it('a modified on-disk file → exit DIFF and a shown change', async () => {
+    await runSync({ cwd, osContext: ctx });
     // Tamper: add an unmanaged server on disk.
     const target = join(home, '.cursor', 'mcp.json');
     mkdirSync(join(home, '.cursor'), { recursive: true });
@@ -56,7 +56,7 @@ describe('runDiff (S3.6)', () => {
         mcpServers: { playwright: { command: 'npx' }, rogue: { command: 'evil' } },
       }),
     );
-    const result = runDiff({ cwd, osContext: ctx });
+    const result = await runDiff({ cwd, osContext: ctx });
     expect(result.exit).toBe(EXIT.DIFF);
     const serverDiffs = result.data.clients[0]?.diff.servers ?? [];
     expect(serverDiffs.find((s) => s.name === 'rogue')?.status).toBe('unmanaged');

@@ -8,11 +8,14 @@ import {
   type CheckableFile,
   type CheckResult,
   type ConfigDiff,
+  type ResolvedServer,
 } from '@mcpfold/core';
 import { realOsContext, registerAll, requireAdapter, type OsContext } from '@mcpfold/adapters';
+import { defaultProviders, resolveSecrets } from '@mcpfold/secrets';
 import { loadConfigFromDisk } from '../util/config.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import { backupIfExists } from '../io/backup.js';
+import { renderWithStrategy } from '../sync/strategy.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
 
@@ -56,7 +59,7 @@ export interface SyncOptions {
   now?: Date;
 }
 
-export function runSync(options: SyncOptions): CommandOutput<SyncData> {
+export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncData>> {
   registerAll();
   const ctx = options.osContext ?? realOsContext();
   const { config } = loadConfigFromDisk(options.cwd);
@@ -68,14 +71,23 @@ export function runSync(options: SyncOptions): CommandOutput<SyncData> {
   const preview = Boolean(options.dryRun || options.check);
 
   const results: SyncFileResult[] = [];
+  const warnings: string[] = [];
   let drift = false;
   let wrote = false;
+
+  // Only the `inline` strategy resolves values; shim/native-input never do.
+  const resolve = (servers: ResolvedServer[]): Promise<ResolvedServer[]> =>
+    resolveSecrets(servers, { providers: defaultProviders(options.cwd) });
 
   for (const name of profileNames) {
     const profile = config.profiles[name]!;
     const adapter = requireAdapter(profile.client);
     const servers = resolveProfile(config, name);
-    const file = adapter.render(servers, ctx);
+    const file = await renderWithStrategy(adapter, servers, {
+      osContext: ctx,
+      resolve,
+      onWarn: (w) => warnings.push(w),
+    });
     const onDisk = existsSync(file.path) ? readFileSync(file.path, 'utf8') : undefined;
 
     if (preview) {
@@ -126,7 +138,7 @@ export function runSync(options: SyncOptions): CommandOutput<SyncData> {
   // --check is the CI gate; --dry-run is informational (always exits 0).
   const exit = options.check && drift ? EXIT.DIFF : EXIT.SUCCESS;
 
-  return { data: { results, drift, wrote }, human, exit };
+  return { data: { results, drift, wrote }, human, warnings, exit };
 }
 
 function renderHuman(
