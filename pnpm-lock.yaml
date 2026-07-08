@@ -50,6 +50,9 @@ importers:
       '@mcpfold/core':
         specifier: workspace:*
         version: link:../core
+      '@mcpfold/proxy':
+        specifier: workspace:*
+        version: link:../proxy
       '@mcpfold/secrets':
         specifier: workspace:*
         version: link:../secrets
@@ -65,6 +68,12 @@ importers:
       zod:
         specifier: ^3.24.1
         version: 3.25.76
+
+  packages/proxy:
+    dependencies:
+      '@mcpfold/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/schema:
     dependencies:

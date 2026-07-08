@@ -9,6 +9,7 @@ export default defineConfig({
       '@mcpfold/core': src('../packages/core/src/index.ts'),
       '@mcpfold/adapters': src('../packages/adapters/src/index.ts'),
       '@mcpfold/secrets': src('../packages/secrets/src/index.ts'),
+      '@mcpfold/proxy': src('../packages/proxy/src/index.ts'),
       mcpfold: src('../packages/cli/src/index.ts'),
     },
   },

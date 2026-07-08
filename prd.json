@@ -1406,7 +1406,7 @@
       "epic": "E5",
       "order": 34,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S4.7"
       ],
@@ -1437,7 +1437,7 @@
       "epic": "E5",
       "order": 35,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S5.1"
       ],
@@ -1467,7 +1467,7 @@
       "epic": "E5",
       "order": 36,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S5.2",
         "S4.7"
@@ -1497,7 +1497,7 @@
       "epic": "E5",
       "order": 37,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S5.3"
       ],

@@ -7,6 +7,7 @@ import { defineConfig } from 'vitest/config';
 const coreSrc = fileURLToPath(new URL('../core/src/index.ts', import.meta.url));
 const adaptersSrc = fileURLToPath(new URL('../adapters/src/index.ts', import.meta.url));
 const secretsSrc = fileURLToPath(new URL('../secrets/src/index.ts', import.meta.url));
+const proxySrc = fileURLToPath(new URL('../proxy/src/index.ts', import.meta.url));
 
 export default defineConfig({
   resolve: {
@@ -14,6 +15,7 @@ export default defineConfig({
       '@mcpfold/core': coreSrc,
       '@mcpfold/adapters': adaptersSrc,
       '@mcpfold/secrets': secretsSrc,
+      '@mcpfold/proxy': proxySrc,
     },
   },
   test: {

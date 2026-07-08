@@ -7,7 +7,8 @@
     "paths": {
       "@mcpfold/core": ["../core/src/index.ts"],
       "@mcpfold/adapters": ["../adapters/src/index.ts"],
-      "@mcpfold/secrets": ["../secrets/src/index.ts"]
+      "@mcpfold/secrets": ["../secrets/src/index.ts"],
+      "@mcpfold/proxy": ["../proxy/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]

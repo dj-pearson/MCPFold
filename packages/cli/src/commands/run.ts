@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
-import { UsageError, type ResolvedServer } from '@mcpfold/core';
+import { UsageError, type ResolvedServer, type ToolsDirective } from '@mcpfold/core';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
+import { connectProxy, streamTransport } from '@mcpfold/proxy';
 import { loadConfigFromDisk } from '../util/config.js';
 
 /**
@@ -32,12 +33,53 @@ const defaultSpawner: Spawner = (command, args, env) =>
     });
   });
 
+/** Spawns a piped child and proxies its stdio through the tool filter; resolves to exit code. */
+export type ProxySpawner = (
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  tools: ToolsDirective,
+) => Promise<number>;
+
+const defaultProxySpawner: ProxySpawner = (command, args, env, tools) =>
+  new Promise<number>((resolve) => {
+    // stderr is inherited so the server's logs still reach the terminal; stdin/stdout are
+    // piped so the proxy can sit between the MCP client (our process) and the real server.
+    const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'inherit'], env });
+    const clientTransport = streamTransport(process.stdin, process.stdout);
+    const serverTransport = streamTransport(child.stdout!, child.stdin!);
+    const dispose = connectProxy(clientTransport, serverTransport, { tools });
+
+    const forward = (signal: NodeJS.Signals): void => {
+      if (!child.killed) child.kill(signal);
+    };
+    process.on('SIGINT', forward);
+    process.on('SIGTERM', forward);
+    child.on('error', () => {
+      dispose();
+      resolve(127);
+    });
+    child.on('exit', (code, signal) => {
+      dispose();
+      process.off('SIGINT', forward);
+      process.off('SIGTERM', forward);
+      resolve(code ?? (signal ? 1 : 0));
+    });
+  });
+
+/** True when a server should launch behind the tool-filtering proxy (S5.3). */
+export function shouldUseProxy(server: { transport: string; tools?: ToolsDirective }): boolean {
+  return server.transport === 'stdio' && server.tools !== undefined;
+}
+
 export interface RunOptions {
   cwd: string;
   name: string;
   providers?: SecretProvider[];
-  /** Injectable spawner for tests. */
+  /** Injectable plain spawner for tests. */
   spawnFn?: Spawner;
+  /** Injectable proxy spawner for tests. */
+  proxySpawnFn?: ProxySpawner;
 }
 
 /** Rewrite an `@latest` package spec to the pinned version (supply-chain hygiene). */
@@ -82,6 +124,13 @@ export async function runRun(options: RunOptions): Promise<number> {
   if (s.transport === 'stdio') {
     const args = applyPin(s.args, s.pin) ?? [];
     const env: NodeJS.ProcessEnv = { ...process.env, ...(s.env ?? {}) };
+    // S5.3: when the server declares a `tools` directive, route stdio through the proxy so
+    // the client sees only the allowed tools. With no directive, plain passthrough — no
+    // proxy overhead.
+    if (s.tools) {
+      const proxySpawner = options.proxySpawnFn ?? defaultProxySpawner;
+      return proxySpawner(s.command ?? '', args, env, s.tools);
+    }
     return spawner(s.command ?? '', args, env);
   }
   // http / sse → bridge with mcp-remote and resolved headers.

@@ -56,7 +56,13 @@ export {
   InlineNotIgnoredError,
   type StrategyOptions,
 } from './sync/strategy.js';
-export { runRun, type RunOptions, type Spawner } from './commands/run.js';
+export {
+  runRun,
+  shouldUseProxy,
+  type ProxySpawner,
+  type RunOptions,
+  type Spawner,
+} from './commands/run.js';
 export {
   runSecretSet,
   runSecretTest,
