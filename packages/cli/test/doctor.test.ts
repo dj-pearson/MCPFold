@@ -96,4 +96,49 @@ describe('runDoctor (S3.7)', () => {
     expect(f?.severity).toBe('error');
     expect(f?.fix).toContain('"servers"');
   });
+
+  it('flags an unpinned mcp-remote bridge in a client config (S17.1, CVE-2025-6514)', () => {
+    write(`{
+      "version": 1,
+      "servers": { "gh": { "transport": "http", "url": "https://x/mcp", "auth": { "type": "bearer", "token": "\${env:T}" }, "tags": ["t"] } },
+      "profiles": { "ws": { "client": "windsurf", "scope": "user", "include": ["t"] } }
+    }`);
+    // Plant a Windsurf config that launches an UNPINNED mcp-remote (the pre-S17.1 shape).
+    const wsDir = join(home, '.codeium', 'windsurf');
+    mkdirSync(wsDir, { recursive: true });
+    writeFileSync(
+      join(wsDir, 'mcp_config.json'),
+      JSON.stringify({
+        mcpServers: { gh: { command: 'npx', args: ['-y', 'mcp-remote', 'https://x/mcp'] } },
+      }),
+    );
+
+    const f = runDoctor({ cwd, osContext: ctx }).data.findings.find((x) =>
+      x.message.includes('mcp-remote'),
+    );
+    expect(f?.severity).toBe('warning');
+    expect(f?.message).toContain('CVE-2025-6514');
+    expect(f?.fix).toContain('mcp-remote@');
+  });
+
+  it('does NOT flag a client config whose mcp-remote is pinned to a safe version', () => {
+    write(`{
+      "version": 1,
+      "servers": { "gh": { "transport": "http", "url": "https://x/mcp", "auth": { "type": "bearer", "token": "\${env:T}" }, "tags": ["t"] } },
+      "profiles": { "ws": { "client": "windsurf", "scope": "user", "include": ["t"] } }
+    }`);
+    const wsDir = join(home, '.codeium', 'windsurf');
+    mkdirSync(wsDir, { recursive: true });
+    writeFileSync(
+      join(wsDir, 'mcp_config.json'),
+      JSON.stringify({
+        mcpServers: { gh: { command: 'npx', args: ['-y', 'mcp-remote@0.1.38', 'https://x/mcp'] } },
+      }),
+    );
+
+    const findings = runDoctor({ cwd, osContext: ctx }).data.findings.filter((x) =>
+      x.message.includes('mcp-remote'),
+    );
+    expect(findings).toEqual([]);
+  });
 });

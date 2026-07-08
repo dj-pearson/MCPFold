@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isMcpfoldError } from '@mcpfold/core';
+import { isMcpfoldError, MCP_REMOTE_SPEC } from '@mcpfold/core';
 import { envProvider } from '@mcpfold/secrets';
 import { runRun, type Spawner } from '../src/commands/run.js';
 import type { TrustGate } from '../src/trust/tofu.js';
@@ -63,7 +63,10 @@ describe('runRun (S4.7)', () => {
     };
     await runRun({ cwd, name: 'remote', providers: [envProvider({ MY_TOKEN: 'tok' })], spawnFn });
     expect(args[0]).toBe('-y');
-    expect(args).toContain('mcp-remote');
+    // The bridge is pinned to the CVE-safe spec (S17.1), never the bare unpinned package.
+    expect(args).toContain(MCP_REMOTE_SPEC);
+    expect(args).not.toContain('mcp-remote');
+    expect(MCP_REMOTE_SPEC).toMatch(/^mcp-remote@\d+\.\d+\.\d+$/);
     expect(args).toContain('Authorization: Bearer tok');
   });
 

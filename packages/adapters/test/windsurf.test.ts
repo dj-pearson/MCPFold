@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MCP_REMOTE_SPEC } from '@mcpfold/core';
 import { windsurfAdapter } from '../src/windsurf.js';
 import { sampleServers } from './fixtures/servers.js';
 import type { OsContext } from '../src/types.js';
@@ -16,14 +17,17 @@ describe('windsurfAdapter (S2.6)', () => {
       mcpServers: Record<string, { command?: string; args?: string[] }>;
     };
     // github (http + bearer) → npx mcp-remote wrapper with an Authorization header arg.
+    // The bridge MUST be pinned to the CVE-safe spec (S17.1), never bare `mcp-remote`.
     expect(parsed.mcpServers.github?.command).toBe('npx');
     expect(parsed.mcpServers.github?.args).toEqual([
       '-y',
-      'mcp-remote',
+      MCP_REMOTE_SPEC,
       'https://api.githubcopilot.com/mcp/',
       '--header',
       'Authorization: Bearer ${infisical:dev/mcp/GITHUB_PAT}',
     ]);
+    expect(MCP_REMOTE_SPEC).toMatch(/^mcp-remote@\d+\.\d+\.\d+$/);
+    expect(parsed.mcpServers.github?.args).not.toContain('mcp-remote'); // never the bare, unpinned name
     // playwright (plain stdio) renders normally.
     expect(parsed.mcpServers.playwright?.command).toBe('npx');
     expect(parsed.mcpServers.playwright?.args).toEqual(['-y', '@playwright/mcp@latest']);

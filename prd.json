@@ -3864,7 +3864,7 @@
       "epic": "E17",
       "order": 1,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Pin and version-gate the mcp-remote bridge (CVE-2025-6514 class)",
       "user_story": "As a user whose remote servers are bridged through mcp-remote, I want mcpfold to spawn a pinned, known-good version so a compromised or vulnerable bridge can't execute code on my machine.",

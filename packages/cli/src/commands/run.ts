@@ -1,5 +1,10 @@
 import { spawn } from 'node:child_process';
-import { UsageError, type ResolvedServer, type ToolsDirective } from '@mcpfold/core';
+import {
+  MCP_REMOTE_SPEC,
+  UsageError,
+  type ResolvedServer,
+  type ToolsDirective,
+} from '@mcpfold/core';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import { connectProxy, streamTransport } from '@mcpfold/proxy';
 import { loadConfigFromDisk } from '../util/config.js';
@@ -102,9 +107,10 @@ function applyPin(args: string[] | undefined, pin: string | undefined): string[]
   return args.map((a) => a.replace(/@latest$/, `@${pin}`));
 }
 
-/** Build `mcp-remote` args for a remote server, injecting resolved auth headers. */
+/** Build `mcp-remote` args for a remote server, injecting resolved auth headers. The bridge is
+ * pinned to a CVE-safe version via MCP_REMOTE_SPEC (see @mcpfold/core bridge.ts). */
 function remoteArgs(server: ResolvedServer): string[] {
-  const args = ['-y', 'mcp-remote', server.url ?? ''];
+  const args = ['-y', MCP_REMOTE_SPEC, server.url ?? ''];
   if (server.auth?.type === 'bearer' && server.auth.token) {
     args.push('--header', `Authorization: Bearer ${server.auth.token}`);
   }

@@ -18,7 +18,9 @@ prioritized. Adding a client is a one-PR job — see [Adapters](./adapters.md) a
 | Gemini CLI     | `mcpServers`      | user          | shim            | no                |
 
 \* Windsurf can't natively call authenticated remote servers, so authed http/sse servers are
-rewritten to a `mcp-remote` stdio invocation (reversible on import).
+rewritten to a `mcp-remote` stdio invocation (reversible on import). The bridge is always pinned
+to a CVE-safe version (`mcp-remote@0.1.38`; floor `0.1.16` fixes CVE-2025-6514) — never unpinned —
+and `mcpfold doctor` warns if it finds an unpinned or vulnerable `mcp-remote` in a client config.
 
 Every adapter passes the shared cross-adapter matrix (render → committed golden + render → parse
 round-trip) and the deterministic-serialization invariant.
