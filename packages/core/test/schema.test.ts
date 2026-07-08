@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigSchema, ServerSchema, ProfileSchema, SECRET_REF_RE } from '../src/schema.js';
+import {
+  CLIENT_IDS,
+  ConfigSchema,
+  ServerSchema,
+  ProfileSchema,
+  SECRET_REF_RE,
+} from '../src/schema.js';
+
+// S17.3: the doc comment on CLIENT_IDS claims a count ("eight clients"); keep it honest.
+describe('CLIENT_IDS (S17.3)', () => {
+  it('has exactly eight clients (matches the "eight clients" comment)', () => {
+    expect(CLIENT_IDS).toHaveLength(8);
+    expect(new Set(CLIENT_IDS).size).toBe(CLIENT_IDS.length); // no duplicates
+  });
+});
 
 /** A minimal valid config used as a base for negative variants. */
 const validConfig = {

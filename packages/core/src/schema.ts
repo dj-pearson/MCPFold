@@ -7,7 +7,7 @@ import { z } from 'zod';
  * these zod schemas. Never hand-duplicate an interface; infer it (see types.ts).
  */
 
-/** The six clients mcpfold folds config out to. */
+/** The eight clients mcpfold folds config out to (keep in sync with CLIENT_IDS.length; tested). */
 export const CLIENT_IDS = [
   'claude-desktop',
   'claude-code',

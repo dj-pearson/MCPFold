@@ -81,6 +81,7 @@ export function fromMcpServersShape(raw: unknown): Partial<Config> {
         }
         servers[name] = server;
       } else if (typeof entry.url === 'string') {
+        // `streamable-http` is Claude Code's alias for `http` (S17.3); anything non-`sse` is http.
         const explicitType = entry.type === 'sse' ? 'sse' : 'http';
         const server: ServerConfig = { transport: explicitType, url: entry.url, tags: [] };
         if (entry.headers && typeof entry.headers === 'object') {

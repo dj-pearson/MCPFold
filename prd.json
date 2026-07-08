@@ -3930,7 +3930,7 @@
       "epic": "E17",
       "order": 3,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Adapter correctness fixes against verified mid-2026 client behavior",
       "user_story": "As a user folding to real clients, I want each adapter to match the client's actually-documented current format so a fold never produces a config the client rejects.",
