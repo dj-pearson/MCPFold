@@ -4,8 +4,9 @@
  * binaries with @yao-pkg/pkg, which cross-compiles ALL targets from one machine. Emits
  * `build/mcpfold-<os>-<arch>[.exe]` plus a `.sha256` for each.
  *
- * Assumes `pnpm -r build` has run. `pnpm build:binaries` builds every target; pass a single
- * pkg target (e.g. `node20-linux-x64`) as argv[2] to build just one. Both tools are devDeps.
+ * Assumes `pnpm -r build` has run. `pnpm build:binaries` builds every target; pass one or more
+ * comma-separated pkg targets (e.g. `pnpm build:binaries -- node20-linux-x64`) to build a subset.
+ * Both tools are devDeps.
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -41,7 +42,9 @@ const TARGETS = {
   'node20-linux-arm64': 'mcpfold-linux-arm64',
   'node20-win-x64': 'mcpfold-windows-x64.exe',
 };
-const only = process.argv[2];
+// First real CLI arg — skip a leading `--` separator, which `pnpm build:binaries -- <targets>`
+// forwards to the script verbatim (otherwise `only` becomes "--" and no target matches).
+const only = process.argv.slice(2).find((a) => a !== '--');
 // Support a single target or a comma-separated list (e.g. from CI matrix)
 const targets = only
   ? Object.fromEntries(
