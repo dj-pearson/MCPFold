@@ -1,6 +1,6 @@
 {
   "name": "@mcpfold/proxy",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Thin local MCP proxy for tool-level curation: transparent passthrough + tools/list filtering.",
   "license": "MIT",
   "type": "module",
