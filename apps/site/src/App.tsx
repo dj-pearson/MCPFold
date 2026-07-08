@@ -4,9 +4,9 @@ import { Home } from './pages/Home';
 import { InstallPage } from './install/InstallPage';
 import { DirectoryList } from './directory/DirectoryList';
 import { ServerPage } from './directory/ServerPage';
+import { PricingPage } from './pricing/PricingPage';
 
-/** Marketing-site routes (S13.1). Later E13 pages (pricing, blog) mount here under the shared
- * Layout. */
+/** Marketing-site routes (S13.1). Later E13 pages (blog) mount here under the shared Layout. */
 export function App() {
   return (
     <Routes>
@@ -15,6 +15,7 @@ export function App() {
         <Route path="/install" element={<InstallPage />} />
         <Route path="/directory" element={<DirectoryList />} />
         <Route path="/directory/:id" element={<ServerPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
       </Route>
     </Routes>
   );

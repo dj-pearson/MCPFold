@@ -40,7 +40,13 @@ for (const entry of DIRECTORY) {
 }
 
 // --- Sitemap (static routes + every directory entry) ----------------------------------------
-const ROUTES = ['/', '/install', '/directory', ...DIRECTORY.map((e) => `/directory/${e.id}`)];
+const ROUTES = [
+  '/',
+  '/install',
+  '/pricing',
+  '/directory',
+  ...DIRECTORY.map((e) => `/directory/${e.id}`),
+];
 const urls = ROUTES.map((r) => `  <url>\n    <loc>${SITE_URL}${r}</loc>\n  </url>`).join('\n');
 writeFileSync(
   join(dist, 'sitemap.xml'),
