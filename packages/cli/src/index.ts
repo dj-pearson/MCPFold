@@ -32,12 +32,15 @@ export { buildDiagnoseBundle, diagnose, type DiagnoseBundle } from './commands/d
 export {
   runSync,
   runSyncCheck,
+  runSyncWatch,
   type SyncCheckData,
   type SyncCheckDeps,
   type SyncData,
   type SyncFileResult,
   type SyncOptions,
+  type WatchIo,
 } from './commands/sync.js';
+export { type FsWatcher, nodeFsWatcher, watchWithDebounce, type WatchHandle } from './io/watch.js';
 export { runDiff, type ClientDiff, type DiffData, type DiffOptions } from './commands/diff.js';
 export { runInit, starterConfig, type InitData, type InitOptions } from './commands/init.js';
 export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';

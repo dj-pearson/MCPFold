@@ -23,7 +23,7 @@ export interface Writer {
   err: (text: string) => void;
 }
 
-const processWriter: Writer = {
+export const processWriter: Writer = {
   out: (t) => process.stdout.write(t),
   err: (t) => process.stderr.write(t),
 };

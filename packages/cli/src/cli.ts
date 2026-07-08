@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { diagnose } from './commands/diagnose.js';
-import { runSync } from './commands/sync.js';
+import { runSync, runSyncWatch } from './commands/sync.js';
 import { runDiff } from './commands/diff.js';
 import { runInit } from './commands/init.js';
 import { runDoctor } from './commands/doctor.js';
@@ -21,7 +21,7 @@ import { resolveEndpoint } from './cloud/session.js';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { toEnvelopeError } from './output/envelope.js';
-import { runCommand, type Writer } from './output/render.js';
+import { processWriter, runCommand, type Writer } from './output/render.js';
 import { EXIT, type ExitCode } from './output/exit-codes.js';
 import { enableDebug } from './util/debug.js';
 import { CLI_VERSION } from './version.js';
@@ -109,13 +109,28 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     program
       .command('sync')
       .description('fold the canonical config out to client files, with backups')
-      .option(
-        '--check',
-        'exit nonzero if client files differ from canonical; write nothing',
-        false,
-      ),
-  ).action(async (opts: GlobalFlags) => {
+      .option('--check', 'exit nonzero if client files differ from canonical; write nothing', false)
+      .option('--watch', 're-fold automatically when the config changes (Ctrl-C to stop)', false),
+  ).action(async (opts: GlobalFlags & { check?: boolean; watch?: boolean }) => {
     const ctx = resolve(opts);
+    if (opts.watch) {
+      // Long-running: fold on change until a signal, then stop cleanly. (Not a --json command.)
+      const w = writer ?? processWriter;
+      await new Promise<void>((res) => {
+        const handle = runSyncWatch(
+          { cwd: ctx.cwd, profile: ctx.profile, dryRun: ctx.dryRun },
+          { write: (line) => w.out(`${line}\n`) },
+        );
+        const shutdown = () => {
+          handle.stop();
+          w.out('\nStopped watching.\n');
+          res();
+        };
+        process.once('SIGINT', shutdown);
+        process.once('SIGTERM', shutdown);
+      });
+      return;
+    }
     setExit(
       await runCommand(
         'sync',

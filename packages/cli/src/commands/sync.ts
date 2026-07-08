@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   diffRendered,
   resolveProfile,
@@ -12,9 +13,10 @@ import {
 } from '@mcpfold/core';
 import { realOsContext, registerAll, requireAdapter, type OsContext } from '@mcpfold/adapters';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
-import { loadConfigFromDisk } from '../util/config.js';
+import { findConfigPath, loadConfigFromDisk } from '../util/config.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import { backupIfExists } from '../io/backup.js';
+import { type FsWatcher, watchWithDebounce, type WatchHandle } from '../io/watch.js';
 import { renderWithStrategy } from '../sync/strategy.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
@@ -173,6 +175,55 @@ function renderHuman(
     footer.push('', `Restart required for: ${meta.restartClients.join(', ')}.`);
   }
   return [meta.preview ? 'Sync preview:' : 'Synced:', ...lines, ...footer].join('\n');
+}
+
+/**
+ * `sync --watch` (S10.2). Folds once, then re-folds on every change to the canonical config,
+ * debounced to coalesce rapid saves. Each fold reuses the exact atomic-write + backup path of a
+ * manual sync; `--dry-run` prints diffs without writing. A fold that throws (e.g. an invalid config
+ * mid-edit) is reported and the watcher keeps running. Returns a handle; call stop() on SIGINT.
+ */
+export interface WatchIo {
+  write: (line: string) => void;
+  watcher?: FsWatcher;
+  debounceMs?: number;
+}
+
+function summarize(data: SyncData, preview: boolean): string {
+  if (data.results.length === 0) return 'no profiles to sync';
+  if (preview) {
+    const changed = data.results.filter((r) => r.diff?.hasDrift || r.diff?.fileMissing).length;
+    return changed === 0 ? 'up to date' : `${changed} client(s) would change`;
+  }
+  const wrote = data.results.filter((r) => r.action === 'written').length;
+  return wrote === 0 ? 'all clients up to date' : `folded ${wrote} client(s)`;
+}
+
+export function runSyncWatch(options: SyncOptions, io: WatchIo): WatchHandle {
+  const preview = Boolean(options.dryRun);
+  const stamp = () => new Date().toISOString().slice(11, 19);
+
+  const fold = async (label: string) => {
+    try {
+      const out = await runSync(options);
+      io.write(`[${stamp()}] ${label}: ${summarize(out.data, preview)}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      io.write(`[${stamp()}] ${label}: error — ${msg} (still watching)`);
+    }
+  };
+
+  void fold('initial fold');
+
+  const configPath = findConfigPath(options.cwd) ?? join(options.cwd, 'mcp.config.jsonc');
+  io.write(`Watching ${configPath}${preview ? ' (dry-run)' : ''} — Ctrl-C to stop.`);
+
+  return watchWithDebounce({
+    path: configPath,
+    debounceMs: io.debounceMs,
+    watcher: io.watcher,
+    onChange: () => fold('change'),
+  });
 }
 
 /** Lower-level check helper retained for the S0.10 conformance test + external callers. */
