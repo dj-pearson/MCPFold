@@ -1,5 +1,4 @@
 import { Command } from 'commander';
-import { UsageError } from '@mcpfold/core';
 import { diagnose } from './commands/diagnose.js';
 import { runSync } from './commands/sync.js';
 import { runDiff } from './commands/diff.js';
@@ -11,6 +10,13 @@ import { runRun } from './commands/run.js';
 import { runMigrate } from './commands/migrate.js';
 import { scaffoldAdapter } from './commands/scaffold-adapter.js';
 import { runSecretSet, runSecretTest } from './commands/secret.js';
+import { runLogin } from './commands/login.js';
+import { runPush } from './commands/push.js';
+import { runPull } from './commands/pull.js';
+import { httpCloudApi } from './cloud/api.js';
+import { osKeychainBackend } from './cloud/token-store.js';
+import { resolveEndpoint } from './cloud/session.js';
+import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { toEnvelopeError } from './output/envelope.js';
 import { runCommand, type Writer } from './output/render.js';
@@ -244,28 +250,6 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     );
   });
 
-  // ---- Stubbed commands (implemented in later stories) ------------------------
-
-  const stub = (name: string, description: string, story: string): void => {
-    addGlobalFlags(program.command(name).description(description)).action(
-      async (opts: GlobalFlags) => {
-        const ctx = resolve(opts);
-        setExit(
-          await runCommand(
-            name,
-            ctx.json,
-            () => {
-              throw new UsageError(`\`mcpfold ${name}\` is not implemented yet (${story}).`, {
-                hint: 'Track progress in prd.json / ralph/PROGRESS.md.',
-              });
-            },
-            writer,
-          ),
-        );
-      },
-    );
-  };
-
   addGlobalFlags(
     program
       .command('scaffold-adapter')
@@ -332,9 +316,82 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     },
   );
 
-  stub('login', 'authenticate to the mcpfold cloud (device-code OAuth)', 'S6.6');
-  stub('push', 'push the canonical config to the cloud', 'S6.6');
-  stub('pull', 'pull the canonical config from the cloud', 'S6.6');
+  // ---- Cloud sync: login / push / pull (S6.6) ---------------------------------
+  const outWrite = (text: string): void =>
+    (writer?.out ?? ((t: string) => process.stdout.write(t)))(text);
+
+  addGlobalFlags(
+    program.command('login').description('authenticate to the mcpfold cloud (device-code OAuth)'),
+  ).action(async (opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    const endpoint = resolveEndpoint();
+    setExit(
+      await runCommand(
+        'login',
+        ctx.json,
+        () =>
+          runLogin({
+            api: httpCloudApi(endpoint),
+            backend: osKeychainBackend(),
+            endpoint,
+            machineName: hostname(),
+            print: (m) => outWrite(`${m}\n`),
+          }),
+        writer,
+      ),
+    );
+  });
+
+  addGlobalFlags(
+    program
+      .command('push')
+      .description('push the canonical config to the cloud (refs only, new version)')
+      .option('--team <id>', 'push to a team config instead of your personal one'),
+  ).action(async (opts: GlobalFlags & { team?: string }) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'push',
+        ctx.json,
+        () =>
+          runPush({
+            cwd: ctx.cwd,
+            api: httpCloudApi(resolveEndpoint()),
+            backend: osKeychainBackend(),
+            machineName: hostname(),
+            teamId: opts.team,
+          }),
+        writer,
+      ),
+    );
+  });
+
+  addGlobalFlags(
+    program
+      .command('pull')
+      .description('pull the canonical config from the cloud and diff/apply it')
+      .option('--yes', 'apply the pulled config without confirmation', false)
+      .option('--team <id>', 'pull a team config instead of your personal one')
+      .option('--config-version <n>', 'pull a specific version instead of the latest'),
+  ).action(async (opts: GlobalFlags & { yes?: boolean; team?: string; configVersion?: string }) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'pull',
+        ctx.json,
+        () =>
+          runPull({
+            cwd: ctx.cwd,
+            api: httpCloudApi(resolveEndpoint()),
+            backend: osKeychainBackend(),
+            yes: opts.yes,
+            teamId: opts.team,
+            version: opts.configVersion !== undefined ? Number(opts.configVersion) : undefined,
+          }),
+        writer,
+      ),
+    );
+  });
 
   return { program, getExitCode: () => exitCode };
 }
