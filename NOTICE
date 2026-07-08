@@ -1,0 +1,12 @@
+mcpfold
+Copyright (c) 2026 mcpfold contributors
+
+This product includes software developed as an independent open-source project.
+
+"MCP" refers to the Model Context Protocol. mcpfold uses the "mcp" prefix descriptively,
+consistent with the thousands of community `mcp-*` tools. mcpfold is NOT an official
+Model Context Protocol project and implies NO endorsement by, or affiliation with, the
+Model Context Protocol maintainers, the Linux Foundation, the Agentic AI Foundation, or
+any client vendor (Anthropic, Cursor, Microsoft/VS Code, Codeium/Windsurf, Zed, etc.).
+Client names are used only to identify the configuration formats mcpfold interoperates
+with.

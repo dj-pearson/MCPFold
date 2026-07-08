@@ -305,7 +305,7 @@
       "epic": "E0.5",
       "order": 4.1,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S0.1"
       ],

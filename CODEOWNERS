@@ -1,0 +1,14 @@
+# Default owner for everything.
+*                                   @dj-pearson
+
+# The pure engine and the security surface get extra scrutiny.
+/packages/core/                     @dj-pearson
+/security/                          @dj-pearson
+/packages/secrets/                  @dj-pearson
+
+# Client adapters — route to maintainers who know the format quirks.
+/packages/adapters/                 @dj-pearson
+
+# Release + CI config.
+/.github/                           @dj-pearson
+/.changeset/                        @dj-pearson

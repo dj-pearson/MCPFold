@@ -1,0 +1,34 @@
+name: Bug report
+description: Something in the CLI, an adapter, or a secret provider misbehaves.
+labels: ['bug']
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the exact command and the output. **Redact secrets** — or paste `mcpfold diagnose --json` (it is scrubbed of secret values and ref paths).
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: mcpfold version
+      placeholder: 'e.g. 0.1.0 (mcpfold --version)'
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options: [macOS, Linux, Windows]
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Affected client(s)
+      placeholder: 'e.g. cursor, vscode'
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior

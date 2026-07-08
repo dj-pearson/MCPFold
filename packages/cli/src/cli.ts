@@ -8,7 +8,9 @@ import { runDoctor } from './commands/doctor.js';
 import { runImport } from './commands/import.js';
 import { runRun } from './commands/run.js';
 import { runMigrate } from './commands/migrate.js';
+import { scaffoldAdapter } from './commands/scaffold-adapter.js';
 import { runSecretSet, runSecretTest } from './commands/secret.js';
+import { join } from 'node:path';
 import { toEnvelopeError } from './output/envelope.js';
 import { runCommand, type Writer } from './output/render.js';
 import { EXIT, type ExitCode } from './output/exit-codes.js';
@@ -262,6 +264,23 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       },
     );
   };
+
+  addGlobalFlags(
+    program
+      .command('scaffold-adapter')
+      .description('generate a new client adapter module + test (contributor on-ramp)')
+      .argument('<name>', 'lowercase client id, e.g. continue'),
+  ).action(async (name: string, opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'scaffold-adapter',
+        ctx.json,
+        () => scaffoldAdapter({ name, adaptersRoot: join(ctx.cwd, 'packages', 'adapters') }),
+        writer,
+      ),
+    );
+  });
 
   stub('add', 'interactive: add a server by URL/package', 'S3.4');
   stub('login', 'authenticate to the mcpfold cloud (device-code OAuth)', 'S6.6');

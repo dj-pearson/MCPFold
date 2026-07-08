@@ -43,6 +43,11 @@ export { runInit, starterConfig, type InitData, type InitOptions } from './comma
 export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';
 export { runMigrate, type MigrateData, type MigrateOptions } from './commands/migrate.js';
 export {
+  scaffoldAdapter,
+  type ScaffoldAdapterOptions,
+  type ScaffoldData,
+} from './commands/scaffold-adapter.js';
+export {
   runImport,
   type ImportConflict,
   type ImportData,

@@ -1,0 +1,44 @@
+name: Adapter request (new client)
+description: Request support for a new MCP client, or volunteer to add it.
+labels: ['adapter', 'enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Adding a client is a **one-PR** contribution — see
+        [docs/adapters.md](../../docs/adapters.md) and run `mcpfold scaffold-adapter <name>`.
+  - type: input
+    id: client
+    attributes:
+      label: Client name
+      placeholder: 'e.g. Continue, Cline, JetBrains AI'
+    validations:
+      required: true
+  - type: input
+    id: root-key
+    attributes:
+      label: Native config root key
+      placeholder: 'mcpServers | servers | context_servers | other'
+  - type: textarea
+    id: paths
+    attributes:
+      label: Config file path(s) per OS
+      description: User scope and (if any) project/workspace scope, for macOS / Linux / Windows.
+  - type: dropdown
+    id: secrets
+    attributes:
+      label: How does the client handle secrets?
+      options:
+        - inline (writes tokens to the file)
+        - native-input (its own indirection, like VS Code ${input:})
+        - none / unknown
+  - type: input
+    id: docs
+    attributes:
+      label: Link to the client's MCP config docs
+  - type: checkboxes
+    id: volunteer
+    attributes:
+      label: Contribution
+      options:
+        - label: I'm willing to open the PR for this adapter.
