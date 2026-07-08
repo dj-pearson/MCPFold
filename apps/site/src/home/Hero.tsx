@@ -43,7 +43,7 @@ export function Hero() {
           flexWrap: 'wrap',
         }}
       >
-        <Button href="/docs/install.html">Install</Button>
+        <Button href="/install">Install</Button>
         <Button href="https://app.mcpfold.com" variant="ghost">
           Try the cloud
         </Button>

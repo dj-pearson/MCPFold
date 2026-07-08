@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SITE_URL = 'https://mcpfold.com';
-const ROUTES = ['/'];
+const ROUTES = ['/', '/install'];
 
 const dist = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 if (!existsSync(dist)) {

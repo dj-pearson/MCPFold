@@ -28,6 +28,9 @@ export function Layout() {
             mcpfold
           </a>
           <nav style={{ display: 'flex', gap: 'var(--space-6)', marginLeft: 'auto' }}>
+            <a href="/install" style={{ color: 'var(--fg-muted)' }}>
+              Install
+            </a>
             <a href="/docs" style={{ color: 'var(--fg-muted)' }}>
               Docs
             </a>

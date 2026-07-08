@@ -4,7 +4,7 @@ test('homepage renders the value prop and benchmark headline', async ({ page }) 
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('context-window tax');
   await expect(page.getByTestId('benchmark-headline')).toContainText('80%');
-  await expect(page.getByRole('link', { name: 'Install' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('link', { name: 'Install' })).toBeVisible();
 });
 
 test('theme toggle flips the color theme', async ({ page }) => {
