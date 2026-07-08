@@ -4,6 +4,12 @@
 canonical config and folds it out to every client — loading only the tools each agent
 actually needs, and resolving secret _references_ instead of hardcoding values.
 
+<p align="center">
+  <img src="./docs/assets/demo.svg" alt="mcpfold demo: init → import → sync → diff, cutting tool-schema tokens ~80%" width="820" />
+</p>
+
+<sub>Demo regenerated from the real CLI with `pnpm demo:record` (an [asciinema cast](./demo/mcpfold.cast) + this SVG; a GIF renders in CI via [`demo/mcpfold.tape`](./demo/mcpfold.tape)). Server names shown are examples — no endorsement implied.</sub>
+
 > Status: ground-floor build. The canonical [`mcp.config.jsonc`](./docs/config-format.md)
 > format, the local-first CLI wedge, and (later) the cloud sync layer are being built
 > story-by-story from [`prd.json`](./prd.json). Full docs live in [`docs/`](./docs/index.md).
