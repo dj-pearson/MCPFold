@@ -49,9 +49,11 @@ the service already sets HSTS + hardening headers on every response.
 
 ## Deploy in Coolify
 
-1. New Resource → **Dockerfile** application, pointed at `services/edge` (Dockerfile at its root).
+1. New Resource → **Dockerfile** application, **Base Directory `/services/edge`** (its `COPY` paths
+   are relative to that folder, so the build context must be it — not the repo root).
 2. Set the environment variables above as Coolify secrets (mark them secret; never commit).
-3. Expose port 8000; put it behind the Coolify/Traefik HTTPS proxy at e.g. `api.mcpfold.com`.
+3. Expose port 8000 and give it its **own host**, `functions.mcpfold.com` (Supabase owns
+   `api.mcpfold.com`). Coolify/Traefik terminates TLS — no per-path routing needed.
 4. Coolify uses the image `HEALTHCHECK` for zero-downtime rollouts.
 
 ## CI
