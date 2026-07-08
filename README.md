@@ -106,21 +106,6 @@ fund ongoing work:
 
 Sponsorships fund the free, open-source core. Thank you 🙏
 
-## Autonomous build loop
-
-This project is built story-by-story from [`prd.json`](./prd.json). The loop harness
-lives in [`ralph/`](./ralph): [`PROMPT.md`](./ralph/PROMPT.md) is the driver,
-[`PROGRESS.md`](./ralph/PROGRESS.md) is the append-only log, and
-[`AGENT_NOTES.md`](./ralph/AGENT_NOTES.md) records cross-cutting decisions. Each iteration
-picks the highest-priority `todo` story whose dependencies are all `done`, implements it,
-runs `verify_all`, and appends a completion line. Run a loop with:
-
-```bash
-while :; do claude -p ralph/PROMPT.md || break; done
-```
-
-State lives entirely on disk (story `status` in `prd.json` + `PROGRESS.md`), so a fresh
-loop resumes without redoing completed work.
 
 ## License
 
