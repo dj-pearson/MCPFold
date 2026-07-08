@@ -106,7 +106,10 @@ jobs:
           version: 10.33.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Pin to a patch @yao-pkg/pkg-fetch ships a prebuilt Node base binary for. pkg matches the
+          # runner's Node version; the default (20.20.2) has no prebuilt, so pkg tries to compile
+          # Node from source and fails. 20.10.0 is the newest node20 with pkg-fetch prebuilts.
+          node-version: 20.10.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
