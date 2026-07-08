@@ -10,6 +10,7 @@ import {
 import { handshake, type MessageTransport, streamTransport } from '@mcpfold/proxy';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import { loadConfigFromDisk } from '../util/config.js';
+import { resolveCommand } from '../util/spawn.js';
 import { Redactor } from '../util/redact.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
@@ -77,9 +78,11 @@ function serversToTest(
 function realTransport(server: ResolvedServer): MessageTransport {
   if (server.transport === 'stdio') {
     if (!server.command) throw new UsageError(`Server "${server.name}" has no launch command.`);
-    const child = spawn(server.command, server.args ?? [], {
+    const r = resolveCommand(server.command, server.args ?? []);
+    const child = spawn(r.command, r.args, {
       stdio: ['pipe', 'pipe', 'ignore'],
       env: { ...process.env, ...server.env },
+      windowsVerbatimArguments: r.windowsVerbatimArguments,
     });
     let spawnError: string | undefined;
     child.on('error', (e) => {

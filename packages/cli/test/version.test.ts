@@ -8,7 +8,8 @@ import { CLI_VERSION } from '../src/version.js';
 import { getUpdateNotice } from '../src/update-notifier.js';
 
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-const pkgVersion = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8')).version as string;
+const pkgVersion = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8'))
+  .version as string;
 
 /**
  * S16.1 — the shipped binary must report the real published version. A drifting version.ts makes
@@ -47,7 +48,10 @@ describe('CLI version wiring (S16.1)', () => {
 
   it('update notifier is silent when the running version equals the latest published version', () => {
     // A cache advertising the SAME version we run — the exact real-world up-to-date case.
-    writeFileSync(cachePath, JSON.stringify({ latest: CLI_VERSION, checkedAt: new Date().toISOString() }));
+    writeFileSync(
+      cachePath,
+      JSON.stringify({ latest: CLI_VERSION, checkedAt: new Date().toISOString() }),
+    );
     const notice = getUpdateNotice({
       currentVersion: CLI_VERSION,
       env: {}, // notifier-enabled path
@@ -60,8 +64,16 @@ describe('CLI version wiring (S16.1)', () => {
   it('update notifier DOES surface a notice when a strictly newer version is published', () => {
     const [maj, min, patch] = CLI_VERSION.split('.').map((n) => parseInt(n, 10));
     const newer = `${maj}.${min}.${(patch || 0) + 1}`;
-    writeFileSync(cachePath, JSON.stringify({ latest: newer, checkedAt: new Date().toISOString() }));
-    const notice = getUpdateNotice({ currentVersion: CLI_VERSION, env: {}, isTTY: true, cachePath });
+    writeFileSync(
+      cachePath,
+      JSON.stringify({ latest: newer, checkedAt: new Date().toISOString() }),
+    );
+    const notice = getUpdateNotice({
+      currentVersion: CLI_VERSION,
+      env: {},
+      isTTY: true,
+      cachePath,
+    });
     expect(notice).toContain(newer);
   });
 });

@@ -96,3 +96,65 @@ describe('runTest (S10.4)', () => {
     expect(out.data.results[0]!.error).toMatch(/no response within 80ms/);
   });
 });
+
+/**
+ * S16.2 — cross-OS real spawn. Launches an actual stdio server (a tiny node script) through the
+ * default (non-mocked) transport, so the spawn goes through resolveCommand on the real platform.
+ * On the windows-latest matrix leg this proves a bare command resolves to its .exe and initializes
+ * + lists tools without a shell around args; on posix it proves the passthrough is unchanged.
+ */
+describe('runTest real stdio spawn (S16.2)', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'mcpfold-real-spawn-'));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('launches a real node stdio server and lists its tools on this OS', async () => {
+    // A minimal newline-delimited JSON-RPC MCP server: answers initialize + tools/list.
+    const server = join(dir, 'server.mjs');
+    writeFileSync(
+      server,
+      [
+        "let buf = '';",
+        "process.stdin.setEncoding('utf8');",
+        "process.stdin.on('data', (chunk) => {",
+        '  buf += chunk;',
+        "  let i = buf.indexOf('\\n');",
+        '  while (i !== -1) {',
+        '    const line = buf.slice(0, i);',
+        '    buf = buf.slice(i + 1);',
+        '    if (line.trim()) {',
+        '      const msg = JSON.parse(line);',
+        '      if (msg.id != null) {',
+        '        const result =',
+        "          msg.method === 'initialize'",
+        "            ? { protocolVersion: '2024-11-05' }",
+        "            : msg.method === 'tools/list'",
+        "              ? { tools: [{ name: 'ping' }, { name: 'pong' }, { name: 'echo' }] }",
+        '              : {};',
+        "        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }) + '\\n');",
+        '      }',
+        '    }',
+        "    i = buf.indexOf('\\n');",
+        '  }',
+        '});',
+      ].join('\n'),
+    );
+
+    // Use the bare `node` command (resolved on win32 to node.exe by resolveCommand).
+    const config = JSON.stringify({
+      version: 1,
+      servers: { local: { transport: 'stdio', command: 'node', args: [server] } },
+      profiles: {},
+    });
+    writeFileSync(join(dir, 'mcp.config.jsonc'), config);
+
+    const out = await runTest({ cwd: dir, server: 'local', timeoutMs: 8000 });
+    expect(out.exit).toBe(EXIT.SUCCESS);
+    const r = out.data.results[0]!;
+    expect(r.reachable).toBe(true);
+    expect(r.toolCount).toBe(3);
+    expect(r.protocolVersion).toBe('2024-11-05');
+  });
+});

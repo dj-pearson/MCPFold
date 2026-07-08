@@ -4,6 +4,7 @@ import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/
 import { connectProxy, streamTransport } from '@mcpfold/proxy';
 import { loadConfigFromDisk } from '../util/config.js';
 import { fileTrustGate, isExecutable, type TrustGate } from '../trust/tofu.js';
+import { resolveCommand } from '../util/spawn.js';
 
 /**
  * `mcpfold run <name>` (S4.7) — the shim launcher the `shim` strategy points clients at.
@@ -20,7 +21,12 @@ export type Spawner = (command: string, args: string[], env: NodeJS.ProcessEnv) 
 
 const defaultSpawner: Spawner = (command, args, env) =>
   new Promise<number>((resolve) => {
-    const child = spawn(command, args, { stdio: 'inherit', env });
+    const r = resolveCommand(command, args);
+    const child = spawn(r.command, r.args, {
+      stdio: 'inherit',
+      env,
+      windowsVerbatimArguments: r.windowsVerbatimArguments,
+    });
     const forward = (signal: NodeJS.Signals): void => {
       if (!child.killed) child.kill(signal);
     };
@@ -46,7 +52,12 @@ const defaultProxySpawner: ProxySpawner = (command, args, env, tools) =>
   new Promise<number>((resolve) => {
     // stderr is inherited so the server's logs still reach the terminal; stdin/stdout are
     // piped so the proxy can sit between the MCP client (our process) and the real server.
-    const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'inherit'], env });
+    const r = resolveCommand(command, args);
+    const child = spawn(r.command, r.args, {
+      stdio: ['pipe', 'pipe', 'inherit'],
+      env,
+      windowsVerbatimArguments: r.windowsVerbatimArguments,
+    });
     const clientTransport = streamTransport(process.stdin, process.stdout);
     const serverTransport = streamTransport(child.stdout!, child.stdin!);
     const dispose = connectProxy(clientTransport, serverTransport, { tools });

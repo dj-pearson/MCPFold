@@ -3660,7 +3660,7 @@
       "epic": "E16",
       "order": 2,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Cross-platform executable resolution for spawned processes (Windows .cmd/npx)",
       "user_story": "As a Windows user, I want `mcpfold run`/`test` to launch npx-based MCP servers successfully so the core shim works on my platform.",

@@ -41,7 +41,9 @@ const mismatched = Object.entries(channels).filter(([, v]) => v !== npmVersion);
 if (mismatched.length > 0) {
   console.error('✗ install-channel version mismatch:');
   for (const [name, v] of Object.entries(channels)) {
-    console.error(`  ${name.padEnd(10)} ${v ?? '(missing)'}${v === npmVersion ? '' : '  ← differs from npm'}`);
+    console.error(
+      `  ${name.padEnd(10)} ${v ?? '(missing)'}${v === npmVersion ? '' : '  ← differs from npm'}`,
+    );
   }
   if (mismatched.some(([name]) => name === 'cli-binary')) {
     console.error(`  → fix: run \`node scripts/gen-cli-version.mjs\` to regenerate version.ts`);
