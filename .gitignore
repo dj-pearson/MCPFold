@@ -24,3 +24,5 @@ apps/site/.lighthouseci/
 
 # Standalone binary build artifacts (S11.1)
 build/
+
+keywords/*

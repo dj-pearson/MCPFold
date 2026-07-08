@@ -1,0 +1,60 @@
+name: Adapter compat
+
+# Scheduled check (S14.2): does each adapter still render a shape the client accepts? If a client
+# changed its on-disk config format upstream, this flags it and opens a tracking issue — so drift
+# surfaces here, not silently for users. Resilient: an unreachable format source skips, never fails.
+on:
+  schedule:
+    - cron: '0 6 * * 1' # weekly, Monday 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  compat:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mcpfold/core build
+
+      - name: Run compat harness
+        id: check
+        continue-on-error: true
+        run: |
+          set +e
+          npx tsx packages/adapters/compat/run.ts > compat-report.txt 2>&1
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+          cat compat-report.txt
+
+      - name: Open or update a tracking issue on divergence
+        if: steps.check.outputs.code != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="Adapter compat drift detected"
+          {
+            echo "The scheduled compat harness found a client whose config format diverged from mcpfold's rendered output. Refresh the sample (see packages/adapters/compat/README.md) and update the affected adapter."
+            echo
+            echo '```'
+            cat compat-report.txt
+            echo '```'
+          } > issue-body.md
+          num=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number' 2>/dev/null)
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --body-file issue-body.md
+          else
+            gh issue create --title "$title" --body-file issue-body.md
+          fi
+
+      - name: Fail if divergent
+        if: steps.check.outputs.code != '0'
+        run: exit 1
