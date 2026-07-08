@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { Config, ServerConfig } from '@mcpfold/core';
 import { useAuth } from '../auth/AuthProvider';
 import { createCloudApi } from '../api/cloud';
@@ -14,6 +15,7 @@ interface HistoryEntry {
 
 export function ConfigEditor() {
   const { session } = useAuth();
+  const location = useLocation();
   const api = useMemo(() => createCloudApi(() => session?.accessToken ?? null), [session]);
 
   const [config, setConfig] = useState<Config>(EMPTY);
@@ -23,6 +25,12 @@ export function ConfigEditor() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Prefill the add-server form when arriving from the directory ("Add to config").
+  useEffect(() => {
+    const prefill = (location.state as { prefill?: ServerDraft } | null)?.prefill;
+    if (prefill) setDraft(prefill);
+  }, [location.state]);
 
   useEffect(() => {
     let active = true;

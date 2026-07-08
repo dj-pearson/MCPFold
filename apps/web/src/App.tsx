@@ -4,6 +4,7 @@ import { Header, Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { ConfigEditor } from './editor/ConfigEditor';
 import { ProfileManager } from './profiles/ProfileManager';
+import { Directory } from './directory/Directory';
 
 export function App() {
   return (
@@ -33,6 +34,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <ProfileManager />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/directory"
+            element={
+              <ProtectedRoute>
+                <Directory />
               </ProtectedRoute>
             }
           />
