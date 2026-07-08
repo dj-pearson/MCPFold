@@ -6,6 +6,7 @@ import { runInit } from './commands/init.js';
 import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
 import { runStatus } from './commands/status.js';
+import { runTest } from './commands/test.js';
 import { runImport } from './commands/import.js';
 import { runAdd } from './commands/add.js';
 import { runRun } from './commands/run.js';
@@ -222,6 +223,22 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   ).action(async (opts: GlobalFlags) => {
     const ctx = resolve(opts);
     setExit(await runCommand('status', ctx.json, () => runStatus({ cwd: ctx.cwd }), writer));
+  });
+
+  addGlobalFlags(
+    program
+      .command('test [server]')
+      .description('connect to a server and confirm it initializes + lists tools'),
+  ).action(async (server: string | undefined, opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'test',
+        ctx.json,
+        () => runTest({ cwd: ctx.cwd, server, profile: ctx.profile }),
+        writer,
+      ),
+    );
   });
 
   addGlobalFlags(

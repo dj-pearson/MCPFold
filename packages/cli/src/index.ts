@@ -55,6 +55,13 @@ export {
 } from './onboarding/guided.js';
 export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';
 export {
+  runTest,
+  type TestData,
+  type TestOptions,
+  type TestServerResult,
+  type TransportFactory,
+} from './commands/test.js';
+export {
   runStatus,
   type StatusClient,
   type StatusCloud,

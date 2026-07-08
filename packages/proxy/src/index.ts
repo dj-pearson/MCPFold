@@ -17,3 +17,4 @@ export { filterTools, isToolAllowed, type McpTool } from './filter.js';
 export { streamTransport } from './transport/stdio.js';
 export { MemoryTransport } from './transport/memory.js';
 export type { MessageTransport } from './transport/types.js';
+export { handshake, MCP_PROTOCOL_VERSION, type HandshakeResult } from './handshake.js';
