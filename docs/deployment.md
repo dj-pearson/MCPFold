@@ -325,23 +325,24 @@ from the binaries attached to a **GitHub Release**.
 cross-compiles a native `mcpfold` binary for each OS/arch, checksums them, and attaches them to the
 release. Nothing for you to do beyond creating the Release.
 
-**Homebrew & Scoop (one-time setup, then automatic):** these are *not* wired up until you create the
-package repos:
+**Homebrew & Scoop (automatic once set up):** the release pipeline already has a `packaging` job that,
+on each release, renders the concrete formula/manifest (real version + download URLs + SHA-256 from
+the release binaries) and pushes them to your tap/bucket repos. You only do the **one-time setup**:
 
 1. Create two public GitHub repos under your account:
-   - `dj-pearson/homebrew-tap` — holds the Homebrew formula.
-   - `dj-pearson/scoop-bucket` — holds the Scoop manifest.
-2. Seed them from the templates in this repo: `packaging/homebrew/mcpfold.rb` and
-   `packaging/scoop/mcpfold.json`.
-3. Create a GitHub token that can push to those two repos and add it as the repo secret
-   `HOMEBREW_TAP_TOKEN`.
-4. Add a release step (see the `NEEDS (user, one-time)` note at the bottom of `release.yml`) that, on
-   each release, bumps the version + `sha256` in `mcpfold.rb` / `mcpfold.json` and pushes them to the
-   tap/bucket repos.
+   - `dj-pearson/homebrew-tap` — the pipeline writes `Formula/mcpfold.rb` here.
+   - `dj-pearson/scoop-bucket` — the pipeline writes `bucket/mcpfold.json` here.
+   - (Empty repos are fine — the job creates the files. No manual seeding needed.)
+2. Create a **PAT with write (contents) access to both repos** and add it as the repo secret
+   **`HOMEBREW_TAP_TOKEN`**. Until it's set, the `packaging` job renders the manifests but **skips the
+   push** (it won't fail the release).
+3. Re-run the release (or cut the next one). The job pushes `mcpfold.rb` / `mcpfold.json` with that
+   release's version and checksums.
 
-After that, `brew install dj-pearson/tap/mcpfold` and `scoop install mcpfold` auto-update on each
-release. `pnpm check:version-parity` (run in CI) guards that the npm, Homebrew, and Scoop versions
-stay in sync.
+After that, `brew install dj-pearson/tap/mcpfold` and `scoop install mcpfold` track every release.
+Version parity is kept green automatically: `scripts/sync-packaging-version.mjs` runs during the
+"Version Packages" step to bump the template versions, and `pnpm check:version-parity` (CI) enforces
+that npm, Homebrew, and Scoop all agree.
 
 ✅ **Check:** `brew install dj-pearson/tap/mcpfold && mcpfold --version` works on macOS;
 `scoop install mcpfold` works on Windows.

@@ -68,7 +68,9 @@ jobs:
       - name: Create Release PR or publish
         uses: changesets/action@v1
         with:
-          version: pnpm changeset version
+          # Bump packages, then sync the Homebrew/Scoop template versions so the version-parity gate
+          # stays green (the "Version Packages" PR carries the bump).
+          version: pnpm changeset version && node scripts/sync-packaging-version.mjs
           publish: pnpm changeset publish
           # Publish to npm only; don't spawn a GitHub Release per package. A single product
           # release (tag `v*`) is cut separately and carries the standalone binaries.
@@ -124,6 +126,51 @@ jobs:
             build/mcpfold-*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # NEEDS (user, one-time): a HOMEBREW_TAP_TOKEN + a dj-pearson/homebrew-tap repo and a
-      # dj-pearson/scoop-bucket repo, then a step here to bump + push packaging/homebrew/mcpfold.rb
-      # and packaging/scoop/mcpfold.json (version + sha256) to them so `brew`/`scoop` auto-update.
+
+  # Homebrew + Scoop: render the concrete formula/manifest from the release's binaries + checksums
+  # and push them to the tap/bucket repos so `brew upgrade` / `scoop update` track every release.
+  # One-time user setup: create dj-pearson/homebrew-tap and dj-pearson/scoop-bucket repos, and a
+  # HOMEBREW_TAP_TOKEN secret (a PAT with write access to both). Absent the token, this is skipped.
+  packaging:
+    name: publish homebrew + scoop
+    if: github.event_name == 'release'
+    needs: binaries
+    runs-on: ubuntu-latest
+    env:
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Download release checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p build
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.sha256' --dir build
+      - name: Render Homebrew formula + Scoop manifest
+        run: node scripts/render-packaging.mjs "$TAG"
+      - name: Push to homebrew-tap + scoop-bucket
+        if: env.TAP_TOKEN != ''
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/dj-pearson/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+          cp dist-packaging/mcpfold.rb tap/Formula/mcpfold.rb
+          git -C tap add Formula/mcpfold.rb
+          git -C tap diff --cached --quiet || git -C tap commit -m "mcpfold $TAG"
+          git -C tap push
+
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/dj-pearson/scoop-bucket.git" bucket
+          mkdir -p bucket/bucket
+          cp dist-packaging/mcpfold.json bucket/bucket/mcpfold.json
+          git -C bucket add bucket/mcpfold.json
+          git -C bucket diff --cached --quiet || git -C bucket commit -m "mcpfold $TAG"
+          git -C bucket push
+      - name: Note when skipped
+        if: env.TAP_TOKEN == ''
+        run: echo "HOMEBREW_TAP_TOKEN not set — rendered manifests but skipped the tap/bucket push."

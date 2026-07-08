@@ -27,3 +27,6 @@ apps/site/.lighthouseci/
 build/
 
 keywords/*
+
+# Rendered Homebrew/Scoop manifests (S11.1) — produced in CI, pushed to tap/bucket repos
+dist-packaging/
