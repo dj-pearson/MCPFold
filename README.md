@@ -50,6 +50,24 @@ pnpm verify_all       # lint + typecheck + test + build (the full gate)
 CI runs `verify_all` on a Windows/macOS/Linux × Node 20 matrix — path resolution is
 central to this product, so the cross-OS matrix is non-negotiable.
 
+## Editor autocomplete (JSON Schema)
+
+Add a `$schema` line to the top of your `mcp.config.jsonc` for autocomplete and inline
+validation in editors that support it:
+
+```jsonc
+{
+  "$schema": "https://mcpfold.com/schema/v1.json",
+  "version": 1,
+  // …
+}
+```
+
+`mcpfold init` writes this line for you. The schema is generated from the zod source
+(`packages/schema`) and a CI check fails if the committed
+[`mcp.config.schema.json`](./packages/schema/mcp.config.schema.json) drifts from it —
+regenerate with `pnpm --filter @mcpfold/schema generate`.
+
 ## Autonomous build loop
 
 This project is built story-by-story from [`prd.json`](./prd.json). The loop harness

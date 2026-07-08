@@ -10,6 +10,7 @@ import { realOsContext, registerAll, requireAdapter, type OsContext } from '@mcp
 import { defaultProviders, resolveSecrets } from '@mcpfold/secrets';
 import { loadConfigFromDisk } from '../util/config.js';
 import { renderWithStrategy } from '../sync/strategy.js';
+import { Redactor } from '../util/redact.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
 
@@ -66,8 +67,11 @@ export async function runDiff(options: DiffOptions): Promise<CommandOutput<DiffD
     clients.push({ profile: name, client: profile.client, path: file.path, diff });
   }
 
+  // S9.3: mask any resolved/inlined secret value that could appear in field changes before
+  // it reaches --json output. The human render only shows field names, so it is safe.
+  const redactedClients = new Redactor().deep(clients);
   return {
-    data: { clients, drift },
+    data: { clients: redactedClients, drift },
     human: renderHuman(clients, drift),
     exit: drift ? EXIT.DIFF : EXIT.SUCCESS,
   };

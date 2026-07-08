@@ -21,6 +21,23 @@ export function redactRefPaths(input: string): string {
 }
 
 /**
+ * Mask token-shaped strings (S9.3): known provider prefixes and high-entropy blobs. This
+ * catches a resolved/inlined secret in output even when it wasn't registered as a sentinel.
+ * References (`${scheme:path}`) are left alone — they are handled by {@link redactRefPaths}
+ * and are not secret values.
+ */
+const KNOWN_TOKEN_RE =
+  /\b(?:gh[pousr]_|sk-|xox[baprs]-|AKIA|ya29\.|glpat-|pk_live_|rk_live_)[A-Za-z0-9_\-./]{6,}/g;
+// A long URL-safe run that contains BOTH a letter and a digit (avoids masking prose, plain
+// URLs, and `KEY=` separators — the class excludes `=`/`+`/`/` so it stops at delimiters).
+const HIGH_ENTROPY_RE =
+  /(?<![${:\w])(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{24,}(?![A-Za-z0-9_-])/g;
+
+export function maskTokens(input: string): string {
+  return input.replace(KNOWN_TOKEN_RE, REDACTED).replace(HIGH_ENTROPY_RE, REDACTED);
+}
+
+/**
  * A stateful redactor that also scrubs registered sentinel secret values. Reused across a
  * process so any resolved secret registered once is scrubbed from all later output.
  */
@@ -34,13 +51,13 @@ export class Redactor {
     }
   }
 
-  /** Redact ref paths and any registered sentinel from a string. */
+  /** Redact ref paths, any registered sentinel, and token-shaped strings from a string. */
   string(input: string): string {
     let out = redactRefPaths(input);
     for (const secret of this.sentinels) {
       out = out.split(secret).join(REDACTED);
     }
-    return out;
+    return maskTokens(out);
   }
 
   /** Deep-redact every string in an arbitrary JSON-serializable value. */

@@ -624,7 +624,7 @@
       "epic": "E1",
       "order": 9,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S1.1"
       ],
@@ -2102,7 +2102,7 @@
       "epic": "E9",
       "order": 56,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S3.6",
         "S3.7",

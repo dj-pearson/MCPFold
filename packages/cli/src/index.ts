@@ -18,7 +18,13 @@ export { EXIT, exitCodeForError, type ExitCode } from './output/exit-codes.js';
 export { runCommand, type CommandOutput, type Writer } from './output/render.js';
 
 // Redaction (S0.6, shared with S9.3)
-export { defaultRedactor, redactConfig, redactRefPaths, Redactor } from './util/redact.js';
+export {
+  defaultRedactor,
+  maskTokens,
+  redactConfig,
+  redactRefPaths,
+  Redactor,
+} from './util/redact.js';
 export { debug, enableDebug, isDebugEnabled } from './util/debug.js';
 
 // Commands

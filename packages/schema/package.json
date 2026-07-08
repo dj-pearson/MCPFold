@@ -1,0 +1,37 @@
+{
+  "name": "@mcpfold/schema",
+  "version": "0.0.0",
+  "description": "Published JSON Schema for mcp.config.jsonc, generated from the zod source.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mcp.config.schema.json": "./mcp.config.schema.json"
+  },
+  "files": [
+    "dist",
+    "mcp.config.schema.json"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "generate": "WRITE_SCHEMA=1 vitest run",
+    "test": "vitest run",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mcpfold/core": "workspace:*",
+    "zod-to-json-schema": "^3.23.5"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

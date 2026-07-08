@@ -3,6 +3,7 @@ import { loadConfig } from '@mcpfold/core';
 import { realOsContext, registerAll, type OsContext } from '@mcpfold/adapters';
 import { findConfigPath } from '../util/config.js';
 import { checkConfigValid } from '../checks/config.js';
+import { Redactor } from '../util/redact.js';
 import { checkClientFiles } from '../checks/clients.js';
 import {
   checkHardcodedSecrets,
@@ -64,9 +65,12 @@ export function runDoctor(options: DoctorOptions): CommandOutput<DoctorData> {
   const errorCount = findings.filter((f) => f.severity === 'error').length;
   const warningCount = findings.filter((f) => f.severity === 'warning').length;
 
+  // S9.3: mask any token-shaped string that a finding message/fix might echo.
+  const safeFindings = new Redactor().deep(findings);
+
   return {
-    data: { configPath, findings, errorCount, warningCount },
-    human: renderHuman(configPath, findings, errorCount, warningCount),
+    data: { configPath, findings: safeFindings, errorCount, warningCount },
+    human: renderHuman(configPath, safeFindings, errorCount, warningCount),
     exit: errorCount > 0 ? EXIT.ERROR : EXIT.SUCCESS,
   };
 }

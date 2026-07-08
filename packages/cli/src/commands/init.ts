@@ -12,7 +12,7 @@ import type { CommandOutput } from '../output/render.js';
  * existing config without `--force`; `--dry-run` previews.
  */
 
-export const SCHEMA_URL = 'https://mcpfold.com/schema/mcp.config.schema.json';
+export const SCHEMA_URL = 'https://mcpfold.com/schema/v1.json';
 
 export function starterConfig(): string {
   return `{
