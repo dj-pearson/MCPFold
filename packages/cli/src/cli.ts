@@ -8,6 +8,13 @@ import { runDoctor } from './commands/doctor.js';
 import { runStatus } from './commands/status.js';
 import { runTest } from './commands/test.js';
 import { runRestore } from './commands/restore.js';
+import {
+  buildSpec,
+  completionScript,
+  completionValues,
+  SHELLS,
+  type Shell,
+} from './commands/completions.js';
 import { runImport } from './commands/import.js';
 import { runAdd } from './commands/add.js';
 import { runRun } from './commands/run.js';
@@ -241,6 +248,29 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       ),
     );
   });
+
+  program
+    .command('completions <shell>')
+    .description(`print a shell completion script (${SHELLS.join(' | ')})`)
+    .action((shell: string) => {
+      const w = writer ?? processWriter;
+      if (!(SHELLS as readonly string[]).includes(shell)) {
+        w.err(`Unknown shell "${shell}". Supported: ${SHELLS.join(', ')}.\n`);
+        setExit(EXIT.ERROR);
+        return;
+      }
+      w.out(completionScript(shell as Shell, buildSpec(program)));
+    });
+
+  // Hidden: emit dynamic completion candidates for the generated scripts to consume.
+  program
+    .command('__complete <kind>', { hidden: true })
+    .option('-C, --cwd <dir>')
+    .action((kind: string, opts: { cwd?: string }) => {
+      const w = writer ?? processWriter;
+      if (kind !== 'profiles' && kind !== 'servers') return;
+      for (const v of completionValues(kind, opts.cwd ?? process.cwd())) w.out(`${v}\n`);
+    });
 
   addGlobalFlags(
     program
