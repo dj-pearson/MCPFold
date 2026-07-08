@@ -46,7 +46,15 @@ module.exports = {
   parserOptions: { ecmaVersion: 2022, sourceType: 'module' },
   plugins: ['@typescript-eslint'],
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
-  ignorePatterns: ['dist/', 'build/', 'coverage/', 'node_modules/', '**/*.d.ts', '**/fixtures/**'],
+  ignorePatterns: [
+    'dist/',
+    'build/',
+    'coverage/',
+    'node_modules/',
+    '**/*.d.ts',
+    '**/fixtures/**',
+    'services/edge/', // Deno service — linted/formatted by `deno lint` / `deno fmt`
+  ],
   rules: {
     '@typescript-eslint/no-unused-vars': [
       'error',
