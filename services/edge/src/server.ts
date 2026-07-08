@@ -12,6 +12,13 @@ import {
   createMachinesHandler,
   createRevokeHandler,
 } from "../functions/status/index.ts";
+import {
+  createTeamAuditHandler,
+  createTeamInviteHandler,
+  createTeamMembersHandler,
+  createTeamRemoveHandler,
+  createTeamsHandler,
+} from "../functions/teams/index.ts";
 import { DEFAULT_CONFIG, type DeviceAuthConfig, type Sql } from "../lib/device.ts";
 import { json } from "../lib/http.ts";
 
@@ -23,6 +30,11 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
   const machines = createMachinesHandler({ sql, cfg });
   const history = createHistoryHandler({ sql, cfg });
   const revoke = createRevokeHandler({ sql, cfg });
+  const teams = createTeamsHandler({ sql, cfg });
+  const teamMembers = createTeamMembersHandler({ sql, cfg });
+  const teamInvite = createTeamInviteHandler({ sql, cfg });
+  const teamRemove = createTeamRemoveHandler({ sql, cfg });
+  const teamAudit = createTeamAuditHandler({ sql, cfg });
   return (req) => {
     const path = new URL(req.url).pathname.replace(/\/+$/, "");
     if (path.endsWith("/health") || path === "") {
@@ -33,6 +45,11 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
     if (path.endsWith("/machines")) return machines(req);
     if (path.endsWith("/history")) return history(req);
     if (path.endsWith("/revoke")) return revoke(req);
+    if (path.endsWith("/team-members")) return teamMembers(req);
+    if (path.endsWith("/team-invite")) return teamInvite(req);
+    if (path.endsWith("/team-remove")) return teamRemove(req);
+    if (path.endsWith("/team-audit")) return teamAudit(req);
+    if (path.endsWith("/teams")) return teams(req);
     return auth(req);
   };
 }

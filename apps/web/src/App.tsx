@@ -6,6 +6,7 @@ import { ConfigEditor } from './editor/ConfigEditor';
 import { ProfileManager } from './profiles/ProfileManager';
 import { Directory } from './directory/Directory';
 import { SyncDashboard } from './machines/SyncDashboard';
+import { TeamConsole } from './teams/TeamConsole';
 
 export function App() {
   return (
@@ -51,6 +52,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <SyncDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teams"
+            element={
+              <ProtectedRoute>
+                <TeamConsole />
               </ProtectedRoute>
             }
           />

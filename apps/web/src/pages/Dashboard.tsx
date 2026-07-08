@@ -46,6 +46,7 @@ export function Header() {
         <Link to="/profiles">Profiles</Link>
         <Link to="/directory">Directory</Link>
         <Link to="/machines">Sync</Link>
+        <Link to="/teams">Teams</Link>
         <button className="link" onClick={() => void signOut()}>
           Sign out
         </button>
