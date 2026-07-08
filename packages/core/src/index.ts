@@ -94,6 +94,16 @@ export {
   type FileReader,
 } from './check.js';
 
+// Schema versioning + migration (S0.7)
+export {
+  detectVersion,
+  migrateConfig,
+  MigrationError,
+  SCHEMA_VERSION,
+  type MigrateResult,
+} from './migrate/index.js';
+export { MIGRATIONS, type Migration } from './migrate/migrations.js';
+
 // Drift-diff engine (S1.6)
 export {
   diffRendered,

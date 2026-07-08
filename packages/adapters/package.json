@@ -26,5 +26,14 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dj-pearson/MCPFold.git",
+    "directory": "packages/adapters"
+  },
+  "homepage": "https://mcpfold.com",
+  "bugs": {
+    "url": "https://github.com/dj-pearson/MCPFold/issues"
   }
 }

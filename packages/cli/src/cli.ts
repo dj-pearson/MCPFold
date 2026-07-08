@@ -7,6 +7,7 @@ import { runInit } from './commands/init.js';
 import { runDoctor } from './commands/doctor.js';
 import { runImport } from './commands/import.js';
 import { runRun } from './commands/run.js';
+import { runMigrate } from './commands/migrate.js';
 import { runSecretSet, runSecretTest } from './commands/secret.js';
 import { toEnvelopeError } from './output/envelope.js';
 import { runCommand, type Writer } from './output/render.js';
@@ -170,6 +171,22 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   ).action(async (opts: GlobalFlags) => {
     const ctx = resolve(opts);
     setExit(await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer));
+  });
+
+  addGlobalFlags(
+    program
+      .command('migrate')
+      .description('upgrade an outdated mcp.config.jsonc to the current schema version'),
+  ).action(async (opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'migrate',
+        ctx.json,
+        () => runMigrate({ cwd: ctx.cwd, dryRun: ctx.dryRun }),
+        writer,
+      ),
+    );
   });
 
   // run <name> — the shim launcher. Its exit code is the child server's, so it bypasses the

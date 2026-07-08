@@ -6,6 +6,7 @@ import {
   type Node as JsoncNode,
 } from 'jsonc-parser';
 import { ConfigSchema } from './schema.js';
+import { detectVersion, SCHEMA_VERSION } from './migrate/index.js';
 import type { Config } from './types.js';
 
 /**
@@ -106,6 +107,26 @@ export function loadConfig(text: string): LoadResult {
 
   // Parse the concrete value from the same text (tree gives us positions; value gives us data).
   const value = nodeToValue(tree);
+
+  // Detect a config authored by a NEWER mcpfold before schema validation, so the user gets
+  // an actionable "upgrade" message instead of a confusing literal-mismatch error (S0.7).
+  const version = detectVersion(value);
+  if (version > SCHEMA_VERSION) {
+    return {
+      ok: false,
+      errors: [
+        {
+          code: 'schema',
+          message: `This config is version ${version}, newer than this mcpfold supports (v${SCHEMA_VERSION}).`,
+          path: 'version',
+          line: 1,
+          column: 1,
+          hint: 'Upgrade mcpfold (npm i -g mcpfold@latest) to read this config.',
+        },
+      ],
+    };
+  }
+
   const result = ConfigSchema.safeParse(value);
   if (result.success) {
     return { ok: true, config: result.data };

@@ -1,7 +1,7 @@
 {
   "name": "mcpfold",
   "version": "0.0.0",
-  "description": "One source of truth for your MCP servers — fold one config out to every client.",
+  "description": "One source of truth for your MCP servers \u2014 fold one config out to every client.",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -10,6 +10,12 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "files": [
     "dist"
   ],
@@ -25,9 +31,19 @@
     "@mcpfold/core": "workspace:*",
     "@mcpfold/proxy": "workspace:*",
     "@mcpfold/secrets": "workspace:*",
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "jsonc-parser": "^3.3.1"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dj-pearson/MCPFold.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://mcpfold.com",
+  "bugs": {
+    "url": "https://github.com/dj-pearson/MCPFold/issues"
   }
 }
