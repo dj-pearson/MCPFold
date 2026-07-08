@@ -48,6 +48,7 @@ module.exports = {
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
   ignorePatterns: [
     'dist/',
+    'dist-docs/', // generated docs site (S13.4 adds search-index.js/search.js — browser globals)
     'build/',
     'coverage/',
     'node_modules/',

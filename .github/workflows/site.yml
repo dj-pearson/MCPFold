@@ -28,7 +28,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mcpfold/site build
-      - name: Playwright e2e (homepage, theme, SEO)
+      - name: Build docs (unified shell + search) so the docs e2e can run
+        run: pnpm docs:build
+      - name: Playwright e2e (homepage, theme, SEO, docs)
         run: |
           pnpm --filter @mcpfold/site exec playwright install --with-deps chromium
           pnpm --filter @mcpfold/site e2e
@@ -53,6 +55,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mcpfold/site build
+      - name: Mount docs under /docs (unified site, S13.4)
+        run: |
+          pnpm docs:build
+          cp -r dist-docs apps/site/dist/docs
       - name: Publish to Cloudflare Pages
         # NEEDS (user, one-time): CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID repo secrets and a
         # `mcpfold-site` Pages project. Until set, this step is skipped rather than failing the run.
