@@ -36,6 +36,7 @@ const NAV = [
   ['site-hosting.md', 'Site hosting'],
   ['coolify-edge-service.md', 'Edge service'],
   ['security.md', 'Security'],
+  ['telemetry.md', 'Telemetry'],
   ['security-at-rest.md', 'At-rest hardening'],
   ['threat-model.md', 'Threat model'],
   ['ci.md', 'CI'],

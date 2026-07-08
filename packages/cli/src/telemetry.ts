@@ -1,3 +1,4 @@
+import { CLIENT_IDS } from '@mcpfold/core';
 import { Redactor } from './util/redact.js';
 
 /**
@@ -65,7 +66,69 @@ export function buildTelemetryEvent(input: BuildEventInput): TelemetryEvent {
   };
 }
 
-export type TelemetrySink = (event: TelemetryEvent) => void | Promise<void>;
+/**
+ * Adoption signal (S11.5) — a strictly opt-in, AGGREGATE event so adapter/provider work is driven
+ * by data, not guesswork. Every field is a fixed allow-list of non-identifying values: which client
+ * adapters and provider schemes were seen (from the known enums only — arbitrary strings are
+ * dropped), and COARSE size buckets. Never a config, path, URL, server name, or secret. See
+ * docs/telemetry.md for the exact fields and the aggregation view.
+ */
+export const KNOWN_SCHEMES = ['env', 'dotenv', 'infisical', 'keychain', 'op'] as const;
+export type ProviderScheme = (typeof KNOWN_SCHEMES)[number];
+
+export interface AdoptionEvent {
+  event: 'adoption';
+  cliVersion: string;
+  os: NodeJS.Platform;
+  /** Subset of the known client ids, sorted. */
+  adapters: string[];
+  /** Subset of the known provider schemes, sorted. */
+  providerSchemes: string[];
+  /** Coarse size buckets — never exact counts. */
+  serverBucket: string;
+  profileBucket: string;
+}
+
+/** Coarse, non-identifying size bucket. */
+export function bucketCount(n: number): string {
+  if (n <= 0) return '0';
+  if (n <= 5) return '1-5';
+  if (n <= 20) return '6-20';
+  return '20+';
+}
+
+export interface BuildAdoptionInput {
+  cliVersion: string;
+  adapters: string[];
+  providerSchemes: string[];
+  serverCount: number;
+  profileCount: number;
+  platform?: NodeJS.Platform;
+}
+
+/**
+ * Build the adoption event. Adapters and schemes are filtered to the known enums, so a config path
+ * or server name passed in by mistake can never become a field value — only real client ids and
+ * scheme names survive.
+ */
+export function buildAdoptionEvent(input: BuildAdoptionInput): AdoptionEvent {
+  const clients = new Set<string>(CLIENT_IDS);
+  const schemes = new Set<string>(KNOWN_SCHEMES);
+  const allow = (arr: string[], set: Set<string>) =>
+    [...new Set(arr.filter((x) => set.has(x)))].sort();
+  return {
+    event: 'adoption',
+    cliVersion: input.cliVersion,
+    os: input.platform ?? process.platform,
+    adapters: allow(input.adapters, clients),
+    providerSchemes: allow(input.providerSchemes, schemes),
+    serverBucket: bucketCount(input.serverCount),
+    profileBucket: bucketCount(input.profileCount),
+  };
+}
+
+export type TelemetryPayload = TelemetryEvent | AdoptionEvent;
+export type TelemetrySink = (event: TelemetryPayload) => void | Promise<void>;
 
 export interface SendOptions {
   env?: TelemetryEnv;
@@ -78,14 +141,19 @@ export interface SendOptions {
  * anything was sent. The event is redacted before sending as a final guard: if any field ever
  * carried a secret-shaped value, it would be masked, not transmitted.
  */
-export async function sendTelemetry(
-  event: TelemetryEvent,
-  options: SendOptions = {},
-): Promise<boolean> {
+async function sendEvent(event: TelemetryPayload, options: SendOptions): Promise<boolean> {
   if (!isTelemetryEnabled(options.env ?? process.env)) return false;
   if (!options.sink) return false;
   const redactor = options.redactor ?? new Redactor();
-  const safe = redactor.deep(event) as TelemetryEvent;
-  await options.sink(safe);
+  await options.sink(redactor.deep(event) as TelemetryPayload);
   return true;
+}
+
+export function sendTelemetry(event: TelemetryEvent, options: SendOptions = {}): Promise<boolean> {
+  return sendEvent(event, options);
+}
+
+/** Send the opt-in adoption signal (same gating + redaction guard as {@link sendTelemetry}). */
+export function sendAdoption(event: AdoptionEvent, options: SendOptions = {}): Promise<boolean> {
+  return sendEvent(event, options);
 }

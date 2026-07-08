@@ -3,7 +3,7 @@ import {
   buildTelemetryEvent,
   isTelemetryEnabled,
   sendTelemetry,
-  type TelemetryEvent,
+  type TelemetryPayload,
 } from '../src/telemetry.js';
 
 describe('telemetry (S8.3) — opt-in only', () => {
@@ -47,7 +47,7 @@ describe('telemetry (S8.3) — opt-in only', () => {
   });
 
   it('does not send anything when disabled', async () => {
-    const sent: TelemetryEvent[] = [];
+    const sent: TelemetryPayload[] = [];
     const event = buildTelemetryEvent({
       command: 'diff',
       cliVersion: '0.1.0',
@@ -60,7 +60,7 @@ describe('telemetry (S8.3) — opt-in only', () => {
   });
 
   it('sends only when opted in AND a sink is configured', async () => {
-    const sent: TelemetryEvent[] = [];
+    const sent: TelemetryPayload[] = [];
     const event = buildTelemetryEvent({
       command: 'diff',
       cliVersion: '0.1.0',
@@ -76,7 +76,7 @@ describe('telemetry (S8.3) — opt-in only', () => {
   });
 
   it('redacts any secret-shaped value before sending (belt-and-suspenders)', async () => {
-    const sent: TelemetryEvent[] = [];
+    const sent: TelemetryPayload[] = [];
     // Simulate a hypothetical future field carrying a token — it must never be transmitted raw.
     const leaky = {
       ...buildTelemetryEvent({
@@ -88,6 +88,8 @@ describe('telemetry (S8.3) — opt-in only', () => {
     };
     await sendTelemetry(leaky, { env: { MCPFOLD_TELEMETRY: '1' }, sink: (e) => void sent.push(e) });
     expect(sent).toHaveLength(1);
-    expect(sent[0]!.command).not.toContain('ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123');
+    expect((sent[0] as { command: string }).command).not.toContain(
+      'ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123',
+    );
   });
 });
