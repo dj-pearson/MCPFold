@@ -1,7 +1,9 @@
+import { createServer, type Server } from 'node:http';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { PREFERRED_PROTOCOL_VERSION } from '@mcpfold/proxy';
 import type { JsonRpcId, JsonRpcMessage, MessageTransport } from '@mcpfold/proxy';
 import { runTest } from '../src/commands/test.js';
 import { EXIT } from '../src/output/exit-codes.js';
@@ -156,5 +158,71 @@ describe('runTest real stdio spawn (S16.2)', () => {
     expect(r.reachable).toBe(true);
     expect(r.toolCount).toBe(3);
     expect(r.protocolVersion).toBe('2024-11-05');
+  });
+});
+
+/**
+ * S17.4 — over real streamable HTTP, the handshake must negotiate a version and echo it as the
+ * `MCP-Protocol-Version` header on every request after `initialize` (required since 2025-06-18).
+ */
+describe('runTest HTTP protocol-version header (S17.4)', () => {
+  let dir: string;
+  let server: Server;
+  let url: string;
+  const seen: { method: string; protoHeader: string | undefined }[] = [];
+
+  beforeEach(async () => {
+    dir = mkdtempSync(join(tmpdir(), 'mcpfold-http-proto-'));
+    seen.length = 0;
+    server = createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        const msg = JSON.parse(body) as JsonRpcMessage;
+        seen.push({
+          method: msg.method ?? '',
+          protoHeader: req.headers['mcp-protocol-version'] as string | undefined,
+        });
+        // Server counter-offers 2025-06-18 regardless of what we offered.
+        const result =
+          msg.method === 'initialize'
+            ? { protocolVersion: '2025-06-18' }
+            : msg.method === 'tools/list'
+              ? { tools: [{ name: 'a' }] }
+              : {};
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }));
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const addr = server.address();
+    url = `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}/mcp`;
+  });
+  afterEach(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('negotiates the version and sends MCP-Protocol-Version after initialize', async () => {
+    writeFileSync(
+      join(dir, 'mcp.config.jsonc'),
+      JSON.stringify({
+        version: 1,
+        servers: { remote: { transport: 'http', url } },
+        profiles: {},
+      }),
+    );
+
+    const out = await runTest({ cwd: dir, server: 'remote', timeoutMs: 8000 });
+    expect(out.exit).toBe(EXIT.SUCCESS);
+    expect(out.data.results[0]!.protocolVersion).toBe('2025-06-18'); // negotiated, not offered
+
+    const initReq = seen.find((s) => s.method === 'initialize');
+    const listReq = seen.find((s) => s.method === 'tools/list');
+    // The initialize offer carries the newest supported version in its body (not asserted here);
+    // the KEY requirement is that the follow-up request echoes the NEGOTIATED version as a header.
+    expect(initReq).toBeTruthy();
+    expect(listReq?.protoHeader).toBe('2025-06-18');
+    expect(PREFERRED_PROTOCOL_VERSION).not.toBe('2025-06-18'); // proves negotiation actually moved it
   });
 });

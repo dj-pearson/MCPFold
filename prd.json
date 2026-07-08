@@ -3962,7 +3962,7 @@
       "epic": "E17",
       "order": 4,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "MCP protocol-version negotiation (stop pinning 2024-11-05)",
       "user_story": "As a user testing or proxying modern MCP servers, I want mcpfold to negotiate the protocol version rather than announce a two-generation-old one, so handshakes succeed against current servers.",

@@ -113,6 +113,11 @@ function realTransport(server: ResolvedServer): MessageTransport {
     onMessage: (h) => {
       onMsg = h;
     },
+    // Once the handshake negotiates a version, echo it as MCP-Protocol-Version on every subsequent
+    // request (required since MCP 2025-06-18). Mutates the shared headers used by send().
+    setProtocolVersion: (version) => {
+      headers['mcp-protocol-version'] = version;
+    },
     send: (msg) => {
       if (msg.id == null) return; // notification: fire-and-forget
       fetch(server.url!, { method: 'POST', headers, body: JSON.stringify(msg) })

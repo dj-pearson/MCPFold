@@ -8,11 +8,43 @@ import type { MessageTransport } from './transport/types.js';
  * its tools, with a bounded per-request timeout so a hung server aborts cleanly (S0.9).
  */
 
-export const MCP_PROTOCOL_VERSION = '2024-11-05';
+/**
+ * Known MCP protocol versions, oldest → newest. The lineage is
+ * 2024-11-05 → 2025-03-26 → 2025-06-18 → 2025-11-25. We offer the newest by default and accept the
+ * server's counter-offer per the spec's version-negotiation rules.
+ */
+export const SUPPORTED_PROTOCOL_VERSIONS = [
+  '2024-11-05',
+  '2025-03-26',
+  '2025-06-18',
+  '2025-11-25',
+] as const;
+
+export type ProtocolVersion = (typeof SUPPORTED_PROTOCOL_VERSIONS)[number];
+
+/** The newest supported stable version — what mcpfold announces unless told otherwise. */
+export const PREFERRED_PROTOCOL_VERSION: ProtocolVersion = '2025-11-25';
+
+/**
+ * @deprecated Retained for back-compat. Use {@link PREFERRED_PROTOCOL_VERSION} for the version to
+ * offer, or {@link SUPPORTED_PROTOCOL_VERSIONS} for the full set. This is the OLDEST supported
+ * version, not a value any call site should pin to.
+ */
+export const MCP_PROTOCOL_VERSION: ProtocolVersion = SUPPORTED_PROTOCOL_VERSIONS[0];
+
+/** True if `version` is one mcpfold knows how to speak. */
+export function isSupportedProtocolVersion(version: string): version is ProtocolVersion {
+  return (SUPPORTED_PROTOCOL_VERSIONS as readonly string[]).includes(version);
+}
 
 export interface HandshakeResult {
   reachable: boolean;
+  /** The version the server settled on (its `initialize` response), i.e. the negotiated version. */
   protocolVersion?: string;
+  /** The version mcpfold offered in `initialize`. */
+  offeredVersion?: string;
+  /** True when the negotiated version is one mcpfold supports. */
+  protocolSupported?: boolean;
   toolCount?: number;
   /** Present when unreachable — a message safe to print (never the resolved token). */
   error?: string;
@@ -25,9 +57,10 @@ interface Pending {
 
 export async function handshake(
   transport: MessageTransport,
-  opts: { timeoutMs?: number; clientName?: string } = {},
+  opts: { timeoutMs?: number; clientName?: string; preferredVersion?: string } = {},
 ): Promise<HandshakeResult> {
   const timeoutMs = opts.timeoutMs ?? 10_000;
+  const offeredVersion = opts.preferredVersion ?? PREFERRED_PROTOCOL_VERSION;
   const pending = new Map<JsonRpcId, Pending>();
 
   transport.onMessage((msg: JsonRpcMessage) => {
@@ -63,10 +96,15 @@ export async function handshake(
 
   try {
     const init = (await request('initialize', {
-      protocolVersion: MCP_PROTOCOL_VERSION,
+      protocolVersion: offeredVersion,
       capabilities: {},
       clientInfo: { name: opts.clientName ?? 'mcpfold', version: '1' },
     })) as { protocolVersion?: string } | null;
+
+    // Per spec: the server echoes our version if it supports it, else counter-offers one it does.
+    // We accept that negotiated version and, on HTTP, echo it as MCP-Protocol-Version henceforth.
+    const negotiated = init?.protocolVersion ?? offeredVersion;
+    transport.setProtocolVersion?.(negotiated);
 
     // MCP requires the client to confirm initialization before other requests.
     transport.send({ jsonrpc: '2.0', method: 'notifications/initialized' });
@@ -74,7 +112,9 @@ export async function handshake(
     const tools = (await request('tools/list', {})) as { tools?: unknown[] } | null;
     return {
       reachable: true,
-      protocolVersion: init?.protocolVersion,
+      protocolVersion: negotiated,
+      offeredVersion,
+      protocolSupported: isSupportedProtocolVersion(negotiated),
       toolCount: Array.isArray(tools?.tools) ? tools!.tools!.length : 0,
     };
   } catch (err) {
