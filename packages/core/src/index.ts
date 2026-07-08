@@ -83,6 +83,7 @@ export {
 
 // Deterministic serialization (S0.8)
 export { isByteIdentical, serialize, sortKeysDeep, type SerializeOptions } from './serialize.js';
+export { DIRECTORY, DIRECTORY_VERSION, searchDirectory, type DirectoryEntry } from './directory.js';
 
 // Drift-check engine (S0.8)
 export {

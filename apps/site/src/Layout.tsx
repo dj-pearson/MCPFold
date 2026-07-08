@@ -31,6 +31,9 @@ export function Layout() {
             <a href="/install" style={{ color: 'var(--fg-muted)' }}>
               Install
             </a>
+            <a href="/directory" style={{ color: 'var(--fg-muted)' }}>
+              Directory
+            </a>
             <a href="/docs" style={{ color: 'var(--fg-muted)' }}>
               Docs
             </a>
