@@ -90,8 +90,16 @@ The CLI and everything local are **free forever and MIT-licensed**; the hosted c
 surface (and you can self-host it yourself for free). See the [pricing model](./docs/pricing-model.md),
 the public [roadmap](./docs/roadmap.md), and how the project is run in [governance](./docs/governance.md).
 
-If mcpfold saves you time, consider [sponsoring](https://github.com/sponsors/dj-pearson) — it funds
-the free, open-source core.
+## Support the project
+
+mcpfold's CLI and core are **free forever and MIT-licensed**. If it saves you time, you can help
+fund ongoing work:
+
+- **Recurring** — [GitHub Sponsors](https://github.com/sponsors/dj-pearson)
+  or [Open Collective](https://opencollective.com/mcpfold)
+- **One-time** — [donate via Stripe](https://buy.stripe.com/9B600l5BR6KF1YV01s1Fe00)
+
+Sponsorships fund the free, open-source core. Thank you 🙏
 
 ## Autonomous build loop
 
