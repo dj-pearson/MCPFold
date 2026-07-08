@@ -13,3 +13,8 @@ coverage/
 .vitest/
 *.mcpfold.bak.*
 *.mcpfold.tmp
+
+# Playwright (web e2e) artifacts
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/dist/
