@@ -18,3 +18,6 @@ coverage/
 apps/web/test-results/
 apps/web/playwright-report/
 apps/web/dist/
+
+# Standalone binary build artifacts (S11.1)
+build/

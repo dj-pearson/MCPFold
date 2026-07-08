@@ -22,6 +22,7 @@ const checkOnly = process.argv.includes('--check');
 /** Pages must exist and appear in the nav, in this order. Guards the acceptance criteria. */
 const NAV = [
   ['index.md', 'Home'],
+  ['install.md', 'Install'],
   ['quickstart.md', 'Quickstart'],
   ['config-format.md', 'Config format'],
   ['secrets.md', 'Secrets'],
