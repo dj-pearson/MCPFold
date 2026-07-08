@@ -1,4 +1,5 @@
 import { findSecretRefs, isSecretRef, type Config } from '@mcpfold/core';
+import { parseIntegrity } from '../trust/integrity.js';
 import type { Finding } from './types.js';
 
 /**
@@ -21,6 +22,23 @@ export function checkUnpinnedLatest(config: Config, file: string): Finding[] {
         where: `servers.${name}`,
         message: `Server "${name}" runs an unpinned @latest package.`,
         fix: `Add a "pin" (e.g. "pin": "1.4.2") so mcpfold rewrites @latest to a fixed version at fold time.`,
+      });
+    }
+  }
+  return findings;
+}
+
+/** Flag a pinned server whose `integrity` hash is malformed (can never match a real package). */
+export function checkPinIntegrity(config: Config, file: string): Finding[] {
+  const findings: Finding[] = [];
+  for (const [name, server] of Object.entries(config.servers)) {
+    if (typeof server.integrity === 'string' && parseIntegrity(server.integrity) === null) {
+      findings.push({
+        severity: 'error',
+        file,
+        where: `servers.${name}.integrity`,
+        message: `Server "${name}" has a malformed integrity hash "${server.integrity}".`,
+        fix: 'Use an SRI hash like "sha512-<base64>" (or remove the field).',
       });
     }
   }

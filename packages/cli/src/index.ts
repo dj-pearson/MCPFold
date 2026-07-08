@@ -77,6 +77,30 @@ export {
   type SecretTestData,
 } from './commands/secret.js';
 
+// Config-as-code trust + version signing (S9.2)
+export {
+  defaultTrustPath,
+  executableSignature,
+  fileTrustGate,
+  isExecutable,
+  memoryTrustGate,
+  untrustedServers,
+  type ExecutableEntry,
+  type TrustGate,
+  type TrustStatus,
+  type UntrustedServer,
+} from './trust/tofu.js';
+export {
+  getOrCreateSigningKey,
+  loadSigningKey,
+  signConfig,
+  verifyConfig,
+} from './trust/signing.js';
+export { runLogin, type LoginData, type LoginOptions } from './commands/login.js';
+export { runPush, type PushData, type PushOptions } from './commands/push.js';
+export { runPull, type PullData, type PullOptions } from './commands/pull.js';
+export { runTrust, type TrustData, type TrustOptions } from './commands/trust.js';
+
 // IO helpers (S3.5)
 export { atomicWrite } from './io/atomic-write.js';
 export { backupIfExists } from './io/backup.js';

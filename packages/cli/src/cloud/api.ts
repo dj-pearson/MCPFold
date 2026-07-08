@@ -37,12 +37,16 @@ export interface PullResponse {
   config: Config;
   created_at: string;
   created_by: string;
+  /** HMAC signature of the config (S9.2); absent for unsigned/legacy versions. */
+  signature?: string;
 }
 
 export interface PushBody {
   config: Config;
   machine_name?: string;
   team_id?: string;
+  /** HMAC signature of the config (S9.2). */
+  signature?: string;
 }
 
 export interface CloudApi {

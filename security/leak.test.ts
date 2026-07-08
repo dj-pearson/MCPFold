@@ -13,7 +13,9 @@ import {
   createMcpServersAdapter,
   type OsContext,
 } from '@mcpfold/adapters';
-import { runSync, runRun, renderWithStrategy, type Spawner } from 'mcpfold';
+import { runSync, runRun, renderWithStrategy, type Spawner, type TrustGate } from 'mcpfold';
+
+const trustAll: TrustGate = { status: () => 'trusted', isTrusted: () => true, approve: () => {} };
 import {
   assertRefOnlyForPush,
   findRawSecretsForPush,
@@ -145,7 +147,13 @@ describe('S9.1 — run injects into the child env only, never to disk (memory-on
       capturedEnv = env;
       return 0;
     };
-    await runRun({ cwd, name: 'local', providers: [sentinelProvider('env')], spawnFn });
+    await runRun({
+      cwd,
+      name: 'local',
+      providers: [sentinelProvider('env')],
+      spawnFn,
+      trust: trustAll,
+    });
     // Correctly injected into the child process env...
     expect(capturedEnv.API_TOKEN).toBe(SENTINEL);
     // ...but nothing was cached/written to disk (memory-only resolution).

@@ -79,6 +79,9 @@
               "pin": {
                 "type": "string"
               },
+              "integrity": {
+                "type": "string"
+              },
               "tools": {
                 "type": "object",
                 "properties": {

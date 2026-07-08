@@ -2,6 +2,7 @@ import type { CloudApi } from '../cloud/api.js';
 import type { KeychainBackend } from '../cloud/token-store.js';
 import { assertRefOnly } from '../cloud/refguard.js';
 import { endpointError, getAccessToken, requireSession } from '../cloud/session.js';
+import { getOrCreateSigningKey, signConfig } from '../trust/signing.js';
 import { loadConfigFromDisk } from '../util/config.js';
 import type { CommandOutput } from '../output/render.js';
 
@@ -33,12 +34,17 @@ export async function runPush(opts: PushOptions): Promise<CommandOutput<PushData
   const session = await requireSession(opts.backend);
   const token = await getAccessToken(session, opts.api, opts.backend, opts.now?.());
 
+  // Sign the version for integrity (S9.2) — pull verifies it against the same per-user key.
+  const signingKey = await getOrCreateSigningKey(opts.backend);
+  const signature = signConfig(config, signingKey);
+
   let res;
   try {
     res = await opts.api.push(token, {
       config,
       machine_name: opts.machineName,
       team_id: opts.teamId,
+      signature,
     });
   } catch (error) {
     throw endpointError(session.endpoint, error);

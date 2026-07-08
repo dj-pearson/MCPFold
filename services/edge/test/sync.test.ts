@@ -151,6 +151,14 @@ Deno.test({
         assertEquals(res.status, 200);
         assertEquals((await res.json()).version, 1);
       });
+
+      await t.step("a version's integrity signature round-trips (S9.2)", async () => {
+        const push = await pushReq(tokenA, { config: CONFIG_V2, signature: "sig-abc-123" });
+        assertEquals(push.status, 201);
+        const pushed = await push.json();
+        const res = await pullReq(tokenA, `?version=${pushed.version}`);
+        assertEquals((await res.json()).signature, "sig-abc-123");
+      });
     } finally {
       await sql`delete from public.configs where owner_id in ${sql([userA, userB])}`;
       await sql`delete from public.users where id in ${sql([userA, userB])}`;

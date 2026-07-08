@@ -13,6 +13,7 @@ import { runSecretSet, runSecretTest } from './commands/secret.js';
 import { runLogin } from './commands/login.js';
 import { runPush } from './commands/push.js';
 import { runPull } from './commands/pull.js';
+import { runTrust } from './commands/trust.js';
 import { httpCloudApi } from './cloud/api.js';
 import { osKeychainBackend } from './cloud/token-store.js';
 import { resolveEndpoint } from './cloud/session.js';
@@ -315,6 +316,17 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       );
     },
   );
+
+  // ---- Config-as-code trust (S9.2) --------------------------------------------
+  addGlobalFlags(
+    program
+      .command('trust')
+      .description('approve new or changed server launch commands (config-as-code TOFU)')
+      .argument('[name]', 'a single server to trust; omit to trust all untrusted'),
+  ).action(async (name: string | undefined, opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('trust', ctx.json, () => runTrust({ cwd: ctx.cwd, name }), writer));
+  });
 
   // ---- Cloud sync: login / push / pull (S6.6) ---------------------------------
   const outWrite = (text: string): void =>

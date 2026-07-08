@@ -63,6 +63,8 @@ export const ServerSchema = z
     env: z.record(StringOrSecretRef).optional(),
     /** Pins an `@latest` stdio server to a fixed version at fold time (supply-chain hygiene). */
     pin: z.string().optional(),
+    /** Optional SRI integrity hash (e.g. `sha512-…`) for the pinned stdio package (S9.2). */
+    integrity: z.string().optional(),
     tools: ToolsSchema.optional(),
     tags: z.array(z.string()).default([]),
   })

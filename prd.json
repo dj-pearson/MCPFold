@@ -55,6 +55,7 @@
     "packages/cli": "mcpfold \u2014 the CLI binary (init/import/add/sync/diff/doctor/secret/run/login/push/pull), wires core + adapters + secrets + proxy.",
     "packages/schema": "Published JSON Schema for mcp.config.jsonc (editor autocomplete) generated from zod.",
     "apps/web": "React/TS visual editor + directory + team console, Cloudflare Pages.",
+    "apps/site": "Public marketing site at the mcpfold.com root (hero + interactive benchmark, install funnel, integrated docs+search, public directory, pricing, blog/changelog), Cloudflare Pages - distinct from apps/web (authenticated app) and the docs static build.",
     "services/edge": "Deno Supabase edge functions (auth, push, pull) + side Docker service.",
     "supabase": "migrations/, seed.sql, RLS policies, config.toml, coolify compose docs.",
     "docs": "Format spec, adapter authoring guide, benchmark writeup.",
@@ -171,6 +172,31 @@
       "id": "E9",
       "title": "Security & integrity",
       "goal": "Prove the ref-only invariant on every path, treat config as executable code (trust + integrity), redact all output, and harden the self-hosted at-rest + session surfaces. Decision: server-side-at-rest (TLS + volume/DB encryption + RLS); no end-to-end config encryption \u2014 the server stays able to read config for the visual editor, directory, and audit-diff."
+    },
+    {
+      "id": "E10",
+      "title": "Daily-driver cohesion",
+      "goal": "Turn the toolbox of verbs into a product opened daily: a unified status front door, background auto-sync, a guided first run, live server health checks, and one-command rollback. Net-new beyond the original spec."
+    },
+    {
+      "id": "E11",
+      "title": "Distribution & adoption surface",
+      "goal": "Meet users on every install channel, remove first-run friction (completions, update notifier), ship the launch's visual demo, and close a privacy-preserving learning loop so adoption is measured, not guessed."
+    },
+    {
+      "id": "E12",
+      "title": "Team-without-cloud wedge",
+      "goal": "Let a team standardize MCP setups from a repo-committed canonical config with a CI drift gate and a packaged GitHub Action - collaboration that needs no backend and funnels toward the paid cloud."
+    },
+    {
+      "id": "E13",
+      "title": "Marketing site - mcpfold.com",
+      "goal": "A complete public site that sells the context-window wedge, converts to install and cloud signup, and hosts docs, an interactive benchmark, the server directory, pricing, and a blog/changelog."
+    },
+    {
+      "id": "E14",
+      "title": "Moat durability & sustainability",
+      "goal": "Keep the adapter-breadth advantage from decaying (coverage roadmap + live-client compatibility testing) and define the business layer (pricing, billing path, sponsorship, public roadmap)."
     }
   ],
   "stories": [
@@ -2068,7 +2094,7 @@
       "epic": "E9",
       "order": 55,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S3.5",
         "S6.6"
@@ -2226,6 +2252,706 @@
       "definition_of_done": [
         "Web hardening in place and the security gate enforced in CI."
       ]
+    },
+    {
+      "id": "S10.1",
+      "epic": "E10",
+      "order": 60,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S3.6",
+        "S3.7",
+        "S6.6"
+      ],
+      "title": "`mcpfold status` - unified health + sync front door",
+      "user_story": "As a user, I want one command that answers 'is my setup OK?' - detected clients, drift per client, login/sync state, and outstanding warnings - so mcpfold has a daily front door instead of a pile of subcommands.",
+      "context": "The toolbox has no cohesion command; after the one-time migration there is no reason to reopen it. status aggregates existing engines (diff for drift, doctor for footguns, cloud session for login/last-sync) into a single scannable summary; strictly read-only. Honors the --json envelope and exit-code contract (S0.10).",
+      "acceptance_criteria": [
+        "Lists each detected client with: managed/unmanaged, in-sync vs drifted (server + field counts), and needsRestart hint.",
+        "Summarizes canonical-config health (doctor error/warn counts) and flags unpinned/insecure entries without a full doctor dump.",
+        "Shows cloud state when applicable: logged-in identity, last push/pull version, behind/ahead status.",
+        "Read-only: never writes files or backups; safe to run anytime.",
+        "--json emits the stable envelope; exit 0 when clean/in-sync, 1 when actionable drift or warnings exist, 2 on error."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/status.ts",
+        "packages/cli/test/status.test.ts"
+      ],
+      "tests": [
+        "Clean tmp HOME -> all in-sync, exit 0; mutate one client file -> drift shown, exit 1; logged-out hides cloud section; --json shape stable."
+      ],
+      "definition_of_done": [
+        "status is the single command that summarizes local + cloud health at a glance."
+      ]
+    },
+    {
+      "id": "S10.2",
+      "epic": "E10",
+      "order": 61,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S3.5"
+      ],
+      "title": "`mcpfold sync --watch` - background auto-fold on config change",
+      "user_story": "As a user, I want mcpfold to re-fold my clients automatically when mcp.config.jsonc changes, so keeping every client in sync is a background habit rather than a command I forget to run.",
+      "context": "Converts the one-time migration tool into a daily driver. A debounced file watcher on the canonical config re-runs sync, reusing the atomic-write + backup path and respecting --profile, --dry-run, and the determinism invariant (S0.8).",
+      "acceptance_criteria": [
+        "--watch observes mcp.config.jsonc and re-syncs affected profiles on change, debounced to coalesce rapid edits.",
+        "Each auto-sync backs up and writes atomically exactly as a manual sync; no half-written files on rapid saves.",
+        "Clean shutdown on SIGINT/SIGTERM; a summary line per fold; --dry-run watches and prints diffs without writing.",
+        "Errors during a watched fold (e.g. invalid config mid-edit) are reported and never crash the watcher or leave partial output.",
+        "Cross-platform watching works on win32/darwin/linux (tested via an injectable fs-event abstraction)."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/sync.ts",
+        "packages/cli/src/io/watch.ts",
+        "packages/cli/test/watch.test.ts"
+      ],
+      "tests": [
+        "Editing the config triggers one debounced re-sync; invalid intermediate config is reported without crashing; SIGINT stops cleanly."
+      ],
+      "definition_of_done": [
+        "Auto-sync keeps every client current without manual re-runs."
+      ]
+    },
+    {
+      "id": "S10.3",
+      "epic": "E10",
+      "order": 62,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S3.2",
+        "S3.3",
+        "S3.7",
+        "S5.4"
+      ],
+      "title": "Guided first-run onboarding (`mcpfold init --guided`)",
+      "user_story": "As a brand-new user, I want a guided flow that walks me from zero to synced - detect clients, import what I have, fix footguns, sync, and show my context savings - so the first five minutes prove the value.",
+      "context": "init today scaffolds a file; nothing walks a newcomer through the golden path. A guided flow chains init -> import -> doctor (with offered fixes) -> sync -> a before/after context-window number (S5.4), each step skippable and non-interactive-flag friendly.",
+      "acceptance_criteria": [
+        "Detects installed clients, offers to import existing configs, and previews the merge before writing.",
+        "Runs doctor inline and offers to apply safe fixes (rewrite plaintext tokens to refs, pin @latest) with confirmation.",
+        "Ends by syncing and printing the context-window before/after for the resolved set, linking to the benchmark.",
+        "Every prompt has a non-interactive flag/default so the flow is scriptable and CI-safe; --dry-run shows the whole plan.",
+        "Never clobbers an existing canonical config without confirmation; safe to abort at any step with no partial writes."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/init.ts",
+        "packages/cli/src/onboarding/guided.ts",
+        "packages/cli/test/guided.test.ts"
+      ],
+      "tests": [
+        "Scripted guided run in a tmp HOME with fixture clients: imports, fixes a footgun, syncs, prints savings; abort leaves no partial writes."
+      ],
+      "definition_of_done": [
+        "A newcomer reaches a synced, secure, measurably-lighter setup in one guided flow."
+      ]
+    },
+    {
+      "id": "S10.4",
+      "epic": "E10",
+      "order": 63,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S5.1",
+        "S1.4"
+      ],
+      "title": "`mcpfold test <server>` - live MCP handshake + health check",
+      "user_story": "As a user, I want to actually connect to a configured server and confirm it initializes and lists tools, so 'doctor says valid' becomes 'this server really works'.",
+      "context": "doctor validates structure; nothing verifies a server actually responds. Reusing the proxy transports (S5.1), test resolves a server, performs the MCP initialize handshake + tools/list, and reports reachability, tool count, and any auth failure - resolving secrets in-memory only, never printing values.",
+      "acceptance_criteria": [
+        "test <server> resolves the server (secrets in-memory), opens the correct transport (stdio/http/sse), and performs the MCP initialize + tools/list handshake.",
+        "Reports reachable/unreachable, negotiated protocol, and tool count; with no arg, tests all servers in the active profile.",
+        "Auth/connection failures produce a clear, actionable message that never echoes the resolved token.",
+        "Bounded per-server timeout (reuses the offline/degraded contract S0.9); a hung server aborts cleanly.",
+        "--json emits a per-server result array; exit nonzero if any tested server fails."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/test.ts",
+        "packages/proxy/src/handshake.ts",
+        "packages/cli/test/test-server.test.ts"
+      ],
+      "tests": [
+        "Against an in-memory/mock MCP server: healthy server reports tool count; unreachable + auth-failure paths reported without leaking the token; timeout aborts."
+      ],
+      "definition_of_done": [
+        "Users can confirm a server truly works, not just that its config parses."
+      ]
+    },
+    {
+      "id": "S10.5",
+      "epic": "E10",
+      "order": 64,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S3.5",
+        "S9.3"
+      ],
+      "title": "`mcpfold restore` - first-class rollback from backups",
+      "user_story": "As a user, I want to roll back a client file to a mcpfold backup with one command, so I can undo a bad sync without hunting for timestamped .bak files by hand.",
+      "context": "sync writes timestamped <path>.mcpfold.bak.<ts> backups but there is no restore verb. restore lists available backups per client and restores a chosen one atomically, honoring the backup-hardening rules (permissions, gitignore) from S9.3.",
+      "acceptance_criteria": [
+        "Lists available backups per client with timestamps; --list shows them without restoring.",
+        "Restores the selected (or latest) backup atomically, backing up the current file first so restore is itself reversible.",
+        "Respects the S9.3 backup permission/redaction rules; refuses to expose or mishandle a possibly-inlined secret.",
+        "Handles missing/corrupt backups with a clear error; --dry-run shows what would be restored.",
+        "--json output and exit codes follow the contract."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/restore.ts",
+        "packages/cli/src/io/backup.ts",
+        "packages/cli/test/restore.test.ts"
+      ],
+      "tests": [
+        "Sync creates a backup -> mutate -> restore returns the prior contents; latest-vs-chosen selection; missing backup errors; dry-run writes nothing."
+      ],
+      "definition_of_done": [
+        "Any sync is one command away from being undone."
+      ]
+    },
+    {
+      "id": "S11.1",
+      "epic": "E11",
+      "order": 65,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S8.4"
+      ],
+      "title": "Multi-channel install: Homebrew, curl|sh, Scoop/winget, standalone binaries",
+      "user_story": "As a user who won't npx a random package, I want to install mcpfold via Homebrew, a curl|sh script, Scoop/winget, or a standalone binary, so distribution isn't limited to the npm audience.",
+      "context": "S8.4 ships npm only. Broaden reach: build standalone binaries (per-OS/arch) in the release pipeline, publish a Homebrew tap and a Scoop/winget manifest, and host a checksummed curl|sh installer - all driven off the same tagged release so versions never diverge.",
+      "acceptance_criteria": [
+        "Release CI builds standalone binaries for macOS (arm64/x64), Linux (x64/arm64), and Windows (x64), with checksums.",
+        "A Homebrew tap formula and a Scoop/winget manifest install the current release and update automatically on publish.",
+        "A hosted install.sh (curl|sh) verifies a checksum before installing and supports a pinned version.",
+        "Every channel resolves to the same version as the npm publish for a given tag (a CI check asserts parity).",
+        "Install docs cover all channels with copy-paste commands."
+      ],
+      "files_hint": [
+        ".github/workflows/release.yml",
+        "packaging/homebrew/mcpfold.rb",
+        "packaging/scoop/mcpfold.json",
+        "scripts/install.sh",
+        "docs/install.md"
+      ],
+      "tests": [
+        "CI installs each artifact on its OS and runs `mcpfold --version`; checksum verification fails closed on a tampered binary; version-parity check across channels."
+      ],
+      "definition_of_done": [
+        "A user can install mcpfold through their preferred channel and get the same version."
+      ]
+    },
+    {
+      "id": "S11.2",
+      "epic": "E11",
+      "order": 66,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S3.1"
+      ],
+      "title": "Shell completions (bash/zsh/fish/pwsh)",
+      "user_story": "As a CLI user, I want tab completion for commands, flags, profile names, and server names, so mcpfold feels like a first-class tool.",
+      "context": "Standard CLI table stakes. Generate completions from the command tree, expose `mcpfold completions <shell>`, and complete dynamic values (profiles, server names) from the local canonical config where cheap.",
+      "acceptance_criteria": [
+        "`mcpfold completions <bash|zsh|fish|pwsh>` prints a valid completion script for that shell.",
+        "Completes subcommands and global/command flags.",
+        "Completes dynamic --profile and server-name arguments from the local config when present.",
+        "Per-shell install instructions documented.",
+        "Completion generation is covered by a snapshot test per shell."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/completions.ts",
+        "packages/cli/test/completions.test.ts",
+        "docs/completions.md"
+      ],
+      "tests": [
+        "Snapshot the generated script per shell; dynamic profile/server completion resolves from a fixture config."
+      ],
+      "definition_of_done": [
+        "Tab completion works in all four supported shells."
+      ]
+    },
+    {
+      "id": "S11.3",
+      "epic": "E11",
+      "order": 67,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S3.1"
+      ],
+      "title": "Update notifier",
+      "user_story": "As a user, I want a quiet heads-up when a newer mcpfold is available, so I stay current without polling npm.",
+      "context": "A non-blocking, cached, opt-out-able check comparing the running version to the latest published version, printing a one-line notice with the upgrade command for the detected install channel. Must never block a command, leak anything, or run in CI/non-TTY by default.",
+      "acceptance_criteria": [
+        "Checks the latest version at most once per interval, cached to disk; never blocks or delays the actual command.",
+        "Prints a single, dismissable notice naming the new version and the correct upgrade command for how mcpfold was installed.",
+        "Disabled automatically in non-TTY/CI and via an env opt-out (aligned with the S8.3 telemetry/DO_NOT_TRACK conventions).",
+        "Failure to reach the registry is silent (never an error).",
+        "No config, path, or identifying data is sent; only a version is fetched."
+      ],
+      "files_hint": [
+        "packages/cli/src/update-notifier.ts",
+        "packages/cli/test/update-notifier.test.ts"
+      ],
+      "tests": [
+        "Newer version -> notice with channel-correct command; up-to-date -> silent; offline -> silent; CI/non-TTY -> disabled; opt-out honored."
+      ],
+      "definition_of_done": [
+        "Users learn about updates without friction or privacy cost."
+      ]
+    },
+    {
+      "id": "S11.4",
+      "epic": "E11",
+      "order": 68,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S3.5",
+        "S5.4"
+      ],
+      "title": "Scripted terminal demo (VHS/asciinema) for README + site",
+      "user_story": "As a prospective user skimming the README or landing page, I want a short looping demo of import -> sync -> context savings, so I grasp the value in fifteen seconds.",
+      "context": "S8.4's launch collateral is text only; adoption on HN/Reddit hinges on a visual. A committed, regenerable VHS tape (or asciinema cast) records the golden path against fixtures and produces a GIF/SVG embedded in README and the marketing site.",
+      "acceptance_criteria": [
+        "A committed demo script (VHS .tape or asciinema cast) drives init/import -> sync -> diff(clean) -> benchmark against deterministic fixtures.",
+        "A documented command regenerates the recording so it never drifts from real CLI output.",
+        "The rendered asset (GIF/SVG) is embedded in README and available to the marketing site.",
+        "The demo leads with the context-window number and respects the no-implied-endorsement rule.",
+        "Recording runs in CI (or a documented local step) to catch a broken demo before release."
+      ],
+      "files_hint": [
+        "demo/mcpfold.tape",
+        "demo/fixtures/*",
+        "scripts/record-demo.mjs",
+        "docs/assets/demo.gif"
+      ],
+      "tests": [
+        "The demo script runs to completion against fixtures and produces a non-empty asset; regeneration is deterministic."
+      ],
+      "definition_of_done": [
+        "A regenerable 15-second demo exists for launch surfaces."
+      ]
+    },
+    {
+      "id": "S11.5",
+      "epic": "E11",
+      "order": 69,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S8.3"
+      ],
+      "title": "Adoption learning loop: opt-in anonymous adapter/provider signal",
+      "user_story": "As the maintainer, I want a privacy-preserving, opt-in signal of which clients and providers people actually use, so I prioritize adapter work with data instead of guessing.",
+      "context": "S8.3 built opt-in telemetry infra with no sink, so launch is blind. Extend it with a strictly opt-in, aggregate-only event (which adapters were detected/synced, which provider schemes used) - no config, paths, URLs, server names, or secrets - plus a private aggregation view to guide the S14.1 coverage roadmap.",
+      "acceptance_criteria": [
+        "Off by default; opt-in only, honoring the same DO_NOT_TRACK/opt-out precedence as S8.3.",
+        "Payload is a fixed allow-list of non-identifying fields (adapter ids present, provider schemes used, coarse counts) and reuses the S0.6 redactor as a final guard; a test proves no secret/path/name can appear.",
+        "A documented, private aggregation endpoint/view rolls events into 'which clients/providers matter' without per-user tracking.",
+        "The exact collected fields are documented publicly and easy to audit.",
+        "Injectable sink so the loop is testable with no network."
+      ],
+      "files_hint": [
+        "packages/cli/src/telemetry.ts",
+        "docs/telemetry.md",
+        "packages/cli/test/telemetry-usage.test.ts"
+      ],
+      "tests": [
+        "Opt-out -> nothing sent; opt-in payload contains only allow-listed aggregate fields; redactor blocks a planted secret/path/name."
+      ],
+      "definition_of_done": [
+        "Adapter prioritization is driven by opt-in aggregate data, not guesswork."
+      ]
+    },
+    {
+      "id": "S12.1",
+      "epic": "E12",
+      "order": 70,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S0.8",
+        "S3.6",
+        "S9.2"
+      ],
+      "title": "Repo config-as-code convention + team drift-gate workflow",
+      "user_story": "As a team, I want to commit one mcp.config.jsonc to our repo and have every developer fold it locally with a CI check that fails on drift, so we standardize MCP setups with no backend.",
+      "context": "The PRD jumps from single-user CLI straight to the hosted cloud, skipping the obvious middle: a repo-committed canonical config as the team source of truth. Combine the existing --check drift gate (S0.8), diff (S3.6), and trust model (S9.2) into a documented team workflow - the collaboration wedge that needs no cloud and funnels toward it.",
+      "acceptance_criteria": [
+        "A documented convention for a repo-committed mcp.config.jsonc (project scope) that developers fold locally.",
+        "`mcpfold sync --check` / `diff --check` is the CI gate: nonzero when a checkout's clients would drift from the committed config.",
+        "The config-as-code trust prompt (S9.2) covers a teammate adding/changing an executable command; --yes documented for CI.",
+        "A worked example repo/dir shows the whole loop (commit config -> teammate folds -> CI gate).",
+        "Docs explain how this graduates to the hosted cloud (teams, audit) without changing the config format."
+      ],
+      "files_hint": [
+        "docs/team-config-as-code.md",
+        "examples/team-repo/*",
+        "packages/cli/src/commands/sync.ts"
+      ],
+      "tests": [
+        "Example repo: matching checkout passes the gate; a drifted client fails it; a new command triggers the trust prompt."
+      ],
+      "definition_of_done": [
+        "A team can standardize MCP setups from a repo with a CI drift gate and no backend."
+      ]
+    },
+    {
+      "id": "S12.2",
+      "epic": "E12",
+      "order": 71,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S12.1"
+      ],
+      "title": "`mcpfold-action` packaged GitHub Action",
+      "user_story": "As a team, I want a ready-made GitHub Action that runs the mcpfold drift/doctor gate on pull requests, so enforcing our MCP config standard is one workflow snippet.",
+      "context": "Packages the S12.1 workflow as a reusable Action (composite or Docker) that installs mcpfold, runs diff/doctor --check + --json, and annotates the PR with findings. Published and versioned alongside the CLI.",
+      "acceptance_criteria": [
+        "A published action.yml runs mcpfold checks with inputs for profile, working directory, and check level.",
+        "Emits PR annotations/summary from the --json output and sets the job status to the CLI exit code.",
+        "Pinned to a released mcpfold version, with a documented tag/version policy.",
+        "A self-test workflow in this repo exercises the Action on a fixture (clean pass + drift fail).",
+        "README/usage snippet copy-pasteable into any repo."
+      ],
+      "files_hint": [
+        "action.yml",
+        ".github/workflows/action-selftest.yml",
+        "docs/github-action.md"
+      ],
+      "tests": [
+        "Self-test workflow: clean fixture passes, drifted fixture fails with annotations."
+      ],
+      "definition_of_done": [
+        "Any repo can enforce mcpfold config standards via one Action."
+      ]
+    },
+    {
+      "id": "S13.1",
+      "epic": "E13",
+      "order": 72,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S8.1"
+      ],
+      "title": "Marketing site scaffold, design system, and deploy pipeline",
+      "user_story": "As a visitor to mcpfold.com, I want a fast, polished public site with consistent design and shareable metadata, so mcpfold reads as a credible product.",
+      "context": "The public top-of-funnel site at the mcpfold.com root, distinct from the docs static site (S8.1) and the authenticated app (E7). React/TS + Vite (or an SSG) on Cloudflare Pages, sharing @mcpfold/core types where useful. Establishes the design system, layout shell, responsive + light/dark theme, SEO/OG/sitemap, and privacy-friendly analytics that every later page reuses.",
+      "acceptance_criteria": [
+        "apps/site builds and deploys to Cloudflare Pages at the mcpfold.com root, with a CI preview per PR.",
+        "A shared design system (tokens, typography, components) + responsive layout shell with light/dark theme.",
+        "SEO baseline on every route: title/description, Open Graph/Twitter cards, canonical URLs, robots.txt, and a generated sitemap.",
+        "Privacy-friendly analytics (no PII, no cookie wall) wired in and documented.",
+        "Routing/hosting decided so the site (root), docs (/docs), and app coexist without conflicting paths; documented.",
+        "A Lighthouse/perf budget (performance + accessibility thresholds) is checked in CI."
+      ],
+      "files_hint": [
+        "apps/site/vite.config.ts",
+        "apps/site/src/main.tsx",
+        "apps/site/src/design/*",
+        "apps/site/wrangler.toml",
+        ".github/workflows/site.yml"
+      ],
+      "tests": [
+        "Playwright: homepage renders, theme toggles, OG tags present; CI perf/a11y budget passes on the preview."
+      ],
+      "definition_of_done": [
+        "A themed, SEO-ready site shell deploys to Pages and hosts the rest of E13."
+      ]
+    },
+    {
+      "id": "S13.2",
+      "epic": "E13",
+      "order": 73,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S5.4"
+      ],
+      "title": "Hero + interactive context-window benchmark ('the tax')",
+      "user_story": "As a visitor, I want the homepage to lead with the context-window tax and let me see the before/after savings interactively, so the core value lands immediately.",
+      "context": "The headline metric (~72% -> <20%) is the pitch. The hero states it; an interactive widget lets a visitor pick servers/tools (or paste a tools/list) and see the token/context reduction using the published benchmark methodology (S5.4), alongside the demo recording (S11.4).",
+      "acceptance_criteria": [
+        "Hero leads with the context-window benchmark and a primary install CTA + secondary cloud CTA.",
+        "An interactive calculator shows before/after tool count and token/context savings using the S5.4 methodology (client-side, no secrets).",
+        "The S11.4 demo recording is embedded above the fold or one scroll down.",
+        "Numbers are sourced from the committed benchmark so the site and docs never disagree; copy respects no-implied-endorsement.",
+        "Fully responsive and accessible (keyboard + screen-reader for the calculator)."
+      ],
+      "files_hint": [
+        "apps/site/src/home/*",
+        "apps/site/src/benchmark/*",
+        "apps/site/test/home.spec.ts"
+      ],
+      "tests": [
+        "Playwright: calculator updates savings on input; embedded demo loads; benchmark numbers match the committed source."
+      ],
+      "definition_of_done": [
+        "The homepage sells the wedge and lets visitors feel the savings."
+      ]
+    },
+    {
+      "id": "S13.3",
+      "epic": "E13",
+      "order": 74,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S11.1"
+      ],
+      "title": "Install + get-started page (all channels)",
+      "user_story": "As a visitor ready to try mcpfold, I want a single install page with copy-paste commands for my platform and a clear first-run path, so I'm running in under a minute.",
+      "context": "Surfaces every channel from S11.1 (npx/npm, Homebrew, curl|sh, Scoop/winget, binaries) with OS detection and a copy button, then funnels into the init -> import -> sync quickstart and the guided flow (S10.3).",
+      "acceptance_criteria": [
+        "Shows install commands for every channel with one-click copy and auto-highlights the visitor's likely OS.",
+        "Links straight into the quickstart (init/import/sync) and the guided onboarding.",
+        "Version shown reflects the latest release (sourced, not hardcoded).",
+        "Verified/checksum guidance surfaced for the curl|sh and binary paths.",
+        "Responsive + accessible."
+      ],
+      "files_hint": [
+        "apps/site/src/install/*",
+        "apps/site/test/install.spec.ts"
+      ],
+      "tests": [
+        "Playwright: OS auto-select, copy button works, latest version rendered from source."
+      ],
+      "definition_of_done": [
+        "Every install channel is one copy-paste away with a clear next step."
+      ]
+    },
+    {
+      "id": "S13.4",
+      "epic": "E13",
+      "order": 75,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S8.1"
+      ],
+      "title": "Docs integrated under unified site nav + search",
+      "user_story": "As a user, I want the docs to live under mcpfold.com/docs with the same nav, theme, and a search box, so learning and marketing feel like one site.",
+      "context": "S8.1 already builds a static docs site with link-checking. Integrate it under the marketing shell (shared header/footer/theme) at /docs, add client-side search, and keep the existing build/link-check as the source of truth rather than forking content.",
+      "acceptance_criteria": [
+        "Docs render under /docs inside the marketing shell (shared nav/theme), reusing the S8.1 content pipeline (no forked copies).",
+        "Client-side search over docs content.",
+        "The existing docs link-check + build gate still runs and blocks on breakage.",
+        "The hosted JSON schema URL (/schema/v1.json) remains stable and served.",
+        "Deep links and heading anchors continue to resolve."
+      ],
+      "files_hint": [
+        "apps/site/src/docs/*",
+        "scripts/build-docs.mjs",
+        "apps/site/test/docs.spec.ts"
+      ],
+      "tests": [
+        "Playwright: docs render in-shell, search finds a known page, schema URL resolves; link-check stays green."
+      ],
+      "definition_of_done": [
+        "Docs and marketing are one coherent, searchable site."
+      ]
+    },
+    {
+      "id": "S13.5",
+      "epic": "E13",
+      "order": 76,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S7.4"
+      ],
+      "title": "Public SEO server directory with add-to-config deep links",
+      "user_story": "As someone searching for an MCP server, I want a browsable, SEO-indexed public directory that deep-links into adding a server to my config, so mcpfold is discoverable and useful pre-signup.",
+      "context": "A public, statically-rendered (SEO-friendly) view of the curated directory (shares seed data with the app's S7.4), each entry with a stable page and an 'add to config' deep link that prefills the CLI add flow or the app editor. A top organic-discovery surface.",
+      "acceptance_criteria": [
+        "Browse/search a directory of MCP servers, each with its own indexable page (server-rendered/prerendered for SEO).",
+        "Each entry offers 'add to config' that deep-links to the add flow (CLI command snippet and/or app editor prefill), token as a ref placeholder.",
+        "Directory data is shared/seeded with S7.4 (single source), and adding entries is documented.",
+        "Per-entry OG cards and sitemap inclusion for discoverability.",
+        "Respects no-implied-endorsement copy."
+      ],
+      "files_hint": [
+        "apps/site/src/directory/*",
+        "supabase/seed/directory.sql",
+        "apps/site/test/directory.spec.ts"
+      ],
+      "tests": [
+        "Playwright: search + open an entry page (SEO tags present) + add-to-config produces a valid snippet/prefill."
+      ],
+      "definition_of_done": [
+        "The public directory is a browsable, indexable discovery + add surface."
+      ]
+    },
+    {
+      "id": "S13.6",
+      "epic": "E13",
+      "order": 77,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S7.6",
+        "S14.3"
+      ],
+      "title": "Pricing page + cloud signup funnel",
+      "user_story": "As a team lead evaluating mcpfold, I want a clear pricing page contrasting free OSS with the paid team cloud, and a signup CTA, so I can decide and convert.",
+      "context": "Presents the business model from S14.3: free/OSS local + CLI vs paid team console/audit (S7.6). Explains what is free forever vs paid, with a signup/waitlist CTA into the app (E7). No secret handling; pure marketing + funnel.",
+      "acceptance_criteria": [
+        "A pricing page contrasting free OSS (local CLI, all adapters, self-host) with paid team features (shared configs, audit, sync dashboard).",
+        "Clear signup/waitlist CTA routing into the app auth (E7), or a documented waitlist if billing is deferred.",
+        "FAQ covering self-hosting, licensing (MIT core, commercial cloud), and refs-only data handling.",
+        "Pricing figures/tiers come from the S14.3 model (single source), not ad-hoc copy.",
+        "Responsive + accessible."
+      ],
+      "files_hint": [
+        "apps/site/src/pricing/*",
+        "apps/site/test/pricing.spec.ts"
+      ],
+      "tests": [
+        "Playwright: pricing renders tiers from source; signup CTA routes to app auth/waitlist."
+      ],
+      "definition_of_done": [
+        "Pricing is clear and there is a path to convert to the paid cloud."
+      ]
+    },
+    {
+      "id": "S13.7",
+      "epic": "E13",
+      "order": 78,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [
+        "S13.1"
+      ],
+      "title": "Blog + changelog / release notes",
+      "user_story": "As a follower of the project, I want a blog and a changelog on the site, so I can track releases, launches, and deep-dives like the benchmark writeup.",
+      "context": "Content surface for launch posts, the benchmark deep-dive, and human-readable release notes generated from changesets/CHANGELOG. Feeds SEO and gives the launch collateral (S8.4) a home.",
+      "acceptance_criteria": [
+        "A blog with markdown-authored posts (the benchmark writeup and a launch post seeded), each with OG cards and RSS.",
+        "A changelog page rendering release notes derived from the changesets/CHANGELOG source (not hand-maintained twice).",
+        "Posts and changelog are in the sitemap and searchable.",
+        "Authoring a new post is a documented one-file process.",
+        "Responsive + accessible."
+      ],
+      "files_hint": [
+        "apps/site/src/blog/*",
+        "apps/site/content/*",
+        "apps/site/test/blog.spec.ts"
+      ],
+      "tests": [
+        "Playwright: blog index + a post render with OG tags and RSS; changelog reflects the CHANGELOG source."
+      ],
+      "definition_of_done": [
+        "The site has a living blog + changelog wired to real release data."
+      ]
+    },
+    {
+      "id": "S14.1",
+      "epic": "E14",
+      "order": 79,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S0.5",
+        "S11.5"
+      ],
+      "title": "Adapter coverage roadmap + prioritized expansion",
+      "user_story": "As the maintainer, I want a living, data-informed adapter coverage roadmap and a batch of the next highest-demand clients shipped, so breadth (the moat) keeps pace with the ecosystem.",
+      "context": "Six adapters is a start; breadth is the moat and it decays as new clients appear. Maintain a public coverage matrix and ship the next tranche of high-demand clients (candidates: Cline, Continue, Warp, Goose, Gemini CLI, JetBrains AI, Cody), prioritized by the S11.5 usage signal + community requests, each via the existing scaffold-adapter on-ramp.",
+      "acceptance_criteria": [
+        "A published coverage matrix (supported clients, scope support, secret strategy, restart semantics) kept current.",
+        "At least the top-requested additional clients are implemented via scaffold-adapter, each with fixtures + round-trip in the S2.8 matrix.",
+        "Prioritization references the S11.5 opt-in signal and open adapter requests, documented.",
+        "Each new adapter passes the shared determinism + round-trip invariants.",
+        "The 'add a client in one PR' on-ramp is validated by at least one of these landing as a community-style PR."
+      ],
+      "files_hint": [
+        "packages/adapters/src/*.ts",
+        "docs/coverage.md",
+        "packages/adapters/test/matrix.test.ts"
+      ],
+      "tests": [
+        "New adapters pass the cross-adapter matrix (render snapshot + round-trip); coverage matrix generated/checked."
+      ],
+      "definition_of_done": [
+        "Adapter breadth is tracked and actively extended to the clients people use."
+      ]
+    },
+    {
+      "id": "S14.2",
+      "epic": "E14",
+      "order": 80,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S2.8"
+      ],
+      "title": "Live-client compatibility test harness",
+      "user_story": "As a maintainer, I want to detect when a client changes its on-disk config format upstream, so mcpfold breaks loudly in CI instead of silently for users.",
+      "context": "Adapters are pinned to committed fixtures; if a client updates its config schema, mcpfold can silently produce a file the client no longer accepts. A scheduled harness checks each adapter's assumptions against the latest known client format/schema (or a captured sample) and flags divergence.",
+      "acceptance_criteria": [
+        "A scheduled CI job checks each adapter's rendered shape against the current upstream client format/schema (pulled or captured), per client.",
+        "Divergence opens/updates a tracking issue naming the client, the changed key/shape, and the affected adapter.",
+        "Where a client publishes a schema, validate rendered output against it; otherwise compare against a versioned captured sample with a documented refresh process.",
+        "The job is resilient to network/source unavailability (skips with a warning, never a false failure).",
+        "A deliberately outdated fixture is detected by the harness (self-test)."
+      ],
+      "files_hint": [
+        "packages/adapters/compat/check.ts",
+        ".github/workflows/adapter-compat.yml",
+        "packages/adapters/compat/samples/*"
+      ],
+      "tests": [
+        "Self-test: a planted format change is flagged; source-unavailable path skips cleanly."
+      ],
+      "definition_of_done": [
+        "Upstream client format drift surfaces in CI before it reaches users."
+      ]
+    },
+    {
+      "id": "S14.3",
+      "epic": "E14",
+      "order": 81,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Business layer: pricing model, billing path, sponsorship, roadmap",
+      "user_story": "As the founder, I want a defined pricing/packaging model, a billing integration path, sponsorship channels, and a public roadmap, so the project is sustainable and the paid cloud has a real business behind it.",
+      "context": "The team console is called 'the paid surface' but nothing defines the model. Define free-OSS vs paid tiers and limits, choose a billing path (e.g. Stripe) to integrate later, set up sponsorship (GitHub Sponsors/OpenCollective) for the MIT project, and publish a roadmap + governance doc. Deliverable is decisions + scaffolding, not full billing implementation.",
+      "acceptance_criteria": [
+        "A documented pricing/packaging model: what is free forever vs paid, tiers, and limits - the single source S13.6 renders.",
+        "A billing integration decision + stubbed path (provider chosen, entitlement-check interface defined) so S7.6's billing gate can be wired later.",
+        "Sponsorship set up (GitHub Sponsors and/or OpenCollective) and linked from README + site.",
+        "A public roadmap + light governance/maintainership doc (how decisions and releases are made).",
+        "Licensing boundaries restated: MIT core/CLI, commercial cloud."
+      ],
+      "files_hint": [
+        "docs/pricing-model.md",
+        "docs/roadmap.md",
+        "docs/governance.md",
+        ".github/FUNDING.yml"
+      ],
+      "tests": [
+        "N/A (docs/decisions) - a markdown-lint/link check that the pricing, roadmap, governance, and FUNDING files exist and cross-link."
+      ],
+      "definition_of_done": [
+        "The business model, billing path, funding, and roadmap are defined and published."
+      ]
     }
   ],
   "milestones": [
@@ -2328,6 +3054,56 @@
         "S9.6"
       ],
       "goal": "Cloudflare Pages editor + Supabase edge sync API + login/push/pull + teams; config-integrity/TOFU, at-rest hardening, session hardening, web security gate; OSS launch."
+    },
+    {
+      "name": "v0.4 daily-driver",
+      "spec_ref": "post-PRD",
+      "stories": [
+        "S10.1",
+        "S10.2",
+        "S10.3",
+        "S10.4",
+        "S10.5",
+        "S11.2",
+        "S11.3"
+      ],
+      "goal": "mcpfold becomes a product you open daily: status front door, auto-sync watch, guided onboarding, live server test, restore, plus completions + update notifier."
+    },
+    {
+      "name": "v0.5 distribution & team",
+      "spec_ref": "post-PRD",
+      "stories": [
+        "S11.1",
+        "S11.4",
+        "S11.5",
+        "S12.1",
+        "S12.2"
+      ],
+      "goal": "Reach every install channel with a visual demo and a learning loop; ship the zero-cloud team wedge (repo config-as-code + GitHub Action)."
+    },
+    {
+      "name": "marketing site",
+      "spec_ref": "post-PRD",
+      "stories": [
+        "S13.1",
+        "S13.2",
+        "S13.3",
+        "S13.4",
+        "S13.5",
+        "S13.6",
+        "S13.7"
+      ],
+      "goal": "A complete mcpfold.com: hero + interactive benchmark, install funnel, integrated docs+search, public directory, pricing, and blog/changelog."
+    },
+    {
+      "name": "moat & sustainability",
+      "spec_ref": "post-PRD",
+      "stories": [
+        "S14.1",
+        "S14.2",
+        "S14.3"
+      ],
+      "goal": "Keep adapter breadth ahead of the ecosystem (coverage roadmap + live-compat testing) and stand up the business layer (pricing, billing path, sponsorship, roadmap)."
     }
   ]
 }

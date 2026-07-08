@@ -5,6 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { isMcpfoldError } from '@mcpfold/core';
 import { envProvider } from '@mcpfold/secrets';
 import { runRun, type Spawner } from '../src/commands/run.js';
+import type { TrustGate } from '../src/trust/tofu.js';
+
+// These tests exercise launch/resolution, not TOFU — trust every server (S9.2 gate tested separately).
+const trustAll: TrustGate = {
+  status: () => 'trusted',
+  isTrusted: () => true,
+  approve: () => {},
+};
 
 let cwd: string;
 
@@ -37,6 +45,7 @@ describe('runRun (S4.7)', () => {
       name: 'local',
       providers: [envProvider({ MY_TOKEN: 's3cr3t' })],
       spawnFn,
+      trust: trustAll,
     });
     expect(code).toBe(0);
     expect(captured.command).toBe('my-server');
@@ -61,14 +70,20 @@ describe('runRun (S4.7)', () => {
   it('propagates the child exit code', async () => {
     const spawnFn: Spawner = async () => 42;
     expect(
-      await runRun({ cwd, name: 'local', providers: [envProvider({ MY_TOKEN: 'x' })], spawnFn }),
+      await runRun({
+        cwd,
+        name: 'local',
+        providers: [envProvider({ MY_TOKEN: 'x' })],
+        spawnFn,
+        trust: trustAll,
+      }),
     ).toBe(42);
   });
 
   it('fails closed on resolution error without leaking (never spawns)', async () => {
     const spawnFn = vi.fn<Spawner>(async () => 0);
     await expect(
-      runRun({ cwd, name: 'local', providers: [envProvider({})], spawnFn }),
+      runRun({ cwd, name: 'local', providers: [envProvider({})], spawnFn, trust: trustAll }),
     ).rejects.toSatisfy((e) => isMcpfoldError(e) && e.code === 'SECRET_RESOLUTION');
     expect(spawnFn).not.toHaveBeenCalled();
   });

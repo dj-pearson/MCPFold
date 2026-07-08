@@ -33,6 +33,7 @@ export function createPushHandler(deps: PushDeps): (req: Request) => Promise<Res
     const body = await readJson(req);
     const config = body.config;
     const teamId = typeof body.team_id === "string" ? body.team_id : null;
+    const signature = typeof body.signature === "string" ? body.signature : null;
 
     const invalid = validateConfigForPush(config);
     if (invalid) return json({ error: invalid.code, message: invalid.message }, 400);
@@ -43,8 +44,8 @@ export function createPushHandler(deps: PushDeps): (req: Request) => Promise<Res
       const configJson = JSON.stringify(config);
       const rows = await asUser(deps.sql, userId, (tx) =>
         tx`
-          insert into public.configs (owner_id, team_id, created_by, config)
-          values (${userId}, ${teamId}, ${userId}, ${configJson}::jsonb)
+          insert into public.configs (owner_id, team_id, created_by, config, signature)
+          values (${userId}, ${teamId}, ${userId}, ${configJson}::jsonb, ${signature})
           returning id, version, created_at
         `);
       const row = rows[0];

@@ -50,13 +50,13 @@ export function createPullHandler(deps: PullDeps): (req: Request) => Promise<Res
       const rows = await asUser(deps.sql, userId, (tx) =>
         version !== null
           ? tx`
-              select id, version, config, created_at, created_by
+              select id, version, config, created_at, created_by, signature
               from public.configs
               where team_id is not distinct from ${teamId} and version = ${version}
               limit 1
             `
           : tx`
-              select id, version, config, created_at, created_by
+              select id, version, config, created_at, created_by, signature
               from public.configs
               where team_id is not distinct from ${teamId}
               order by version desc
@@ -72,6 +72,7 @@ export function createPullHandler(deps: PullDeps): (req: Request) => Promise<Res
         config,
         created_at: row.created_at,
         created_by: row.created_by,
+        signature: row.signature ?? null,
       }, 200);
     } catch (err) {
       console.error("pull error:", err instanceof Error ? err.message : err);
