@@ -31,6 +31,7 @@ const NAV = [
   ['offline-contract.md', 'Offline contract'],
   ['self-hosting.md', 'Self-hosting'],
   ['security.md', 'Security'],
+  ['security-at-rest.md', 'At-rest hardening'],
   ['ci.md', 'CI'],
 ];
 

@@ -25,6 +25,7 @@ import {
   startDeviceAuth,
 } from "../../lib/device.ts";
 import { verifyJwt } from "../../lib/jwt.ts";
+import { json, readJson, segment } from "../../lib/http.ts";
 
 export interface HandlerDeps {
   sql: Sql;
@@ -33,27 +34,6 @@ export interface HandlerDeps {
   verifyApprover?: (token: string, now?: Date) => Promise<string | null>;
   /** Injectable clock for tests. */
   now?: () => Date;
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-async function readJson(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const body = await req.json();
-    return (body && typeof body === "object") ? body as Record<string, unknown> : {};
-  } catch {
-    return {};
-  }
-}
-
-function segment(url: string): string {
-  const path = new URL(url).pathname.replace(/\/+$/, "");
-  return path.slice(path.lastIndexOf("/") + 1);
 }
 
 export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Response> {

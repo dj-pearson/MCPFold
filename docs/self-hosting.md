@@ -114,5 +114,13 @@ docker compose -f supabase/docker-compose.ci.yml down -v
 
 CI runs this on every push (the **`db`** job in
 [`ci.yml`](../.github/workflows/ci.yml)): it stands up `docker-compose.ci.yml`, applies
-migrations, runs the smoke test (which also asserts `migrate.sh` is idempotent), and fails
-the build on any error. So a broken migration is caught before it reaches the deployment.
+migrations, runs the smoke test (which also asserts `migrate.sh` is idempotent), the RLS +
+edge-function tests, and the encrypted-backup round-trip, failing the build on any error. So a
+broken migration is caught before it reaches the deployment.
+
+## Hardening
+
+Before serving real traffic, work through [At-rest hardening](security-at-rest.md): LUKS
+encryption for the Postgres data volume, encrypted + restore-tested backups
+(`supabase/backup/`), and enforced TLS/HSTS — with `supabase/verify-hardening.sh` to confirm
+they're actually on.

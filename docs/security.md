@@ -93,5 +93,5 @@ rewrites secret material.
 - **No values synced.** `push` uploads references only; the client guard, server guard, and DB CHECK
   are three independent layers rejecting a raw secret (S6.4 / S9.1).
 - **At-rest.** Because only references are stored, a database compromise exposes config metadata
-  (server names, URLs, ref paths) — never secret values. Self-hosted at-rest hardening (volume
-  encryption, encrypted backups, TLS/HSTS) is addressed in S9.4; see [Self-hosting](self-hosting.md).
+  (server names, URLs, ref paths) — never secret values. Self-hosted volume encryption, encrypted
+  backups, and TLS/HSTS are covered in [At-rest hardening](security-at-rest.md).

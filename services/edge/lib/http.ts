@@ -1,10 +1,22 @@
 // Small shared HTTP helpers for the edge handlers.
 import { verifyJwt } from "./jwt.ts";
 
+/**
+ * Security headers on every API response (S9.4). HSTS forces HTTPS for the whole domain (TLS is
+ * terminated at the Coolify/Kong edge; see docs/security-at-rest.md). The API returns JSON only,
+ * so it also refuses to be sniffed or framed. Full CSP for the web app is S9.6.
+ */
+export const SECURITY_HEADERS: Record<string, string> = {
+  "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "no-referrer",
+};
+
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...SECURITY_HEADERS },
   });
 }
 

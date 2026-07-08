@@ -152,6 +152,13 @@ jobs:
           JWT_SECRET: test-jwt-secret-at-least-32-chars-long-000
         run: deno test --allow-net --allow-env
 
+      # Encrypted-backup encrypt→restore round-trip (S9.4). Runs the pg client inside the DB
+      # container so pg_dump matches the server version.
+      - name: Encrypted backup round-trip
+        run: |
+          CID=$(docker compose -f supabase/docker-compose.ci.yml ps -q db)
+          MCPFOLD_PG_CONTAINER="$CID" bash supabase/backup/test-backup.sh
+
       - name: Tear down
         if: always()
         run: docker compose -f supabase/docker-compose.ci.yml down -v
