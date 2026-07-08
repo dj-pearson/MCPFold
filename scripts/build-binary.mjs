@@ -15,7 +15,6 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
-  renameSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -64,17 +63,13 @@ run(bin('esbuild'), [
   `--outfile=${bundle}`,
 ]);
 
-// 2. Package each target with pkg.
-run(bin('pkg'), [bundle, '--targets', Object.keys(targets).join(','), '--out-path', outDir]);
-
-// 3. Rename pkg's outputs to our asset names and write a checksum for each.
+// 2. Package each target on its own with an explicit --output. pkg's multi-target auto-naming is
+// `mcpfold-<arch>` (ambiguous, and not our asset names), so build one at a time to name it exactly.
 for (const [target, asset] of Object.entries(targets)) {
-  const suffix = target.includes('win') ? '.exe' : '';
-  const produced = join(outDir, `mcpfold-${target.replace(/^node\d+-/, '')}${suffix}`);
-  const finalPath = join(outDir, asset);
-  if (existsSync(produced) && produced !== finalPath) renameSync(produced, finalPath);
+  run(bin('pkg'), [bundle, '--targets', target, '--output', join(outDir, asset)]);
 }
-// Fallback: checksum every asset present.
+
+// 3. Write a checksum for each produced asset.
 for (const asset of Object.values(targets)) {
   const p = join(outDir, asset);
   if (!existsSync(p)) continue;
