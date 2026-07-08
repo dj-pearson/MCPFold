@@ -77,12 +77,23 @@ jobs:
           NPM_CONFIG_PROVENANCE: 'true'
 
   # Standalone binaries (S11.1): on a published GitHub Release, build a native binary for every
-  # OS/arch (pkg cross-compiles from one runner), checksum each, and attach them to the release —
-  # the source the curl|sh installer, Homebrew formula, and Scoop manifest all download from.
+  # OS/arch using native runners (cross-compilation from Linux fails for macOS arm64 targets).
   binaries:
-    name: standalone binaries
+    name: standalone binaries (${{ matrix.platform }})
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-latest
+            targets: node20-linux-x64,node20-linux-arm64
+          - platform: macos
+            os: macos-latest
+            targets: node20-macos-arm64,node20-macos-x64
+          - platform: windows
+            os: windows-latest
+            targets: node20-win-x64
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
     steps:
@@ -97,7 +108,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
       - name: Build standalone binaries + checksums
-        run: pnpm build:binaries
+        run: pnpm build:binaries -- ${{ matrix.targets }}
       - name: Attach binaries to the release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2

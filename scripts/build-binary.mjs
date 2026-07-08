@@ -42,7 +42,12 @@ const TARGETS = {
   'node20-win-x64': 'mcpfold-windows-x64.exe',
 };
 const only = process.argv[2];
-const targets = only ? { [only]: TARGETS[only] } : TARGETS;
+// Support a single target or a comma-separated list (e.g. from CI matrix)
+const targets = only
+  ? Object.fromEntries(
+      only.split(',').map(t => t.trim()).filter(t => TARGETS[t]).map(t => [t, TARGETS[t]])
+    )
+  : TARGETS;
 
 // 1. Bundle the built CLI into one CommonJS file (pkg packages a single static entry cleanly).
 run(bin('esbuild'), [
