@@ -89,13 +89,13 @@ jobs:
         include:
           - platform: linux
             os: ubuntu-latest
-            targets: node20-linux-x64,node20-linux-arm64
+            targets: node22-linux-x64,node22-linux-arm64
           - platform: macos
             os: macos-latest
-            targets: node20-macos-arm64,node20-macos-x64
+            targets: node22-macos-arm64,node22-macos-x64
           - platform: windows
             os: windows-latest
-            targets: node20-win-x64
+            targets: node22-win-x64
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -106,10 +106,10 @@ jobs:
           version: 10.33.0
       - uses: actions/setup-node@v4
         with:
-          # Pin to a patch @yao-pkg/pkg-fetch ships a prebuilt Node base binary for. pkg matches the
-          # runner's Node version; the default (20.20.2) has no prebuilt, so pkg tries to compile
-          # Node from source and fails. 20.10.0 is the newest node20 with pkg-fetch prebuilts.
-          node-version: 20.10.0
+          # pkg fetches a base binary matching the runner's exact Node version from its pkg-fetch
+          # release (v3.6). Pin to 22.23.1 — a version v3.6 ships prebuilts for on every OS/arch —
+          # so no from-source build, and Node 22 supports require(ESM) (pkg's into-stream dep).
+          node-version: 22.23.1
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build

@@ -34,13 +34,15 @@ const bundle = join(outDir, 'mcpfold.cjs');
 const bin = (name) => join('node_modules', '.bin', isWin ? `${name}.cmd` : name);
 const run = (cmd, args) => execFileSync(cmd, args, { stdio: 'inherit', shell: isWin });
 
-// pkg target → our release asset name.
+// pkg target → our release asset name. Node 22: @yao-pkg/pkg's pkg-fetch release (v3.6) ships
+// prebuilt base binaries for node22 on every OS/arch, but no longer for node20 — so node20 targets
+// force a from-source build that fails in CI. The packaged CLI is Node-version-agnostic.
 const TARGETS = {
-  'node20-macos-arm64': 'mcpfold-macos-arm64',
-  'node20-macos-x64': 'mcpfold-macos-x64',
-  'node20-linux-x64': 'mcpfold-linux-x64',
-  'node20-linux-arm64': 'mcpfold-linux-arm64',
-  'node20-win-x64': 'mcpfold-windows-x64.exe',
+  'node22-macos-arm64': 'mcpfold-macos-arm64',
+  'node22-macos-x64': 'mcpfold-macos-x64',
+  'node22-linux-x64': 'mcpfold-linux-x64',
+  'node22-linux-arm64': 'mcpfold-linux-arm64',
+  'node22-win-x64': 'mcpfold-windows-x64.exe',
 };
 // First real CLI arg — skip a leading `--` separator, which `pnpm build:binaries -- <targets>`
 // forwards to the script verbatim (otherwise `only` becomes "--" and no target matches).
@@ -68,7 +70,7 @@ run(bin('pkg'), [bundle, '--targets', Object.keys(targets).join(','), '--out-pat
 // 3. Rename pkg's outputs to our asset names and write a checksum for each.
 for (const [target, asset] of Object.entries(targets)) {
   const suffix = target.includes('win') ? '.exe' : '';
-  const produced = join(outDir, `mcpfold-${target.replace('node20-', '')}${suffix}`);
+  const produced = join(outDir, `mcpfold-${target.replace(/^node\d+-/, '')}${suffix}`);
   const finalPath = join(outDir, asset);
   if (existsSync(produced) && produced !== finalPath) renameSync(produced, finalPath);
 }
