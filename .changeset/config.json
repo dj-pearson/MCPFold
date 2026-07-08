@@ -7,5 +7,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@mcpfold/security", "@mcpfold/web", "@mcpfold/edge"]
+  "ignore": ["@mcpfold/security", "@mcpfold/web", "@mcpfold/site", "@mcpfold/e2e"]
 }
