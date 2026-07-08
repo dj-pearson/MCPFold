@@ -30,8 +30,8 @@ The formats have quietly diverged — VS Code uses the root key `servers`, Zed u
 plaintext JSON. `mcpfold` keeps one canonical [`mcp.config.jsonc`](./config-format.md) and
 folds it out to each client:
 
-- **Six clients today** — Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Zed —
-  each an [adapter you can add in one PR](./adapters.md).
+- **Eight clients today** — Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Zed,
+  Cline, Gemini CLI — each an [adapter you can add in one PR](./adapters.md).
 - **Secrets never on disk** — the config carries `${scheme:path}` [references](./secrets.md),
   resolved at launch from env / dotenv / Infisical / your OS keychain / 1Password. The
   default `shim` strategy keeps even the reference off the client file.
@@ -58,6 +58,7 @@ The full walkthrough is in the [Quickstart](./quickstart.md).
 - **[Benchmark](./benchmark.md)** — the context-window measurement, reproduced.
 - **[CLI contract](./cli-contract.md)** — exit codes, `--json` envelope, redaction.
 - **[Offline contract](./offline-contract.md)** — fail-closed behavior when providers are down.
+- **[Deployment runbook](./deployment.md)** — zero-to-running for the whole stack: Cloudflare Pages, Supabase, edge service, npm, DNS, and the full env matrix.
 - **[Self-hosting](./self-hosting.md)** — deploy the optional cloud (Supabase + Coolify).
 - **[CI](./ci.md)** — the cross-OS matrix and branch-protection setup.
 
