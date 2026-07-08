@@ -130,5 +130,11 @@ export { runTrust, type TrustData, type TrustOptions } from './commands/trust.js
 
 // IO helpers (S3.5)
 export { atomicWrite } from './io/atomic-write.js';
-export { backupIfExists } from './io/backup.js';
+export { backupIfExists, listBackups, restoreBackup, type BackupInfo } from './io/backup.js';
+export {
+  runRestore,
+  type RestoreData,
+  type RestoreOptions,
+  type RestoreTarget,
+} from './commands/restore.js';
 export { CONFIG_FILENAMES, findConfigPath, loadConfigFromDisk } from './util/config.js';

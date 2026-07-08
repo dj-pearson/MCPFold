@@ -7,6 +7,7 @@ import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
 import { runStatus } from './commands/status.js';
 import { runTest } from './commands/test.js';
+import { runRestore } from './commands/restore.js';
 import { runImport } from './commands/import.js';
 import { runAdd } from './commands/add.js';
 import { runRun } from './commands/run.js';
@@ -240,6 +241,27 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       ),
     );
   });
+
+  addGlobalFlags(
+    program
+      .command('restore [profile]')
+      .description('roll a client file back to a mcpfold backup')
+      .option('--list', 'list available backups without restoring', false)
+      .option('--at <timestamp>', 'restore a specific backup (default: the latest)'),
+  ).action(
+    async (profile: string | undefined, opts: GlobalFlags & { list?: boolean; at?: string }) => {
+      const ctx = resolve(opts);
+      setExit(
+        await runCommand(
+          'restore',
+          ctx.json,
+          () =>
+            runRestore({ cwd: ctx.cwd, profile, list: opts.list, at: opts.at, dryRun: ctx.dryRun }),
+          writer,
+        ),
+      );
+    },
+  );
 
   addGlobalFlags(
     program
