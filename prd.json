@@ -1620,7 +1620,7 @@
       "epic": "E6",
       "order": 41,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S6.3"
       ],
