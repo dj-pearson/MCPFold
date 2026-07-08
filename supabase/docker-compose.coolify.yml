@@ -99,5 +99,31 @@ services:
     volumes:
       - ./kong.yml:/home/kong/kong.yml:ro
 
+  # Side edge service (S6.5) — the standalone Deno container serving the auth-device / push / pull /
+  # teams / status handlers. Co-located in this stack so it shares the internal network with `db`
+  # (reaches Postgres directly as db:5432) and inherits the SAME JWT_SECRET — that's what makes its
+  # HS256 access tokens interoperate with GoTrue/PostgREST + the S6.2 RLS policies. Nothing secret
+  # is committed; all values come from Coolify env / Infisical, same as the services above.
+  #
+  # Routing: point api.mcpfold.com/{auth-device,push,pull,teams,status} at this service's :8000 in
+  # Coolify (Traefik), while every other api path keeps hitting Kong (deployment.md §3). It is
+  # `expose`d (not host-published) to avoid colliding with Kong on :8000; the proxy routes to it by
+  # container name on the internal network.
+  edge:
+    build:
+      context: ../services/edge
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      JWT_SECRET: ${JWT_SECRET}
+      SITE_URL: ${SITE_URL:-https://mcpfold.com}
+      JWT_EXPIRY: ${JWT_EXPIRY:-3600}
+    expose:
+      - '8000'
+
 volumes:
   db-data:
