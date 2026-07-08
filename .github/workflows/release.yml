@@ -30,6 +30,11 @@ jobs:
         run: pnpm --filter "./packages/*" exec publint
       - name: Dry-run publish (no registry writes)
         run: pnpm -r publish --dry-run --no-git-checks
+      # Post-install smoke (S8.4): pack every publishable package, install the tarballs into a
+      # clean project, and run the published `mcpfold` binary through init → doctor → sync. This
+      # catches a broken bin path / missing `files` entry / bad dep version before it hits npm.
+      - name: Post-install smoke test
+        run: node scripts/pack-smoke.mjs
 
   # Publish on merge to main: Changesets opens/updates a "Version Packages" PR, and when that
   # PR merges (bumped versions, no pending changesets) it publishes to npm with provenance.
