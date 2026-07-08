@@ -29,6 +29,7 @@ const NAV = [
   ['adapters.md', 'Adapters'],
   ['benchmark.md', 'Benchmark'],
   ['cli-contract.md', 'CLI contract'],
+  ['team-config-as-code.md', 'Team config-as-code'],
   ['offline-contract.md', 'Offline contract'],
   ['self-hosting.md', 'Self-hosting'],
   ['coolify-edge-service.md', 'Edge service'],

@@ -7,6 +7,9 @@ pnpm-lock.yaml
 demo/*.cast
 demo/*.tape
 docs/assets/
+# Folded client files are owned by mcpfold's serializer, not prettier (they must match `sync` output).
+examples/**/.vscode/
+examples/**/.cursor/
 CHANGELOG.md
 prd.json
 mcpfold-spec.md
