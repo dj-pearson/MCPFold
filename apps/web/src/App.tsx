@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Header, Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
+import { ConfigEditor } from './editor/ConfigEditor';
 
 export function App() {
   return (
@@ -15,6 +16,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/editor"
+            element={
+              <ProtectedRoute>
+                <ConfigEditor />
               </ProtectedRoute>
             }
           />

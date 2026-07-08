@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { CLIENT_IDS, type Config } from '@mcpfold/core';
 import { useAuth } from '../auth/AuthProvider';
 
@@ -39,9 +40,13 @@ export function Header() {
   return (
     <header className="topbar">
       <span className="brand">mcpfold</span>
-      <button className="link" onClick={() => void signOut()}>
-        Sign out
-      </button>
+      <nav className="nav">
+        <Link to="/">Overview</Link>
+        <Link to="/editor">Editor</Link>
+        <button className="link" onClick={() => void signOut()}>
+          Sign out
+        </button>
+      </nav>
     </header>
   );
 }
