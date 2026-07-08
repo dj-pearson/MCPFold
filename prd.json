@@ -1742,7 +1742,7 @@
       "epic": "E7",
       "order": 44,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S6.3"
       ],

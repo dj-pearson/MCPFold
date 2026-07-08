@@ -1,0 +1,6 @@
+# Cloudflare Pages project config for the mcpfold web console. The build output (Vite → dist/)
+# is served as a static SPA. Environment variables (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)
+# are set in the Pages project settings, never committed.
+name = "mcpfold-web"
+compatibility_date = "2024-09-01"
+pages_build_output_dir = "dist"
