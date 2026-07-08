@@ -84,6 +84,15 @@ validation in editors that support it:
 [`mcp.config.schema.json`](./packages/schema/mcp.config.schema.json) drifts from it —
 regenerate with `pnpm --filter @mcpfold/schema generate`.
 
+## Pricing, funding & roadmap
+
+The CLI and everything local are **free forever and MIT-licensed**; the hosted cloud is the paid
+surface (and you can self-host it yourself for free). See the [pricing model](./docs/pricing-model.md),
+the public [roadmap](./docs/roadmap.md), and how the project is run in [governance](./docs/governance.md).
+
+If mcpfold saves you time, consider [sponsoring](https://github.com/sponsors/dj-pearson) — it funds
+the free, open-source core.
+
 ## Autonomous build loop
 
 This project is built story-by-story from [`prd.json`](./prd.json). The loop harness

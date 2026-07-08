@@ -197,6 +197,11 @@
       "id": "E14",
       "title": "Moat durability & sustainability",
       "goal": "Keep the adapter-breadth advantage from decaying (coverage roadmap + live-client compatibility testing) and define the business layer (pricing, billing path, sponsorship, public roadmap)."
+    },
+    {
+      "id": "E15",
+      "title": "Discovery: SEO, GEO & programmatic growth",
+      "goal": "Make mcpfold the answer both Google and AI assistants (Claude/ChatGPT/Perplexity) return for MCP config, server discovery, and per-client setup. Render real content that crawlers and LLMs can read (the current prerender bakes only meta tags, not body content), own the category vocabulary ('MCP config manager', 'context-window tax'), and scale programmatic pages from the directory and the adapter matrix. Focus keyword: 'MCP config'; primary tagline: 'One config for every MCP client.'"
     }
   ],
   "stories": [
@@ -2928,7 +2933,7 @@
       "epic": "E14",
       "order": 81,
       "priority": "p3",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Business layer: pricing model, billing path, sponsorship, roadmap",
       "user_story": "As the founder, I want a defined pricing/packaging model, a billing integration path, sponsorship channels, and a public roadmap, so the project is sustainable and the paid cloud has a real business behind it.",
@@ -2951,6 +2956,271 @@
       ],
       "definition_of_done": [
         "The business model, billing path, funding, and roadmap are defined and published."
+      ]
+    },
+    {
+      "id": "S15.1",
+      "epic": "E15",
+      "order": 82,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S13.5"
+      ],
+      "title": "True content prerender (SSG) + JSON-LD structured data",
+      "user_story": "As a crawler or AI answer engine that does not run JavaScript, I want every marketing route to serve its real content and structured data in the initial HTML, so mcpfold is indexable and citable instead of an empty SPA shell.",
+      "context": "The single highest-leverage SEO/GEO fix. Today gen-seo.mjs only string-replaces <title>/meta on the SPA shell - the <body> stays an empty React root, so non-JS crawlers (most AI bots, and Google's fallback) see no content. Move apps/site to real static generation: prerender each route's rendered HTML (e.g. vite-react-ssg or a render-to-string step over the existing routes in App.tsx), keeping the SPA hydration path. Emit JSON-LD per page type. This is the foundation every other E15 story builds on.",
+      "acceptance_criteria": [
+        "Every route in App.tsx (/, /install, /directory, /directory/:id, and future E15 routes) is prerendered so its main textual content is present in the served HTML with JS disabled.",
+        "Prerendered pages hydrate into the working SPA without content flash or mismatch warnings.",
+        "JSON-LD is injected per page type: SoftwareApplication on the homepage, ItemList on /directory, and BreadcrumbList on entry pages; validates against schema.org with no errors.",
+        "The per-route title/description/OG/canonical logic from Seo.tsx is reconciled with the build-time prerender so there is one source of truth (no divergence between gen-seo.mjs meta swaps and the runtime Seo component).",
+        "The Lighthouse/perf + a11y budget from S13.1 still passes on prerendered pages."
+      ],
+      "files_hint": [
+        "apps/site/vite.config.ts",
+        "apps/site/src/ssg/*",
+        "apps/site/src/seo/jsonld.ts",
+        "apps/site/scripts/gen-seo.mjs",
+        "apps/site/test/prerender.e2e.ts"
+      ],
+      "tests": [
+        "A no-JS fetch of /, /directory, and a /directory/:id page contains the expected headings/body text; JSON-LD blocks parse and validate; hydration produces no console errors."
+      ],
+      "definition_of_done": [
+        "Marketing routes serve real, structured content in the initial HTML for crawlers and LLMs."
+      ]
+    },
+    {
+      "id": "S15.2",
+      "epic": "E15",
+      "order": 83,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S15.1",
+        "S13.4"
+      ],
+      "title": "GEO answer layer: llms.txt, extraction-friendly content, FAQ schema",
+      "user_story": "As an AI assistant summarizing or recommending MCP tooling, I want a machine-readable map of mcpfold plus clean, liftable answer units, so I cite mcpfold accurately when asked about MCP config, discovery, or per-client setup.",
+      "context": "mcpfold's buyers live inside Claude/ChatGPT/Perplexity, so GEO (generative-engine optimization) is first-class. Ship /llms.txt (concise product + link map) and /llms-full.txt (expanded), structure key pages as short definitional answers and Q&A blocks that LLMs can extract, and add FAQPage JSON-LD. Depends on S15.1 so the content actually exists in HTML; reuses docs content from S13.4 rather than forking it.",
+      "acceptance_criteria": [
+        "/llms.txt and /llms-full.txt are served at the root, following the llms.txt convention: what mcpfold is, the focus terms it answers for, and links to install/docs/directory/guides.",
+        "The homepage and each core page carry an extraction-friendly FAQ section (short question + self-contained answer) with FAQPage JSON-LD.",
+        "A documented content pattern for answer-first writing (definition in the first sentence, steps as numbered lists, comparisons as tables) is applied to homepage, glossary (S15.6), and guides (S15.5).",
+        "robots.txt explicitly allows the major AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended) and links the sitemap; the decision is documented.",
+        "A lightweight, documented GEO-check procedure exists: a checklist/script of prompts to run against assistants to see whether mcpfold is surfaced (baseline recorded)."
+      ],
+      "files_hint": [
+        "apps/site/public/llms.txt",
+        "apps/site/scripts/gen-llms.mjs",
+        "apps/site/src/seo/faq.ts",
+        "apps/site/public/robots.txt",
+        "docs/geo-playbook.md"
+      ],
+      "tests": [
+        "llms.txt and llms-full.txt resolve and contain the canonical links; FAQPage JSON-LD validates; robots.txt permits the named AI crawlers and references the sitemap."
+      ],
+      "definition_of_done": [
+        "AI answer engines have a clean, structured, permission-granted surface to read and cite."
+      ]
+    },
+    {
+      "id": "S15.3",
+      "epic": "E15",
+      "order": 84,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S13.2",
+        "S15.1"
+      ],
+      "title": "Homepage + core-page on-page SEO and messaging",
+      "user_story": "As a searcher looking to manage MCP servers across clients, I want the homepage title, H1, and content to match that intent, so mcpfold ranks for and reads as the obvious answer.",
+      "context": "The current H1 is a benefit sentence with no keyword; the page links almost nowhere. Rework on-page SEO around the focus keyword 'MCP config' and the tagline 'One config for every MCP client', without losing the 'context-window tax' brand line or the S13.2 benchmark proof. Add keyword-targeted semantic sections and an internal-linking graph. Copy stays honest and respects no-implied-MCP-endorsement.",
+      "acceptance_criteria": [
+        "Homepage <title> and meta description lead with the focus keyword cluster (MCP config / manage MCP servers / every MCP client) within character limits; H1 contains the primary keyword and brand.",
+        "The first ~100 words name MCP config, MCP servers, the supported clients (Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Zed), and the token-savings claim.",
+        "Below-fold H2 sections each target a cluster (manage every server from one file; works with every MCP client; curate tools/cut context; secrets as references) with the client list rendered as crawlable text/links.",
+        "Internal links added from the homepage to /directory, each /guides/<client> page (S15.5), and /glossary (S15.6); an in-repo keyword->page map documents the target term per core page.",
+        "The benchmark numbers still come from the committed source (S13.2/S5.4); no copy contradicts docs."
+      ],
+      "files_hint": [
+        "apps/site/src/home/Hero.tsx",
+        "apps/site/src/pages/Home.tsx",
+        "apps/site/src/seo/keyword-map.ts",
+        "apps/site/test/home.e2e.ts"
+      ],
+      "tests": [
+        "Playwright/asserts: homepage title/H1/meta contain the target terms; client names and internal links to directory/guides/glossary are present; benchmark headline still matches the committed value."
+      ],
+      "definition_of_done": [
+        "The homepage is optimized for its focus keyword cluster and anchors the internal-link graph."
+      ]
+    },
+    {
+      "id": "S15.4",
+      "epic": "E15",
+      "order": 85,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S13.5",
+        "S15.1"
+      ],
+      "title": "Directory expansion + category/collection pages (pSEO)",
+      "user_story": "As someone searching 'best MCP servers' or for a specific server, I want a large, well-organized directory with rich per-server pages and curated collections, so mcpfold is the discovery surface that ranks and gets cited.",
+      "context": "The 'best/awesome/top MCP servers' + 'MCP server list/directory/registry' cluster is ~5k combined US volume at Low competition and is a top AI-answer question - but DIRECTORY (packages/core) has only 5 entries. Grow the curated seed to 150+ real servers with richer per-entry content, and add programmatic collection pages (all servers; by category/tag). Keep the single-source model (packages/core DIRECTORY mirrored to supabase/seed) and neutral, no-endorsement copy. Builds on S15.1 so pages render real content + ItemList schema.",
+      "acceptance_criteria": [
+        "DIRECTORY expands to 150+ curated, deduplicated servers, each with a neutral one-line description, transport + launch, optional tokenRef placeholder, and suggested tags (schema unchanged or extended additively).",
+        "Per-server pages carry richer indexable content (what it does, its tools/capabilities where known, and add-to-config snippets) - not just a name + one line.",
+        "Programmatic collection pages exist and are prerendered + in the sitemap: a top-level 'Best MCP servers' / directory index and per-category/tag pages (e.g. databases, browser, git, files), each with ItemList JSON-LD and targeted title/H1.",
+        "A documented, low-friction process to add or recategorize a server (single source in packages/core, mirrored to seed) with a test guarding the mirror.",
+        "Thin/near-duplicate collection pages are avoided: a category page renders only when it has enough distinct entries, else it is omitted or canonicalized; index-bloat guard documented."
+      ],
+      "files_hint": [
+        "packages/core/src/directory.ts",
+        "supabase/seed/directory.sql",
+        "apps/site/src/directory/CategoryPage.tsx",
+        "apps/site/scripts/gen-seo.mjs",
+        "apps/site/test/directory.e2e.ts"
+      ],
+      "tests": [
+        "DIRECTORY has 150+ valid entries and matches the SQL seed (mirror test); collection + category pages prerender with ItemList schema and appear in the sitemap; an under-populated category is omitted/canonicalized."
+      ],
+      "definition_of_done": [
+        "The directory is a large, categorized, indexable discovery surface that targets the listicle cluster."
+      ]
+    },
+    {
+      "id": "S15.5",
+      "epic": "E15",
+      "order": 86,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S15.1",
+        "S13.4"
+      ],
+      "title": "Per-client 'add MCP servers to <client>' setup guides (pSEO + HowTo)",
+      "user_story": "As someone mid-setup searching 'cursor mcp' or 'claude code mcp', I want a clear guide for adding and managing MCP servers in my specific client, so I convert on the highest-intent query for my situation.",
+      "context": "Client x MCP is the highest-intent cluster (claude mcp 5.4k, claude code mcp 3.6k, cursor mcp 2.4k, windsurf/vs code/zed/claude-desktop). mcpfold already ships an adapter per client, so each guide is generated from real adapter facts (config path, root key, secret strategy, restart semantics) - authoritative, not generic. One page per supported client with HowTo schema; guides link to the directory and homepage.",
+      "acceptance_criteria": [
+        "A /guides/<client> page for each supported client (Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Zed, and others as adapters land), prerendered with a targeted title/H1 (e.g. 'Add MCP servers to Cursor').",
+        "Each guide is generated from the adapter's real facts (config file path per OS, root key, secret strategy, needsRestart) so it stays correct as adapters change - no hand-duplicated config truth.",
+        "Each guide has numbered HowTo steps with HowTo JSON-LD, a copy-paste mcpfold command, and links to the directory and install page.",
+        "Guides are in the sitemap and internally linked from the homepage (S15.3) and relevant directory entries.",
+        "Copy respects no-implied-endorsement and does not misstate any client's format (guarded against the adapter as source of truth)."
+      ],
+      "files_hint": [
+        "apps/site/src/guides/ClientGuide.tsx",
+        "apps/site/src/guides/gen-guides.ts",
+        "apps/site/scripts/gen-seo.mjs",
+        "apps/site/test/guides.e2e.ts"
+      ],
+      "tests": [
+        "Each client guide prerenders with correct title/H1 + HowTo schema; the config path/root key/restart facts shown match the adapter's own values (generated, asserted against the registry)."
+      ],
+      "definition_of_done": [
+        "Every supported client has an authoritative, indexable setup guide targeting its <client> mcp query."
+      ]
+    },
+    {
+      "id": "S15.6",
+      "epic": "E15",
+      "order": 87,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S15.1"
+      ],
+      "title": "Glossary / concept hub for topical authority",
+      "user_story": "As someone (or an AI) asking 'what is an MCP server' or 'what is the model context protocol', I want clear, authoritative definitional pages on mcpfold, so mcpfold builds topical authority and gets cited for the head terms a product page cannot win.",
+      "context": "The head terms (mcp server 60.5k, model context protocol 18.1k, mcp client 1.9k, mcp tools 2.9k) are informational and are exactly what assistants answer from. A concise glossary/concept hub earns topical authority, feeds GEO citations, and internally links down to the product, directory, and guides. Neutral, accurate, no implied endorsement of the MCP project.",
+      "acceptance_criteria": [
+        "A /glossary hub plus individual concept pages for at least: MCP server, Model Context Protocol, MCP client, MCP tools, context window, secret reference, and 'MCP config manager' (the category term to own).",
+        "Each page opens with a one- to two-sentence extractable definition, then expands, and links to the relevant product/directory/guide pages.",
+        "Concept pages carry appropriate schema (Article/DefinedTerm) and are prerendered + in the sitemap.",
+        "Content is accurate and neutral about the MCP project (no implied affiliation/endorsement).",
+        "The hub is internally linked from the homepage and relevant guides/directory pages."
+      ],
+      "files_hint": [
+        "apps/site/src/glossary/*",
+        "apps/site/content/glossary/*",
+        "apps/site/scripts/gen-seo.mjs",
+        "apps/site/test/glossary.e2e.ts"
+      ],
+      "tests": [
+        "Glossary hub + each concept page prerender with a leading definition, valid schema, sitemap inclusion, and inbound/outbound internal links."
+      ],
+      "definition_of_done": [
+        "A definitional concept hub establishes topical authority and a GEO citation surface for the head terms."
+      ]
+    },
+    {
+      "id": "S15.7",
+      "epic": "E15",
+      "order": 88,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S15.1"
+      ],
+      "title": "Comparison / alternatives pages",
+      "user_story": "As someone evaluating how to manage MCP config across clients, I want honest comparison pages, so I understand where mcpfold fits versus doing it by hand or with other tools - and so assistants have a balanced source to cite.",
+      "context": "Consideration-stage searchers and AI answers reach for comparisons ('MCP config manager', 'X vs Y', 'MCP registry vs directory', 'managing MCP servers manually vs mcpfold'). Provide fair, factual comparison pages that state trade-offs honestly (mcpfold is local-first CLI + curation, not a hosted enterprise gateway - per the PRD non-goals). These rank for modifier queries and are strong GEO citation targets.",
+      "acceptance_criteria": [
+        "At least: a 'managing MCP servers by hand vs mcpfold' page and one category/positioning page ('MCP config manager' / where mcpfold fits), prerendered with targeted titles.",
+        "Comparisons are factual and fair (clear about what mcpfold is NOT, per meta.non_goals), with a comparison table that has appropriate structured data.",
+        "Pages link into install, directory, and guides, and are in the sitemap.",
+        "No unverifiable or disparaging claims about other tools; framing stays neutral and defensible.",
+        "Copy is reviewed against the PRD non-goals so positioning does not overreach."
+      ],
+      "files_hint": [
+        "apps/site/src/compare/*",
+        "apps/site/content/compare/*",
+        "apps/site/test/compare.e2e.ts"
+      ],
+      "tests": [
+        "Comparison pages prerender with a comparison table + schema, correct titles, sitemap inclusion, and no claims contradicting meta.non_goals."
+      ],
+      "definition_of_done": [
+        "Honest comparison/positioning pages capture consideration-stage search and AI citations."
+      ]
+    },
+    {
+      "id": "S15.8",
+      "epic": "E15",
+      "order": 89,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S15.1",
+        "S15.4"
+      ],
+      "title": "Technical SEO at scale + search-engine/AI submission + rank & GEO tracking",
+      "user_story": "As the maintainer, I want the growing set of pages to be technically sound, submitted to search engines, and measured, so programmatic pages get indexed fast and I can see what is ranking and what AI assistants say.",
+      "context": "Once pSEO multiplies pages (S15.4/S15.5/S15.6), technical hygiene and measurement become the gate on results. Scale the sitemap, auto-generate per-page OG images, ping IndexNow on deploy (Cloudflare-native, near-instant indexing), verify Search Console + Bing Webmaster, and stand up lightweight rank + GEO-citation tracking with an in-repo keyword->page map as the source of truth.",
+      "acceptance_criteria": [
+        "Sitemap scales cleanly (sitemap index or typed sitemaps) with lastmod, covering directory, categories, guides, glossary, compare, and blog; canonical/robots correct at scale.",
+        "Per-page Open Graph images are generated (templated) rather than a single static baseline.",
+        "IndexNow is pinged on deploy (Cloudflare) and the process for Google Search Console + Bing Webmaster verification/submission is documented and completed.",
+        "Index-bloat controls are enforced: thin/duplicate pages are noindex or canonicalized, and a build check flags routes missing title/description/canonical.",
+        "A lightweight measurement setup exists: an in-repo keyword->page map, a documented rank-check cadence, and the GEO prompt checklist from S15.2 run on a schedule with results logged."
+      ],
+      "files_hint": [
+        "apps/site/scripts/gen-seo.mjs",
+        "apps/site/scripts/gen-og.mjs",
+        "apps/site/scripts/indexnow.mjs",
+        "apps/site/src/seo/keyword-map.ts",
+        "docs/seo-measurement.md"
+      ],
+      "tests": [
+        "Sitemap index validates and references all typed sitemaps; a build check fails on a route missing required meta; OG image generated per page; IndexNow ping is exercised (mocked) on build."
+      ],
+      "definition_of_done": [
+        "Pages are technically sound at scale, submitted for fast indexing, and organic + GEO performance is measured."
       ]
     }
   ],

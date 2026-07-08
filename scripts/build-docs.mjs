@@ -41,6 +41,9 @@ const NAV = [
   ['telemetry.md', 'Telemetry'],
   ['security-at-rest.md', 'At-rest hardening'],
   ['threat-model.md', 'Threat model'],
+  ['pricing-model.md', 'Pricing model'],
+  ['roadmap.md', 'Roadmap'],
+  ['governance.md', 'Governance'],
   ['ci.md', 'CI'],
 ];
 

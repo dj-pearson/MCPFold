@@ -84,6 +84,9 @@ export function Layout() {
           <span style={{ display: 'flex', gap: 'var(--space-6)' }}>
             <a href="/docs">Docs</a>
             <a href="/docs/security.html">Security</a>
+            <a href="https://github.com/sponsors/dj-pearson" rel="noreferrer">
+              Sponsor
+            </a>
             <a href="https://github.com/dj-pearson/MCPFold" rel="noreferrer">
               GitHub
             </a>
