@@ -15,6 +15,14 @@ import {
   SHELLS,
   type Shell,
 } from './commands/completions.js';
+import {
+  defaultCachePath,
+  getUpdateNotice,
+  isNotifierEnabled,
+  isRefreshDue,
+  refreshUpdateCache,
+} from './update-notifier.js';
+import { spawn } from 'node:child_process';
 import { runImport } from './commands/import.js';
 import { runAdd } from './commands/add.js';
 import { runRun } from './commands/run.js';
@@ -268,6 +276,11 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     const w = writer ?? processWriter;
     if (kind !== 'profiles' && kind !== 'servers') return;
     for (const v of completionValues(kind, process.cwd())) w.out(`${v}\n`);
+  });
+
+  // Hidden: refresh the cached "latest version" in a detached background process (S11.3).
+  program.command('__refresh-update', { hidden: true }).action(async () => {
+    await refreshUpdateCache();
   });
 
   addGlobalFlags(
@@ -533,6 +546,33 @@ export async function run(argv: string[], writer?: Writer): Promise<ExitCode> {
     }
     // Unknown command / missing argument / bad option → commander already printed guidance.
     return EXIT.ERROR;
+  } finally {
+    maybeNotifyUpdate(argv[0], writer ?? processWriter);
   }
   return getExitCode();
+}
+
+/**
+ * Non-blocking update notice (S11.3): print the cached notice to stderr, then kick off a detached
+ * background refresh so the check never delays the command. Best-effort — never throws, never runs
+ * for machine-facing commands, and (via isNotifierEnabled) never runs in CI / non-TTY.
+ */
+function maybeNotifyUpdate(command: string | undefined, w: Writer): void {
+  try {
+    if (!command || command.startsWith('__') || command === 'completions') return;
+    const notice = getUpdateNotice({ currentVersion: CLI_VERSION });
+    if (notice) w.err(`${notice}\n`);
+
+    if (!isNotifierEnabled(process.env, Boolean(process.stdout.isTTY))) return;
+    if (!isRefreshDue(defaultCachePath(), new Date())) return;
+    const bin = process.argv[1];
+    if (!bin) return;
+    const child = spawn(process.execPath, [bin, '__refresh-update'], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+  } catch {
+    // an update check must never affect the command
+  }
 }

@@ -137,6 +137,15 @@ export { runPull, type PullData, type PullOptions } from './commands/pull.js';
 export { runTrust, type TrustData, type TrustOptions } from './commands/trust.js';
 
 // IO helpers (S3.5)
+export {
+  detectChannel,
+  getUpdateNotice,
+  isNewer,
+  isNotifierEnabled,
+  refreshUpdateCache,
+  upgradeCommand,
+  type UpdateChannel,
+} from './update-notifier.js';
 export { atomicWrite } from './io/atomic-write.js';
 export { backupIfExists, listBackups, restoreBackup, type BackupInfo } from './io/backup.js';
 export {
