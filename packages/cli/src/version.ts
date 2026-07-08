@@ -1,5 +1,5 @@
 /**
- * CLI version. Kept in sync with packages/cli/package.json `version`; a later release
- * story (S0.4 / changesets) wires this from package.json at build time.
+ * CLI version — generated from packages/cli/package.json by scripts/gen-cli-version.mjs.
+ * Do not edit by hand; it is regenerated on version bump (Changesets) and on prebuild.
  */
-export const CLI_VERSION = '0.0.0';
+export const CLI_VERSION = '1.0.0';

@@ -68,9 +68,10 @@ jobs:
       - name: Create Release PR or publish
         uses: changesets/action@v1
         with:
-          # Bump packages, then sync the Homebrew/Scoop template versions so the version-parity gate
-          # stays green (the "Version Packages" PR carries the bump).
-          version: pnpm changeset version && node scripts/sync-packaging-version.mjs
+          # Bump packages, then embed the CLI version + sync the Homebrew/Scoop template versions so
+          # `--version` is correct and the version-parity gate stays green (the "Version Packages" PR
+          # carries all of it).
+          version: pnpm changeset version && node scripts/gen-cli-version.mjs && node scripts/sync-packaging-version.mjs
           publish: pnpm changeset publish
           # Publish to npm only; don't spawn a GitHub Release per package. A single product
           # release (tag `v*`) is cut separately and carries the standalone binaries.
