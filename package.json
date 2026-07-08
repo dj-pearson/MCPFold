@@ -29,7 +29,7 @@
     "demo:record": "node scripts/record-demo.mjs",
     "verify_all": "pnpm lint && pnpm typecheck && pnpm test && pnpm -r build",
     "changeset": "changeset",
-    "version-packages": "changeset version",
+    "version-packages": "changeset version && node scripts/gen-cli-version.mjs && node scripts/sync-packaging-version.mjs",
     "release": "pnpm -r build && changeset publish"
   },
   "pnpm": {
