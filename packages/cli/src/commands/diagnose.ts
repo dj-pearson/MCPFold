@@ -67,7 +67,7 @@ export function buildDiagnoseBundle(options: DiagnoseOptions = {}): DiagnoseBund
 
 export function diagnose(options: DiagnoseOptions = {}): CommandOutput<DiagnoseBundle> {
   const bundle = buildDiagnoseBundle(options);
-  const detected = bundle.clients.filter((c) => c.detected).map((c) => c.id);
+  const detected = bundle.clients.filter((c) => c.installed).map((c) => c.id);
   const human = [
     'mcpfold diagnostic bundle',
     `  mcpfold:  ${bundle.mcpfoldVersion}`,

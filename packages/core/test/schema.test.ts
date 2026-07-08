@@ -125,4 +125,9 @@ describe('ConfigSchema (S1.1)', () => {
     const res = ConfigSchema.safeParse({ ...validConfig, mcpServers: {} });
     expect(res.success).toBe(false);
   });
+
+  it('accepts an optional `$schema` pointer (editor autocomplete)', () => {
+    const res = ConfigSchema.safeParse({ ...validConfig, $schema: 'https://mcpfold.com/schema.json' });
+    expect(res.success).toBe(true);
+  });
 });

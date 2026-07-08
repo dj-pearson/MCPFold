@@ -3,6 +3,9 @@ import { UsageError } from '@mcpfold/core';
 import { diagnose } from './commands/diagnose.js';
 import { runSync } from './commands/sync.js';
 import { runDiff } from './commands/diff.js';
+import { runInit } from './commands/init.js';
+import { runDoctor } from './commands/doctor.js';
+import { runImport } from './commands/import.js';
 import { runCommand, type Writer } from './output/render.js';
 import { EXIT, type ExitCode } from './output/exit-codes.js';
 import { enableDebug } from './util/debug.js';
@@ -125,6 +128,47 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     );
   });
 
+  addGlobalFlags(
+    program
+      .command('init')
+      .description('scaffold mcp.config.jsonc and detect installed clients')
+      .option('-f, --force', 'overwrite an existing config', false),
+  ).action(async (opts: GlobalFlags & { force?: boolean }) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'init',
+        ctx.json,
+        () => runInit({ cwd: ctx.cwd, force: opts.force, dryRun: ctx.dryRun }),
+        writer,
+      ),
+    );
+  });
+
+  addGlobalFlags(
+    program
+      .command('import')
+      .description('adopt existing client configs into the canonical file')
+      .option('-f, --force', 'overwrite an existing canonical config', false),
+  ).action(async (opts: GlobalFlags & { force?: boolean }) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'import',
+        ctx.json,
+        () => runImport({ cwd: ctx.cwd, force: opts.force, dryRun: ctx.dryRun }),
+        writer,
+      ),
+    );
+  });
+
+  addGlobalFlags(
+    program.command('doctor').description('validate config and catch silent failures'),
+  ).action(async (opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer));
+  });
+
   // ---- Stubbed commands (implemented in later stories) ------------------------
 
   const stub = (name: string, description: string, story: string): void => {
@@ -147,10 +191,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     );
   };
 
-  stub('init', 'scaffold mcp.config.jsonc and detect installed clients', 'S3.2');
-  stub('import', 'adopt existing client configs into the canonical file', 'S3.3');
   stub('add', 'interactive: add a server by URL/package', 'S3.4');
-  stub('doctor', 'validate config and catch silent failures', 'S3.7');
   stub('secret', 'wire up and verify a secret provider', 'S4.8');
   stub('run', 'internal shim launcher (resolve secret, filter tools, exec server)', 'S4.7');
   stub('login', 'authenticate to the mcpfold cloud (device-code OAuth)', 'S6.6');

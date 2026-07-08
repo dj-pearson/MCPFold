@@ -33,6 +33,16 @@ export {
   type SyncOptions,
 } from './commands/sync.js';
 export { runDiff, type ClientDiff, type DiffData, type DiffOptions } from './commands/diff.js';
+export { runInit, starterConfig, type InitData, type InitOptions } from './commands/init.js';
+export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';
+export {
+  runImport,
+  type ImportConflict,
+  type ImportData,
+  type ImportOptions,
+} from './commands/import.js';
+export { detectClients, type DetectedClient } from './util/detect-clients.js';
+export type { Finding, Severity } from './checks/types.js';
 
 // IO helpers (S3.5)
 export { atomicWrite } from './io/atomic-write.js';

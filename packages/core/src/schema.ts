@@ -87,6 +87,8 @@ export const ProfileSchema = z
 
 export const ConfigSchema = z
   .object({
+    /** Optional JSON Schema pointer for editor autocomplete; ignored semantically. */
+    $schema: z.string().optional(),
     version: z.literal(1),
     servers: z.record(ServerSchema),
     profiles: z.record(ProfileSchema),
