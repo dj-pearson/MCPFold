@@ -147,19 +147,19 @@ export async function runGuided(
       detected.length > 0 &&
       (await prompt.confirm('Import your existing client configs?', true))
     ) {
-      const preview = runImport({ cwd: options.cwd, force: true, dryRun: true });
+      const preview = runImport({ cwd: options.cwd, osContext: ctx, force: true, dryRun: true });
       write(
         `Would import ${preview.data.servers.length} server(s): ${preview.data.servers.join(', ') || '—'}`,
       );
       if (!dryRun && (await prompt.confirm('Apply this import?', true))) {
-        const done = runImport({ cwd: options.cwd, force: true });
+        const done = runImport({ cwd: options.cwd, osContext: ctx, force: true });
         configPath = done.data.configPath;
         result.imported = true;
         write(`Imported ${done.data.servers.length} server(s) — secrets rewritten to references.`);
       }
     }
     if (!configPath && !dryRun) {
-      const done = runInit({ cwd: options.cwd, force: true });
+      const done = runInit({ cwd: options.cwd, osContext: ctx, force: true });
       configPath = done.data.configPath;
       write('Scaffolded a starter mcp.config.jsonc.');
     }

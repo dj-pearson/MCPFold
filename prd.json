@@ -3628,7 +3628,7 @@
       "epic": "E16",
       "order": 1,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Wire CLI_VERSION from package.json at build time",
       "user_story": "As a user, I want `mcpfold --version`, telemetry, and the update notifier to report the real published version so the tool doesn't misreport itself and nag about an update on every run.",
