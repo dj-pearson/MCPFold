@@ -171,6 +171,16 @@ select {
   gap: 0.4rem;
   padding: 0.5rem 0;
 }
+.badge-behind {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--error);
+  color: #fff;
+  font-size: 0.75rem;
+}
+li.behind code {
+  color: var(--error);
+}
 
 .chips {
   list-style: none;

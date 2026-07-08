@@ -7,14 +7,17 @@ import postgres from "postgres";
 import { createHandler } from "../functions/auth-device/index.ts";
 import { createPushHandler } from "../functions/push/index.ts";
 import { createPullHandler } from "../functions/pull/index.ts";
+import { createHistoryHandler, createMachinesHandler } from "../functions/status/index.ts";
 import { DEFAULT_CONFIG, type DeviceAuthConfig, type Sql } from "../lib/device.ts";
 import { json } from "../lib/http.ts";
 
-/** Route a request to health / push / pull / auth by its final path segment. */
+/** Route a request to health / push / pull / machines / history / auth by its final path segment. */
 export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) => Promise<Response> {
   const auth = createHandler({ sql, cfg });
   const push = createPushHandler({ sql, cfg });
   const pull = createPullHandler({ sql, cfg });
+  const machines = createMachinesHandler({ sql, cfg });
+  const history = createHistoryHandler({ sql, cfg });
   return (req) => {
     const path = new URL(req.url).pathname.replace(/\/+$/, "");
     if (path.endsWith("/health") || path === "") {
@@ -22,6 +25,8 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
     }
     if (path.endsWith("/push")) return push(req);
     if (path.endsWith("/pull")) return pull(req);
+    if (path.endsWith("/machines")) return machines(req);
+    if (path.endsWith("/history")) return history(req);
     return auth(req);
   };
 }

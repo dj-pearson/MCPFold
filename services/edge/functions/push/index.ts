@@ -34,21 +34,33 @@ export function createPushHandler(deps: PushDeps): (req: Request) => Promise<Res
     const config = body.config;
     const teamId = typeof body.team_id === "string" ? body.team_id : null;
     const signature = typeof body.signature === "string" ? body.signature : null;
+    const machineName = typeof body.machine_name === "string" ? body.machine_name : null;
 
     const invalid = validateConfigForPush(config);
     if (invalid) return json({ error: invalid.code, message: invalid.message }, 400);
 
     try {
       // Insert AS the user so RLS enforces ownership / team membership. The configs_version
-      // trigger assigns the next version within the config line.
+      // trigger assigns the next version within the config line; the pushing machine is
+      // registered/updated in the same transaction (S7.5) so the sync dashboard reflects it.
       const configJson = JSON.stringify(config);
-      const rows = await asUser(deps.sql, userId, (tx) =>
-        tx`
+      const row = await asUser(deps.sql, userId, async (tx) => {
+        const inserted = await tx`
           insert into public.configs (owner_id, team_id, created_by, config, signature)
           values (${userId}, ${teamId}, ${userId}, ${configJson}::jsonb, ${signature})
           returning id, version, created_at
-        `);
-      const row = rows[0];
+        `;
+        const r = inserted[0];
+        if (machineName) {
+          await tx`
+            insert into public.machines (user_id, name, last_seen_at, last_pushed_version)
+            values (${userId}, ${machineName}, now(), ${r.version})
+            on conflict (user_id, name)
+            do update set last_seen_at = now(), last_pushed_version = ${r.version}
+          `;
+        }
+        return r;
+      });
       return json({ id: row.id, version: row.version, created_at: row.created_at }, 201);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

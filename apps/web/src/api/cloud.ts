@@ -6,9 +6,23 @@ import type { Config } from '@mcpfold/core';
  * backend. Mirrors the CLI's push/pull contract: config is refs-only and versions are append-only.
  */
 
+export interface MachineStatus {
+  name: string;
+  lastSeen: string;
+  lastVersion: number;
+}
+
+export interface VersionRecord {
+  version: number;
+  author: string;
+  at: string;
+}
+
 export interface CloudApi {
   getConfig(): Promise<{ config: Config; version: number } | null>;
   saveConfig(config: Config): Promise<{ version: number }>;
+  getMachines(): Promise<{ machines: MachineStatus[]; latestVersion: number }>;
+  getVersionHistory(): Promise<VersionRecord[]>;
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'https://api.mcpfold.com';
@@ -39,6 +53,16 @@ function httpCloudApi(base: string, getToken: () => string | null): CloudApi {
       const data = await res.json();
       return { version: data.version as number };
     },
+    async getMachines() {
+      const res = await fetch(`${base}/machines`, { headers: authHeader() });
+      if (!res.ok) throw new Error(`Could not load machines (${res.status}).`);
+      return (await res.json()) as { machines: MachineStatus[]; latestVersion: number };
+    },
+    async getVersionHistory() {
+      const res = await fetch(`${base}/history`, { headers: authHeader() });
+      if (!res.ok) throw new Error(`Could not load history (${res.status}).`);
+      return (await res.json()) as VersionRecord[];
+    },
   };
 }
 
@@ -54,6 +78,20 @@ function mockCloudApi(): CloudApi {
       version += 1;
       return Promise.resolve({ version });
     },
+    getMachines: () =>
+      Promise.resolve({
+        latestVersion: 3,
+        machines: [
+          { name: 'laptop', lastSeen: '2026-07-08T10:00:00Z', lastVersion: 3 },
+          { name: 'desktop', lastSeen: '2026-07-07T09:00:00Z', lastVersion: 2 },
+        ],
+      }),
+    getVersionHistory: () =>
+      Promise.resolve([
+        { version: 3, author: 'dev@mcpfold.com', at: '2026-07-08T10:00:00Z' },
+        { version: 2, author: 'dev@mcpfold.com', at: '2026-07-07T09:00:00Z' },
+        { version: 1, author: 'dev@mcpfold.com', at: '2026-07-06T08:00:00Z' },
+      ]),
   };
 }
 

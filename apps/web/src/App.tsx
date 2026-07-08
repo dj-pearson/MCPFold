@@ -5,6 +5,7 @@ import { Login } from './pages/Login';
 import { ConfigEditor } from './editor/ConfigEditor';
 import { ProfileManager } from './profiles/ProfileManager';
 import { Directory } from './directory/Directory';
+import { SyncDashboard } from './machines/SyncDashboard';
 
 export function App() {
   return (
@@ -42,6 +43,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <Directory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/machines"
+            element={
+              <ProtectedRoute>
+                <SyncDashboard />
               </ProtectedRoute>
             }
           />
