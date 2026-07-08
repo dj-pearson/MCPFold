@@ -1,0 +1,3 @@
+# Cloudflare Pages routing (S13.1). Static files (including the docs build mounted at /docs) win
+# over this rule, so only unmatched marketing routes fall back to the SPA entry.
+/*    /index.html    200
