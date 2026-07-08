@@ -70,6 +70,9 @@ jobs:
         with:
           version: pnpm changeset version
           publish: pnpm changeset publish
+          # Publish to npm only; don't spawn a GitHub Release per package. A single product
+          # release (tag `v*`) is cut separately and carries the standalone binaries.
+          createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
