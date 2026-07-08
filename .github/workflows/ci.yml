@@ -109,6 +109,15 @@ jobs:
       - name: Build docs (link-check + schema staging)
         run: pnpm docs:build
 
+      # Deployment bootstrap (S8.5): the runbook's env matrix must stay in sync with the real
+      # sources, and the secret-minting script must be shellcheck-clean.
+      - name: Deployment env matrix in sync
+        run: node scripts/check-deploy-env.mjs
+      - name: shellcheck the cloud-env bootstrap script
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck scripts/gen-cloud-env.sh
+
       # Terminal demo (S11.4): rebuild the CLI, regenerate the recording from the real CLI, and
       # fail if the committed cast/SVG drifted — so the demo can never lie about actual output.
       - name: Build workspace (for demo recorder)
