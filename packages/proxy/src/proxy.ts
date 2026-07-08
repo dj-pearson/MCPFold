@@ -4,19 +4,31 @@ import { filterTools, isToolAllowed, type McpTool } from './filter.js';
 import type { MessageTransport } from './transport/types.js';
 
 /**
- * The mcpfold MCP proxy (S5.1 core + S5.2 filtering).
+ * The mcpfold MCP proxy (S5.1 core + S5.2 filtering + S17.6 stateless-core readiness).
  *
  * Wires a client-side transport to a server-side transport and forwards every message
- * faithfully in both directions (request ids, capabilities, notifications, and errors are
- * preserved). When a `tools` directive is supplied it additionally:
- *   - filters `tools/list` RESPONSES to the allow/deny set, and
+ * faithfully in both directions (request ids, capabilities, notifications, errors, and per-request
+ * `_meta` are preserved verbatim). When a `tools` directive is supplied it additionally:
+ *   - filters the tool list in `tools/list` AND `server/discover` RESPONSES to the allow/deny set
+ *     (the 2026-07-28 stateless-core revision replaces the initialize/tools-list session with a
+ *     mandatory `server/discover`; curation must apply equivalently either way), and
  *   - (optionally) rejects a `tools/call` to a filtered-out tool with a clear MCP error,
- *     without forwarding it to the real server.
+ *     without forwarding it to the real server — regardless of session vs stateless mode.
  * With no directive it is a pure passthrough (S5.1). Opt-in; off by default.
+ *
+ * Everything else — the removal of `initialize`, `_meta`-carried version/identity, MRTR
+ * (`resultType: 'input_required'` + retry) — flows through untouched because the proxy never
+ * rewrites anything but the tool array of a curated list/discover response. See docs/roadmap.md
+ * for the per-item 2026-07-28 RC readiness checklist.
  */
 
 // MCP error code for "method/tool not found".
 const METHOD_NOT_FOUND = -32601;
+
+/** The stateless-core (2026-07-28) capability-discovery method that replaces initialize+tools/list. */
+export const DISCOVER_METHOD = 'server/discover';
+/** The session-mode tool listing method. */
+export const TOOLS_LIST_METHOD = 'tools/list';
 
 export interface ProxyOptions {
   tools?: ToolsDirective;
@@ -53,11 +65,13 @@ export function connectProxy(
 ): () => void {
   const directive = options.tools;
   const rejectFiltered = options.rejectFilteredCalls ?? true;
-  // Track which in-flight request ids were `tools/list` so we filter only their responses.
-  const pendingToolsList = new Set<JsonRpcId>();
+  // Track in-flight request ids whose responses carry a tool list to curate — both the
+  // session-mode `tools/list` and the stateless-core `server/discover`.
+  const pendingToolListing = new Set<JsonRpcId>();
 
   client.onMessage((message) => {
-    // Reject calls to filtered-out tools before they ever reach the real server.
+    // Reject calls to filtered-out tools before they ever reach the real server. `tools/call`
+    // keeps its `params.name` shape in stateless mode, so this enforcement is mode-agnostic.
     if (
       directive &&
       rejectFiltered &&
@@ -75,8 +89,12 @@ export function connectProxy(
         return;
       }
     }
-    if (directive && isRequest(message, 'tools/list') && message.id !== undefined) {
-      pendingToolsList.add(message.id);
+    if (
+      directive &&
+      message.id !== undefined &&
+      (isRequest(message, TOOLS_LIST_METHOD) || isRequest(message, DISCOVER_METHOD))
+    ) {
+      pendingToolListing.add(message.id);
     }
     server.send(message);
   });
@@ -85,14 +103,17 @@ export function connectProxy(
     if (
       directive &&
       message.id !== undefined &&
-      pendingToolsList.has(message.id) &&
+      pendingToolListing.has(message.id) &&
       isToolsResult(message.result)
     ) {
-      pendingToolsList.delete(message.id);
+      pendingToolListing.delete(message.id);
       const filtered = filterTools(message.result.tools, directive);
+      // Spread the original result so `_meta` and any other discover fields survive untouched.
       client.send({ ...message, result: { ...message.result, tools: filtered } });
       return;
     }
+    // Everything else (MRTR input_required results, _meta-carrying messages, notifications,
+    // errors) forwards verbatim — no rewriting, so stateless-core traffic is never corrupted.
     client.send(message);
   });
 

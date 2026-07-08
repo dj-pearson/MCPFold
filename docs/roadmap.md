@@ -29,5 +29,27 @@ gaps. Nothing here is a dated commitment.
 
 - Deeper editor integrations, richer proxy tool-curation policies, org-wide policy enforcement.
 
+## MCP 2026-07-28 stateless-core readiness (S17.6)
+
+The 2026-07-28 protocol revision (release candidate now; final expected ~July 28, 2026) is
+breaking. mcpfold's proxy sits mid-conversation and must speak both worlds during the transition.
+This checklist maps each RC changelog item to how mcpfold handles it. Revisit when the final ships.
+
+| RC changelog item                                     | mcpfold status | How                                                            |
+| ----------------------------------------------------- | -------------- | -------------------------------------------------------------- |
+| Removes `initialize`                                  | supported      | Handshake `mode: 'stateless'` probes via `server/discover`     |
+| Removes `Mcp-Session-Id`; version/identity in `_meta` | passthrough    | Proxy never rewrites `_meta`; only the tool array of a listing |
+| Mandatory `server/discover`                           | supported      | Proxy curates its response exactly like `tools/list`           |
+| MRTR (`resultType: 'input_required'` + retry)         | passthrough    | Forwarded verbatim; not a listing, so never rewritten          |
+| Tasks moved to an official extension                  | passthrough    | Forwarded verbatim                                             |
+| Deprecates HTTP+SSE (12-month lifecycle)              | tracked        | Both transports still work; watch the sunset window            |
+| Deprecates Roots / Sampling / Logging                 | **non-goal**   | We build no features on these; forwarded verbatim if present   |
+
+Enforcement is mode-agnostic: a denied `tools/call` is rejected whether or not a session exists,
+because the call keeps its `params.name` shape. Dual-mode tests
+([`packages/proxy/test/stateless.test.ts`](https://github.com/dj-pearson/MCPFold/blob/main/packages/proxy/test/stateless.test.ts))
+prove identical filtering/enforcement for a 2025-11-25 session and a stateless-core session of the
+same server. The `_meta` version key is provisional until the final spec fixes it.
+
 Have a request? Open an issue — adapter requests use the `adapter-request` label. See
 [Governance](./governance.md) for how proposals become work.

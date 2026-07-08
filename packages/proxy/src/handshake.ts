@@ -55,12 +55,31 @@ interface Pending {
   reject: (error: Error) => void;
 }
 
+/**
+ * The `_meta` key the 2026-07-28 stateless-core revision uses to carry the protocol version on
+ * each request (initialize is removed). Provisional — tracked in docs/roadmap.md against the final.
+ */
+export const META_PROTOCOL_VERSION_KEY = 'io.modelcontextprotocol/protocol-version';
+
+export type HandshakeMode = 'session' | 'stateless';
+
 export async function handshake(
   transport: MessageTransport,
-  opts: { timeoutMs?: number; clientName?: string; preferredVersion?: string } = {},
+  opts: {
+    timeoutMs?: number;
+    clientName?: string;
+    preferredVersion?: string;
+    /**
+     * 'session' (default): initialize → tools/list (2025-11-25 and earlier).
+     * 'stateless' (S17.6): no initialize; probe via `server/discover` with the version in `_meta`
+     * (2026-07-28 revision).
+     */
+    mode?: HandshakeMode;
+  } = {},
 ): Promise<HandshakeResult> {
   const timeoutMs = opts.timeoutMs ?? 10_000;
   const offeredVersion = opts.preferredVersion ?? PREFERRED_PROTOCOL_VERSION;
+  const mode: HandshakeMode = opts.mode ?? 'session';
   const pending = new Map<JsonRpcId, Pending>();
 
   transport.onMessage((msg: JsonRpcMessage) => {
@@ -95,6 +114,22 @@ export async function handshake(
   };
 
   try {
+    // Stateless-core (2026-07-28): no initialize. Carry the version in `_meta` and probe with the
+    // mandatory `server/discover`, which returns the tool list directly.
+    if (mode === 'stateless') {
+      transport.setProtocolVersion?.(offeredVersion);
+      const discover = (await request('server/discover', {
+        _meta: { [META_PROTOCOL_VERSION_KEY]: offeredVersion },
+      })) as { tools?: unknown[] } | null;
+      return {
+        reachable: true,
+        protocolVersion: offeredVersion,
+        offeredVersion,
+        protocolSupported: isSupportedProtocolVersion(offeredVersion),
+        toolCount: Array.isArray(discover?.tools) ? discover!.tools!.length : 0,
+      };
+    }
+
     const init = (await request('initialize', {
       protocolVersion: offeredVersion,
       capabilities: {},
