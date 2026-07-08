@@ -4,7 +4,7 @@
  * entry's title/description/OG baked in — so each server has its own crawlable, unfurlable page.
  * robots.txt ships from public/.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DIRECTORY } from '../../../packages/core/dist/index.js';
@@ -39,13 +39,50 @@ for (const entry of DIRECTORY) {
   writeFileSync(join(dir, 'index.html'), html);
 }
 
-// --- Sitemap (static routes + every directory entry) ----------------------------------------
+// --- Blog: read the same markdown the site renders → RSS feed (S13.7) -----------------------
+const blogDir = join(here, '..', 'content', 'blog');
+const posts = (existsSync(blogDir) ? readdirSync(blogDir) : [])
+  .filter((f) => f.endsWith('.md'))
+  .map((f) => {
+    const raw = readFileSync(join(blogDir, f), 'utf8');
+    const m = /^---\n([\s\S]*?)\n---/.exec(raw);
+    const meta = {};
+    if (m) {
+      for (const line of m[1].split('\n')) {
+        const i = line.indexOf(':');
+        if (i > 0) meta[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+      }
+    }
+    return {
+      slug: f.replace(/\.md$/, ''),
+      title: meta.title ?? f,
+      date: meta.date ?? '',
+      description: meta.description ?? '',
+    };
+  })
+  .sort((a, b) => b.date.localeCompare(a.date));
+
+const items = posts
+  .map(
+    (p) =>
+      `    <item>\n      <title>${esc(p.title)}</title>\n      <link>${SITE_URL}/blog/${p.slug}</link>\n      <guid>${SITE_URL}/blog/${p.slug}</guid>\n      <description>${esc(p.description)}</description>\n      <pubDate>${p.date}</pubDate>\n    </item>`,
+  )
+  .join('\n');
+writeFileSync(
+  join(dist, 'feed.xml'),
+  `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title>mcpfold blog</title>\n    <link>${SITE_URL}/blog</link>\n    <description>Launches, deep-dives, and release notes from mcpfold.</description>\n${items}\n  </channel>\n</rss>\n`,
+);
+
+// --- Sitemap (static routes + directory entries + blog posts) -------------------------------
 const ROUTES = [
   '/',
   '/install',
   '/pricing',
   '/directory',
+  '/blog',
+  '/changelog',
   ...DIRECTORY.map((e) => `/directory/${e.id}`),
+  ...posts.map((p) => `/blog/${p.slug}`),
 ];
 const urls = ROUTES.map((r) => `  <url>\n    <loc>${SITE_URL}${r}</loc>\n  </url>`).join('\n');
 writeFileSync(
@@ -53,5 +90,5 @@ writeFileSync(
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
 );
 console.log(
-  `✓ prerendered ${DIRECTORY.length} directory pages + sitemap.xml (${ROUTES.length} routes)`,
+  `✓ prerendered ${DIRECTORY.length} directory pages + feed.xml (${posts.length} posts) + sitemap.xml (${ROUTES.length} routes)`,
 );

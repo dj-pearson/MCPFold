@@ -37,6 +37,9 @@ export function Layout() {
             <a href="/pricing" style={{ color: 'var(--fg-muted)' }}>
               Pricing
             </a>
+            <a href="/blog" style={{ color: 'var(--fg-muted)' }}>
+              Blog
+            </a>
             <a href="/docs" style={{ color: 'var(--fg-muted)' }}>
               Docs
             </a>

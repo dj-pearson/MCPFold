@@ -2839,7 +2839,7 @@
       "epic": "E13",
       "order": 78,
       "priority": "p3",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S13.1"
       ],
@@ -3221,6 +3221,347 @@
       ],
       "definition_of_done": [
         "Pages are technically sound at scale, submitted for fast indexing, and organic + GEO performance is measured."
+      ]
+    },
+    {
+      "id": "S13.8",
+      "epic": "E13",
+      "order": 90,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S13.2"
+      ],
+      "title": "Homepage: full narrative below the hero",
+      "user_story": "As a visitor who scrolled past the hero, I want the rest of the homepage to explain what mcpfold does, how it works, who it is for, and why to trust it, ending in a clear CTA, so I convert without leaving to hunt for information.",
+      "context": "S13.2 delivered only the hero + interactive benchmark. Complete the homepage body: a features overview of the four pillars (each linking to its deep-dive in S13.10), a 'how it works' init -> import -> sync -> diff sequence with copy-paste commands, a use-cases teaser (S13.11), an OSS-credibility slot (GitHub stars, latest npm version, MIT), and a final install + cloud CTA. Reuse the design system; keep numbers sourced from the committed benchmark; respect no-implied-endorsement.",
+      "acceptance_criteria": [
+        "A features overview section presents the four pillars (one config for every client, tool curation to cut context, secrets as references, sync/diff drift control), each linking to its /features deep-dive (S13.10).",
+        "A 'how it works' section walks init -> import -> sync -> diff with copy-paste commands.",
+        "A use-cases teaser links to the persona pages (S13.11); a final CTA repeats the primary install + secondary cloud actions.",
+        "A credibility slot renders live GitHub/npm signals (stars, latest version, MIT) from source, degrading gracefully when a signal is unavailable.",
+        "Fully responsive + accessible; the homepage still passes the S13.1 perf/a11y budget and its content is present in prerendered HTML (S15.1)."
+      ],
+      "files_hint": [
+        "apps/site/src/home/*",
+        "apps/site/src/pages/Home.tsx",
+        "apps/site/test/home.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: features/how-it-works/use-cases/CTA sections render with working internal links; credibility signals render from source and degrade when mocked-unavailable."
+      ],
+      "definition_of_done": [
+        "The homepage tells the full story end-to-end and converts."
+      ]
+    },
+    {
+      "id": "S13.9",
+      "epic": "E13",
+      "order": 91,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S13.1"
+      ],
+      "title": "Global navigation, header, footer, and site IA",
+      "user_story": "As a visitor, I want a consistent header and footer that let me reach every part of the site, so I can navigate the whole site from anywhere.",
+      "context": "S13.1 shipped a layout shell; as pages multiply (features, use-cases, about, security, legal, guides, glossary, blog, pricing, directory, roadmap) the site needs a real information architecture: a responsive header nav with grouped menus + CTA, an accessible mobile menu, and a complete footer link map. Drive nav + footer from a single site-structure source so new pages are registered in one place and can also feed the sitemap.",
+      "acceptance_criteria": [
+        "A responsive header with primary nav (Product/Features, Docs, Directory, Pricing, Guides) + a primary install CTA and a secondary cloud/app link; keyboard- and screen-reader-accessible mobile menu.",
+        "A complete footer link map (product, resources/docs, community, company/legal, social/GitHub) with the license + no-endorsement note.",
+        "Nav + footer are driven by a single site-structure/navigation source so adding a page updates nav and can feed the sitemap.",
+        "Active-route indication, a skip-to-content link, and the theme toggle are present.",
+        "Responsive + accessible; passes the S13.1 a11y budget."
+      ],
+      "files_hint": [
+        "apps/site/src/Layout.tsx",
+        "apps/site/src/nav/*",
+        "apps/site/src/site-structure.ts",
+        "apps/site/test/nav.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: header + mobile menu open and navigate; every footer link resolves against the route table (no 404); skip link + theme toggle work."
+      ],
+      "definition_of_done": [
+        "Every page is reachable through a consistent, accessible header and footer."
+      ]
+    },
+    {
+      "id": "S13.10",
+      "epic": "E13",
+      "order": 92,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S13.8"
+      ],
+      "title": "Feature deep-dive pages (the four pillars)",
+      "user_story": "As an evaluator, I want a dedicated page per capability with detail, examples, and proof, so I can go deep on the feature that matters to me.",
+      "context": "The homepage teases the pillars; provide a /features page per pillar with real depth: (1) one config for every client (the fold, adapters, format traps like `servers` vs `context_servers`), (2) tool curation / proxy (the benchmark, allow/deny), (3) secrets as references (providers, strategies, the ref-only invariant), (4) sync/diff/drift (backups, CI drift gate). Each reuses real product facts + committed numbers and links to the deep docs and relevant guides.",
+      "acceptance_criteria": [
+        "A page for each of the four pillars under /features with a clear H1, benefit-led copy, a concrete config/CLI example, and links to the deep docs.",
+        "Feature copy and numbers come from committed sources (benchmark, adapter registry, config format) - no drift.",
+        "Each page has SEO metadata + prerendered content (S15.1) and links back to the homepage plus relevant guides/directory; a features index lists all four.",
+        "Related features cross-link to each other.",
+        "Responsive + accessible; respects no-implied-endorsement."
+      ],
+      "files_hint": [
+        "apps/site/src/features/*",
+        "apps/site/scripts/gen-seo.mjs",
+        "apps/site/test/features.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: each feature page renders with H1/example/links and correct meta; numbers match committed sources."
+      ],
+      "definition_of_done": [
+        "Each core capability has a dedicated, accurate, linked deep-dive page."
+      ]
+    },
+    {
+      "id": "S13.11",
+      "epic": "E13",
+      "order": 93,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S13.8"
+      ],
+      "title": "Use-case / persona pages",
+      "user_story": "As a visitor in a specific situation (solo dev, or team lead), I want a page that speaks to my use case, so I see mcpfold framed around my problem and the right next step.",
+      "context": "Different audiences need different framing: an individual developer wrangling MCP config across their own clients, and a team standardizing MCP setups from a repo-committed config (the E12 team-without-cloud wedge) heading toward the paid cloud. Provide persona/use-case pages that reframe the same product around each need and route to the right CTA (install vs pricing/signup).",
+      "acceptance_criteria": [
+        "At least two use-case pages - 'For individual developers' (multi-client local config) and 'For teams' (repo-committed config, CI drift gate, cloud) - each with tailored H1/copy and the appropriate CTA.",
+        "Pages reuse real features and the E12 team wedge where relevant; the team page routes toward pricing/signup (S13.6), the individual page toward install.",
+        "SEO metadata + prerendered content; internally linked from the homepage use-cases teaser and nav.",
+        "Responsive + accessible; claims stay within meta.non_goals (not an enterprise gateway)."
+      ],
+      "files_hint": [
+        "apps/site/src/use-cases/*",
+        "apps/site/test/use-cases.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: each persona page renders tailored copy + correct CTA routing; links from the homepage teaser resolve."
+      ],
+      "definition_of_done": [
+        "Key audiences each have a tailored entry point with the right conversion path."
+      ]
+    },
+    {
+      "id": "S13.12",
+      "epic": "E13",
+      "order": 94,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S13.1"
+      ],
+      "title": "About / open-source project page",
+      "user_story": "As someone deciding whether to trust and adopt mcpfold, I want an about page covering the mission, open-source model, and how to get involved, so I understand what mcpfold is and who is behind it.",
+      "context": "An OSS product needs a credible about/project page: the mission (own the neutral mcp.config.jsonc format; cut the context tax), the open-source model (MIT core/CLI, commercial cloud), links to GitHub/contributing/governance (S0.5, S14.3), and how to contribute an adapter (the community on-ramp). Neutral about the MCP project.",
+      "acceptance_criteria": [
+        "An /about page stating the mission, the OSS model + license boundaries, and links to GitHub, CONTRIBUTING, governance/roadmap, and the adapter on-ramp.",
+        "Live project signals (stars/contributors/latest release) are sourced and degrade gracefully.",
+        "Restates no implied MCP endorsement; SEO metadata + prerendered content; internally linked from footer/nav.",
+        "Responsive + accessible."
+      ],
+      "files_hint": [
+        "apps/site/src/about/*",
+        "apps/site/test/about.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: about page renders mission + license + working GitHub/contributing/roadmap links; signals degrade when mocked-unavailable."
+      ],
+      "definition_of_done": [
+        "The project's story, license model, and contribution path are clear on the site."
+      ]
+    },
+    {
+      "id": "S13.13",
+      "epic": "E13",
+      "order": 95,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S0.6"
+      ],
+      "title": "Security & trust page",
+      "user_story": "As a security-conscious user handing a tool my MCP config, I want a public trust/security page explaining how secrets are handled and how to report issues, so I can adopt mcpfold with confidence.",
+      "context": "mcpfold is secrets-adjacent, so a public-facing security & trust page is trust-critical. Summarize the refs-only invariant (secret values never written to git-tracked files or synced to the cloud), the local-first model, redaction of diagnostics/telemetry (S0.6), the E9 integrity posture, and the private disclosure path (SECURITY.md). Plain-language, linking the authoritative docs; every claim must match the actual invariants.",
+      "acceptance_criteria": [
+        "A /security page summarizing refs-only secret handling (values never written to tracked files, never synced), local-first execution, diagnostics/telemetry redaction, and config-integrity posture.",
+        "A clear responsible-disclosure section linking SECURITY.md and the private contact path.",
+        "Claims match the actual invariants (cross-referenced to E4/E9/S0.6 docs) - no overstatement.",
+        "SEO metadata + prerendered content; linked from the footer and the pricing FAQ.",
+        "Responsive + accessible."
+      ],
+      "files_hint": [
+        "apps/site/src/security/*",
+        "SECURITY.md",
+        "apps/site/test/security.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: security page renders the secret-handling summary + disclosure link; claims cross-checked against SECURITY.md/docs in review."
+      ],
+      "definition_of_done": [
+        "A trustworthy, accurate public security page supports adoption."
+      ]
+    },
+    {
+      "id": "S13.14",
+      "epic": "E13",
+      "order": 96,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S13.1"
+      ],
+      "title": "Legal & policy pages (privacy, terms, analytics disclosure)",
+      "user_story": "As a visitor - and to run signup + analytics lawfully - I want privacy, terms, and an analytics/cookie disclosure, so the site is compliant and transparent.",
+      "context": "A real site with pricing/signup (S13.6) and analytics (S13.1) needs legal pages: a privacy policy (what the site + cloud collect, the privacy-friendly no-PII analytics, opt-in CLI telemetry), terms of use, and a transparent analytics/cookie disclosure (the site deliberately avoids a cookie wall - state that). Content must be consistent with the actual data practices, not contradictory boilerplate.",
+      "acceptance_criteria": [
+        "/privacy, /terms, and an analytics/cookie disclosure, each rendered and footer-linked.",
+        "The privacy policy accurately reflects the no-PII analytics, refs-only data handling, and opt-in CLI telemetry - consistent with the real implementation.",
+        "Pages are dated/versioned and easy to update from a single content source.",
+        "SEO metadata handled (noindex where appropriate is a documented choice); prerendered.",
+        "Responsive + accessible."
+      ],
+      "files_hint": [
+        "apps/site/content/legal/*",
+        "apps/site/src/legal/*",
+        "apps/site/test/legal.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: privacy/terms/disclosure render and are footer-linked; privacy text references the actual analytics/telemetry behavior."
+      ],
+      "definition_of_done": [
+        "The site has accurate, transparent legal and privacy pages."
+      ]
+    },
+    {
+      "id": "S13.15",
+      "epic": "E13",
+      "order": 97,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S13.1"
+      ],
+      "title": "Community & support page",
+      "user_story": "As a user needing help or wanting to contribute, I want a community/support page pointing me to the right channel, so I can get unblocked or get involved.",
+      "context": "Consolidate the ways to engage: GitHub issues/Discussions, the adapter-request template (S0.5), the contributing guide, any chat community, and how to file a good bug with the redaction-safe diagnostics bundle (S0.6). A single hub reduces support friction and channels contributions.",
+      "acceptance_criteria": [
+        "A /community (or /support) page linking GitHub issues/Discussions, the adapter-request path, CONTRIBUTING, and any chat community.",
+        "Guidance on filing a good bug report using `mcpfold diagnose` (the sanitized bundle, S0.6).",
+        "Links verified to resolve; SEO metadata + prerendered content; footer-linked.",
+        "Respects no-endorsement; responsive + accessible."
+      ],
+      "files_hint": [
+        "apps/site/src/community/*",
+        "apps/site/test/community.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: community page renders with resolving links to GitHub/contributing/diagnose docs."
+      ],
+      "definition_of_done": [
+        "Users have one clear place to get help and get involved."
+      ]
+    },
+    {
+      "id": "S13.16",
+      "epic": "E13",
+      "order": 98,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [
+        "S13.1",
+        "S14.3"
+      ],
+      "title": "Public roadmap page",
+      "user_story": "As a follower/adopter, I want a public roadmap on the site, so I can see where mcpfold is headed and what is shipping next.",
+      "context": "S14.3 defines docs/roadmap.md; surface it on the site as a /roadmap page rendered from that single source (not hand-maintained twice), grouped by status (shipped / in progress / planned) and linking to relevant docs/blog as items ship. Feeds trust and reduces 'does this do X yet' questions.",
+      "acceptance_criteria": [
+        "A /roadmap page rendered from the S14.3 roadmap source (single source, no forked copy).",
+        "Status-grouped (shipped / in progress / planned) and linking to relevant docs/blog where items ship.",
+        "In the sitemap + nav/footer; SEO metadata + prerendered.",
+        "Updating the roadmap is a one-source edit.",
+        "Responsive + accessible."
+      ],
+      "files_hint": [
+        "apps/site/src/roadmap/*",
+        "docs/roadmap.md",
+        "apps/site/test/roadmap.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: roadmap renders from source with status groups and reflects an edit to the source."
+      ],
+      "definition_of_done": [
+        "A living public roadmap is on the site, driven by one source."
+      ]
+    },
+    {
+      "id": "S13.17",
+      "epic": "E13",
+      "order": 99,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [
+        "S13.1"
+      ],
+      "title": "404 / error pages, redirects, and brand/press kit",
+      "user_story": "As a visitor who hits a bad URL or wants brand assets, I want a helpful 404 and a brand/press kit, so I recover gracefully and can represent mcpfold correctly.",
+      "context": "Round out the site: a branded 404 (and any needed error page) with search + top links, a redirect map for renamed/legacy paths applied at the Pages hosting layer, and a brand/press kit (logo variants, wordmark, colors, one-liner, screenshots) with usage + no-endorsement notes. Small but expected on a complete site.",
+      "acceptance_criteria": [
+        "A branded 404 page with helpful navigation (search/top links) wired into the Cloudflare Pages hosting, returning the correct HTTP status.",
+        "A redirect map for legacy/renamed routes, documented and applied at the hosting layer.",
+        "A /brand (press kit) page with downloadable logo/wordmark assets, color tokens, the product one-liner, and usage/no-endorsement notes (indexable).",
+        "Responsive + accessible."
+      ],
+      "files_hint": [
+        "apps/site/public/_redirects",
+        "apps/site/src/brand/*",
+        "apps/site/src/pages/NotFound.tsx",
+        "apps/site/test/notfound.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: an unknown URL renders the 404 with working links; a configured redirect resolves; brand assets download."
+      ],
+      "definition_of_done": [
+        "The site handles bad URLs gracefully and offers correct brand assets."
+      ]
+    },
+    {
+      "id": "S13.18",
+      "epic": "E13",
+      "order": 100,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [
+        "S13.1"
+      ],
+      "title": "Reusable email capture / waitlist component",
+      "user_story": "As the project, I want a privacy-friendly email capture I can place on relevant pages, so I can build an audience and a cloud waitlist without a heavy stack.",
+      "context": "A reusable newsletter/waitlist form (used by pricing S13.6, blog S13.7, and a homepage slot) that posts to a privacy-friendly sink (an edge function or provider), is double-opt-in friendly, collects no PII beyond email, and carries clear consent copy consistent with the privacy policy (S13.14). Deliverable is the reusable component + one wired sink, not a full CRM.",
+      "acceptance_criteria": [
+        "A reusable, accessible email-capture component with consent copy and success/error states.",
+        "Submissions post to a documented privacy-friendly sink; no PII beyond email; spam/bot mitigation (e.g. honeypot).",
+        "Consent/handling is consistent with the privacy policy (S13.14); an unsubscribe/opt-out path is noted.",
+        "Placed on at least one surface (pricing waitlist or homepage) and reusable elsewhere.",
+        "Responsive + accessible; degrades gracefully if the sink is unavailable."
+      ],
+      "files_hint": [
+        "apps/site/src/subscribe/*",
+        "services/edge/*",
+        "apps/site/test/subscribe.e2e.ts"
+      ],
+      "tests": [
+        "Playwright: form validates, submits to a mocked sink, and shows success/error; the honeypot blocks a bot submission."
+      ],
+      "definition_of_done": [
+        "A privacy-friendly, reusable email/waitlist capture is available across the site."
       ]
     }
   ],
