@@ -1,6 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
 import { Container } from '../design/components';
-import { Seo } from '../seo/Seo';
 import { postBySlug } from './posts';
 import './prose.css';
 
@@ -12,11 +11,6 @@ export function BlogPost() {
   if (!post) {
     return (
       <Container style={{ padding: 'var(--space-16) var(--space-6)' }}>
-        <Seo
-          title="Post not found — mcpfold"
-          description="No such post."
-          path={`/blog/${slug ?? ''}`}
-        />
         <h1>Not found</h1>
         <p>
           No post “{slug}”. <Link to="/blog">Back to the blog</Link>.
@@ -27,11 +21,6 @@ export function BlogPost() {
 
   return (
     <>
-      <Seo
-        title={`${post.title} — mcpfold`}
-        description={post.description}
-        path={`/blog/${post.slug}`}
-      />
       <Container style={{ padding: 'var(--space-16) var(--space-6)', maxWidth: 720 }}>
         <p style={{ marginBottom: 'var(--space-4)' }}>
           <Link to="/blog">← Blog</Link>

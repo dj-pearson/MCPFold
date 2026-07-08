@@ -1,7 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { DIRECTORY } from '@mcpfold/core';
 import { Container } from '../design/components';
-import { Seo } from '../seo/Seo';
 import { cliSnippet, editorUrl } from './addToConfig';
 
 /** Per-server directory page (S13.5): its own indexable route, OG card, and an add-to-config link. */
@@ -12,11 +11,6 @@ export function ServerPage() {
   if (!entry) {
     return (
       <Container style={{ padding: 'var(--space-16) var(--space-6)' }}>
-        <Seo
-          title="Server not found — mcpfold directory"
-          description="No such server."
-          path={`/directory/${id ?? ''}`}
-        />
         <h1>Not found</h1>
         <p>
           No server “{id}”. <Link to="/directory">Back to the directory</Link>.
@@ -27,11 +21,6 @@ export function ServerPage() {
 
   return (
     <>
-      <Seo
-        title={`${entry.name} — MCP server · mcpfold`}
-        description={entry.description}
-        path={`/directory/${entry.id}`}
-      />
       <Container style={{ padding: 'var(--space-16) var(--space-6)', maxWidth: 720 }}>
         <p style={{ marginBottom: 'var(--space-4)' }}>
           <Link to="/directory">← Directory</Link>

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { searchDirectory } from '@mcpfold/core';
 import { Container } from '../design/components';
-import { Seo } from '../seo/Seo';
 
 /**
  * Public MCP server directory (S13.5) — browsable + searchable, each entry with its own indexable
@@ -15,11 +14,6 @@ export function DirectoryList() {
 
   return (
     <>
-      <Seo
-        title="MCP server directory — browse and add servers"
-        description="Browse a curated directory of MCP servers and add any of them to your config in one command. A neutral, community-maintained list."
-        path="/directory"
-      />
       <Container style={{ padding: 'var(--space-16) var(--space-6)' }}>
         <h1>MCP server directory</h1>
         <p style={{ color: 'var(--fg-muted)' }}>

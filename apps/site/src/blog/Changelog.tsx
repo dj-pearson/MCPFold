@@ -1,6 +1,5 @@
 import { marked } from 'marked';
 import { Container } from '../design/components';
-import { Seo } from '../seo/Seo';
 import './prose.css';
 // The changelog is derived from the repo's CHANGELOG.md (the human-readable summary Changesets
 // feeds), so release notes are never hand-maintained twice.
@@ -12,11 +11,6 @@ const html = marked.parse(changelogRaw, { async: false }) as string;
 export function Changelog() {
   return (
     <>
-      <Seo
-        title="Changelog — mcpfold"
-        description="Human-readable release notes for mcpfold, derived from the CHANGELOG source."
-        path="/changelog"
-      />
       <Container style={{ padding: 'var(--space-16) var(--space-6)', maxWidth: 720 }}>
         <article
           className="prose"

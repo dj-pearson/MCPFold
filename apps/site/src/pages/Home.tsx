@@ -1,5 +1,4 @@
 import { Container } from '../design/components';
-import { Seo } from '../seo/Seo';
 import { Hero } from '../home/Hero';
 import { Calculator } from '../benchmark/Calculator';
 
@@ -8,12 +7,6 @@ import { Calculator } from '../benchmark/Calculator';
 export function Home() {
   return (
     <>
-      <Seo
-        title="mcpfold — one config for every MCP client"
-        description="Connect every MCP server without paying the context-window tax. One canonical config, folded out to every client, with secret references instead of hardcoded values."
-        path="/"
-      />
-
       <Hero />
 
       <Container style={{ padding: 'var(--space-8) var(--space-6)' }}>

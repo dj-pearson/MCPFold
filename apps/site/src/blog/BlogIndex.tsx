@@ -1,17 +1,11 @@
 import { Link } from 'react-router-dom';
 import { Container } from '../design/components';
-import { Seo } from '../seo/Seo';
 import { POSTS } from './posts';
 
 /** Blog index (S13.7) — lists markdown-authored posts, newest first. */
 export function BlogIndex() {
   return (
     <>
-      <Seo
-        title="Blog — mcpfold"
-        description="Launches, deep-dives, and release notes from the mcpfold project."
-        path="/blog"
-      />
       <Container style={{ padding: 'var(--space-16) var(--space-6)', maxWidth: 760 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
           <h1>Blog</h1>

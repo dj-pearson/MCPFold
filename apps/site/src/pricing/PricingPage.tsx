@@ -1,5 +1,4 @@
 import { Container } from '../design/components';
-import { Seo } from '../seo/Seo';
 import { TIERS } from './tiers';
 
 /**
@@ -10,11 +9,6 @@ import { TIERS } from './tiers';
 export function PricingPage() {
   return (
     <>
-      <Seo
-        title="Pricing — mcpfold"
-        description="The CLI and everything local is free forever and MIT-licensed. The hosted team cloud — shared configs, audit trail, sync — is the paid surface. Self-host it yourself for free."
-        path="/pricing"
-      />
       <Container style={{ padding: 'var(--space-16) var(--space-6)' }}>
         <h1 style={{ textAlign: 'center' }}>Pricing</h1>
         <p

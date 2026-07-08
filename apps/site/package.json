@@ -6,10 +6,11 @@
   "description": "mcpfold.com marketing site — public top-of-funnel (design system + shell for E13).",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node scripts/gen-seo.mjs",
+    "build": "tsc --noEmit && vite build && vite build --ssr src/ssg/entry-server.tsx --outDir dist-ssr && node scripts/gen-seo.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test",
+    "e2e:prerender": "playwright test --config playwright.prerender.config.ts",
     "e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {

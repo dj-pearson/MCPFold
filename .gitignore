@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-docs/
+dist-ssr/
 build/
 coverage/
 *.tsbuildinfo

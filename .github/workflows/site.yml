@@ -34,6 +34,8 @@ jobs:
         run: |
           pnpm --filter @mcpfold/site exec playwright install --with-deps chromium
           pnpm --filter @mcpfold/site e2e
+      - name: Prerender e2e (SSG content + JSON-LD + hydration, S15.1)
+        run: pnpm --filter @mcpfold/site e2e:prerender
       - name: Lighthouse budget (perf + a11y thresholds)
         run: npx --yes @lhci/cli@0.14.x autorun --config=apps/site/lighthouserc.json
 

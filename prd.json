@@ -2062,6 +2062,40 @@
       ]
     },
     {
+      "id": "S8.5",
+      "epic": "E8",
+      "order": 53.5,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S6.5",
+        "S7.1",
+        "S8.1"
+      ],
+      "title": "End-to-end deployment runbook + cloud env bootstrap",
+      "user_story": "As the operator standing up mcpfold, I want one runbook that takes me from zero to a fully running stack (both Cloudflare Pages front ends, self-hosted Supabase, the side edge container, and npm publishing) plus a script that generates every secret, so I can go live without piecing it together from per-subsystem docs.",
+      "context": "The per-subsystem docs exist (self-hosting, coolify-edge-service, site-hosting, security-at-rest) but nothing ties them into a single go-live sequence with the full environment matrix and the non-obvious cross-cutting facts: JWT_SECRET is the shared trust anchor across Supabase + edge + the web anon key, and api.mcpfold.com must path-split between the Kong gateway (/auth/v1, /rest/v1, /realtime/v1) and the edge service (/auth-device, /push, /pull, /teams, ...). docs/deployment.md (the runbook + env matrix + go-live checklist) and scripts/gen-cloud-env.sh (generates the random secrets and mints the Supabase ANON_KEY/SERVICE_ROLE_KEY as HS256 JWTs signed with the generated JWT_SECRET, then prints ready-to-paste env blocks) already exist from this work; this story wires their verification and keeps them accurate.",
+      "acceptance_criteria": [
+        "docs/deployment.md documents the architecture, DNS, the api.mcpfold.com path-split, a per-surface environment-variable matrix, the ordered go-live steps, per-surface smoke checks, and a pre-launch checklist, cross-linking the deeper docs (no forked duplication).",
+        "scripts/gen-cloud-env.sh generates POSTGRES_PASSWORD/JWT_SECRET/REALTIME keys and mints valid HS256 ANON_KEY + SERVICE_ROLE_KEY signed with the generated JWT_SECRET, printing paste-ready blocks for Supabase, the edge service, and the web Pages project.",
+        "The env-var list in the runbook stays in sync with the real sources (supabase/.env.example, apps/web/.env.example, services/edge, the workflows) - a check flags drift between them.",
+        "A docs link-check covers deployment.md (every relative link resolves), consistent with the S8.1 docs gate.",
+        "The generated ANON_KEY verifies as a valid Supabase JWT (signature + role/iss/exp) in a test, and shellcheck is clean on the script."
+      ],
+      "files_hint": [
+        "docs/deployment.md",
+        "scripts/gen-cloud-env.sh",
+        "scripts/check-deploy-env.mjs",
+        "docs/index.md"
+      ],
+      "tests": [
+        "gen-cloud-env.sh output parses and the minted ANON_KEY signature verifies against JWT_SECRET; env-matrix drift check trips on a planted mismatch; deployment.md link-check passes."
+      ],
+      "definition_of_done": [
+        "An operator can go from a fresh domain + VPS to a verified, fully running stack using only docs/deployment.md and scripts/gen-cloud-env.sh."
+      ]
+    },
+    {
       "id": "S9.1",
       "epic": "E9",
       "order": 54,
@@ -2963,7 +2997,7 @@
       "epic": "E15",
       "order": 82,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S13.1",
         "S13.5"

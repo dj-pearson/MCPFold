@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Container } from '../design/components';
-import { Seo } from '../seo/Seo';
 import { CopyBlock } from './CopyBlock';
 import { detectOS, OS_LABEL, type OS } from './os';
 
@@ -65,7 +64,11 @@ function forOS(c: Channel, os: OS): boolean {
 }
 
 export function InstallPage() {
-  const [os, setOs] = useState<OS>(() => detectOS());
+  // Start from a deterministic default so the prerendered HTML matches the first client render; the
+  // real OS (which reads navigator/location, unavailable at build time) is resolved after mount so
+  // hydration never mismatches (S15.1).
+  const [os, setOs] = useState<OS>('mac');
+  useEffect(() => setOs(detectOS()), []);
 
   const channels = CHANNELS.filter((c) => forOS(c, os)).sort((a, b) => {
     const ra = a.recommendedFor === os ? 0 : 1;
@@ -75,11 +78,6 @@ export function InstallPage() {
 
   return (
     <>
-      <Seo
-        title="Install mcpfold — every channel, one copy-paste"
-        description="Install mcpfold via npx, npm, Homebrew, curl | sh, Scoop, winget, or a standalone binary — then init, import, and sync."
-        path="/install"
-      />
       <Container style={{ padding: 'var(--space-16) var(--space-6)' }}>
         <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)' }}>Install mcpfold</h1>
         <p style={{ color: 'var(--fg-muted)', fontSize: '1.1rem' }}>

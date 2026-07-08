@@ -1,42 +1,71 @@
 /**
- * Post-build SEO generation (S13.1 + S13.5): writes dist/sitemap.xml for every marketing route,
- * and PRERENDERS a per-entry HTML page for each directory server — the built SPA shell with the
- * entry's title/description/OG baked in — so each server has its own crawlable, unfurlable page.
+ * Post-build static generation (S15.1, extends S13.1/S13.5/S13.7).
+ *
+ * Renders the REAL HTML for every marketing route at build time — not just <title>/meta swaps on an
+ * empty SPA shell — so non-JS crawlers and AI answer engines get full content. It:
+ *   1. imports the SSR bundle (dist-ssr/entry-server.js, built by `vite build --ssr`),
+ *   2. for each route, renders the app to HTML, reconciles the per-route <title>/description/OG/
+ *      canonical (single source of truth: resolveMeta) and injects per-page-type JSON-LD,
+ *   3. writes dist/<route>/index.html (the client hydrates it in place),
+ *   4. regenerates feed.xml (blog RSS) and sitemap.xml.
  * robots.txt ships from public/.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { DIRECTORY } from '../../../packages/core/dist/index.js';
 
 const SITE_URL = 'https://mcpfold.com';
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = join(here, '..', 'dist');
+const ssrEntry = join(here, '..', 'dist-ssr', 'entry-server.js');
 if (!existsSync(dist)) {
   console.error('✗ dist/ not found — run `vite build` first.');
   process.exit(1);
 }
+if (!existsSync(ssrEntry)) {
+  console.error('✗ dist-ssr/entry-server.js not found — run `vite build --ssr` first.');
+  process.exit(1);
+}
+
+const { render, allRoutes } = await import(pathToFileURL(ssrEntry).href);
 
 const esc = (s) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-// --- Prerender per-entry directory pages ----------------------------------------------------
+// --- Prerender every route into its own index.html ------------------------------------------
 const shell = readFileSync(join(dist, 'index.html'), 'utf8');
-for (const entry of DIRECTORY) {
-  const title = `${entry.name} — MCP server · mcpfold`;
-  const desc = entry.description;
-  const url = `${SITE_URL}/directory/${entry.id}`;
-  const html = shell
-    .replace(/<title>[\s\S]*?<\/title>/, `<title>${esc(title)}</title>`)
-    .replace(/(<meta name="description" content=")[\s\S]*?(")/, `$1${esc(desc)}$2`)
-    .replace(/(<meta property="og:title" content=")[\s\S]*?(")/, `$1${esc(title)}$2`)
-    .replace(/(<meta property="og:description" content=")[\s\S]*?(")/, `$1${esc(desc)}$2`)
-    .replace(/(<meta property="og:url" content=")[\s\S]*?(")/, `$1${esc(url)}$2`)
-    .replace(/(<meta name="twitter:title" content=")[\s\S]*?(")/, `$1${esc(title)}$2`)
-    .replace(/(<link rel="canonical" href=")[\s\S]*?(")/, `$1${esc(url)}$2`);
-  const dir = join(dist, 'directory', entry.id);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'index.html'), html);
+
+/** Reconcile <head> SEO tags + inject JSON-LD + the rendered app body into the built shell. */
+function pageHtml(route) {
+  const { appHtml, meta, jsonLd } = render(route);
+  return shell
+    .replace(/<title>[\s\S]*?<\/title>/, `<title>${esc(meta.title)}</title>`)
+    .replace(/(<meta\s+name="description"\s+content=")[\s\S]*?(")/, `$1${esc(meta.description)}$2`)
+    .replace(/(<meta property="og:title" content=")[\s\S]*?(")/, `$1${esc(meta.title)}$2`)
+    .replace(
+      /(<meta\s+property="og:description"\s+content=")[\s\S]*?(")/,
+      `$1${esc(meta.description)}$2`,
+    )
+    .replace(/(<meta property="og:url" content=")[\s\S]*?(")/, `$1${esc(meta.canonical)}$2`)
+    .replace(/(<meta name="twitter:title" content=")[\s\S]*?(")/, `$1${esc(meta.title)}$2`)
+    .replace(
+      /(<meta\s+name="twitter:description"\s+content=")[\s\S]*?(")/,
+      `$1${esc(meta.description)}$2`,
+    )
+    .replace(/(<link rel="canonical" href=")[\s\S]*?(")/, `$1${esc(meta.canonical)}$2`)
+    .replace('</head>', `${jsonLd}</head>`)
+    .replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
+}
+
+const routes = allRoutes();
+for (const route of routes) {
+  const html = pageHtml(route);
+  // "/" writes dist/index.html; "/x/y" writes dist/x/y/index.html.
+  const outDir = route === '/' ? dist : join(dist, ...route.split('/').filter(Boolean));
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, 'index.html'), html);
 }
 
 // --- Blog: read the same markdown the site renders → RSS feed (S13.7) -----------------------
@@ -73,22 +102,12 @@ writeFileSync(
   `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title>mcpfold blog</title>\n    <link>${SITE_URL}/blog</link>\n    <description>Launches, deep-dives, and release notes from mcpfold.</description>\n${items}\n  </channel>\n</rss>\n`,
 );
 
-// --- Sitemap (static routes + directory entries + blog posts) -------------------------------
-const ROUTES = [
-  '/',
-  '/install',
-  '/pricing',
-  '/directory',
-  '/blog',
-  '/changelog',
-  ...DIRECTORY.map((e) => `/directory/${e.id}`),
-  ...posts.map((p) => `/blog/${p.slug}`),
-];
-const urls = ROUTES.map((r) => `  <url>\n    <loc>${SITE_URL}${r}</loc>\n  </url>`).join('\n');
+// --- Sitemap (every prerendered route) ------------------------------------------------------
+const urls = routes.map((r) => `  <url>\n    <loc>${SITE_URL}${r}</loc>\n  </url>`).join('\n');
 writeFileSync(
   join(dist, 'sitemap.xml'),
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
 );
 console.log(
-  `✓ prerendered ${DIRECTORY.length} directory pages + feed.xml (${posts.length} posts) + sitemap.xml (${ROUTES.length} routes)`,
+  `✓ prerendered ${routes.length} routes (${DIRECTORY.length} directory, ${posts.length} blog) + feed.xml + sitemap.xml`,
 );

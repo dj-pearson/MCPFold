@@ -1,16 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Container } from './design/components';
+import { RouteHead } from './seo/Seo';
 import { currentTheme, toggleTheme, type Theme } from './design/theme';
 
 /** Site shell (S13.1): sticky header with nav + theme toggle, and a footer. Every E13 page renders
  * inside this via the router <Outlet />. Docs live at /docs (separate build); the app on its own
  * subdomain — so the marketing routes never collide with them. */
 export function Layout() {
-  const [theme, setTheme] = useState<Theme>(() => currentTheme());
+  // Start from a stable value so the prerendered HTML and the first client render agree (no
+  // hydration mismatch); resolve the real stored/system theme after mount (S15.1).
+  const [theme, setTheme] = useState<Theme>('light');
+  useEffect(() => setTheme(currentTheme()), []);
 
   return (
     <>
+      <RouteHead />
       <header
         style={{
           position: 'sticky',
