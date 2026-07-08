@@ -6,6 +6,7 @@ import { runDiff } from './commands/diff.js';
 import { runInit } from './commands/init.js';
 import { runDoctor } from './commands/doctor.js';
 import { runImport } from './commands/import.js';
+import { runAdd } from './commands/add.js';
 import { runRun } from './commands/run.js';
 import { runMigrate } from './commands/migrate.js';
 import { scaffoldAdapter } from './commands/scaffold-adapter.js';
@@ -282,7 +283,55 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     );
   });
 
-  stub('add', 'interactive: add a server by URL/package', 'S3.4');
+  addGlobalFlags(
+    program
+      .command('add')
+      .description('add a server by URL or npm package (guided or scripted)')
+      .argument('<name>', 'server name')
+      .option('--url <url>', 'remote server URL (creates an http server)')
+      .option('--package <spec>', 'npm package spec (creates a stdio npx server)')
+      .option('--transport <t>', 'http | sse | stdio')
+      .option('--pin <version>', 'pin a stdio package to a fixed version')
+      .option('--tag <tag...>', 'tag(s) to attach')
+      .option('--token-ref <ref>', 'auth token as a ${scheme:path} reference (never a raw token)')
+      .option('--auth-type <t>', 'bearer | header | none', 'bearer'),
+  ).action(
+    async (
+      name: string,
+      opts: GlobalFlags & {
+        url?: string;
+        package?: string;
+        transport?: 'http' | 'sse' | 'stdio';
+        pin?: string;
+        tag?: string[];
+        tokenRef?: string;
+        authType?: 'bearer' | 'header' | 'none';
+      },
+    ) => {
+      const ctx = resolve(opts);
+      setExit(
+        await runCommand(
+          'add',
+          ctx.json,
+          () =>
+            runAdd({
+              cwd: ctx.cwd,
+              name,
+              url: opts.url,
+              package: opts.package,
+              transport: opts.transport,
+              pin: opts.pin,
+              tags: opts.tag,
+              tokenRef: opts.tokenRef,
+              authType: opts.authType,
+              dryRun: ctx.dryRun,
+            }),
+          writer,
+        ),
+      );
+    },
+  );
+
   stub('login', 'authenticate to the mcpfold cloud (device-code OAuth)', 'S6.6');
   stub('push', 'push the canonical config to the cloud', 'S6.6');
   stub('pull', 'pull the canonical config from the cloud', 'S6.6');

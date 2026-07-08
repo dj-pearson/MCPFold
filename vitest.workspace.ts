@@ -11,4 +11,5 @@ export default defineWorkspace([
   'apps/*',
   'services/*',
   './security/vitest.config.ts',
+  './e2e/vitest.config.ts',
 ]);

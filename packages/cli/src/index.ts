@@ -53,6 +53,7 @@ export {
   type ImportData,
   type ImportOptions,
 } from './commands/import.js';
+export { runAdd, type AddData, type AddOptions, type Prompt } from './commands/add.js';
 export { detectClients, type DetectedClient } from './util/detect-clients.js';
 export type { Finding, Severity } from './checks/types.js';
 

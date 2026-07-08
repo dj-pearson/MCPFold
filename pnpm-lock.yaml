@@ -42,6 +42,18 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@20.19.43)
 
+  e2e:
+    dependencies:
+      '@mcpfold/adapters':
+        specifier: workspace:*
+        version: link:../packages/adapters
+      '@mcpfold/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      mcpfold:
+        specifier: workspace:*
+        version: link:../packages/cli
+
   packages/adapters:
     dependencies:
       '@mcpfold/core':

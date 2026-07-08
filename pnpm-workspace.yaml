@@ -3,3 +3,4 @@ packages:
   - 'apps/*'
   - 'services/*'
   - 'security'
+  - 'e2e'
