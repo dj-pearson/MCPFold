@@ -202,6 +202,31 @@
       "id": "E15",
       "title": "Discovery: SEO, GEO & programmatic growth",
       "goal": "Make mcpfold the answer both Google and AI assistants (Claude/ChatGPT/Perplexity) return for MCP config, server discovery, and per-client setup. Render real content that crawlers and LLMs can read (the current prerender bakes only meta tags, not body content), own the category vocabulary ('MCP config manager', 'context-window tax'), and scale programmatic pages from the directory and the adapter matrix. Focus keyword: 'MCP config'; primary tagline: 'One config for every MCP client.'"
+    },
+    {
+      "id": "E16",
+      "title": "Production hardening — pre-1.0 review findings",
+      "goal": "Close the gaps a production readiness review of the CLI surfaced against otherwise-`done` engineering stories: a version string that misreports on every run, cross-platform (Windows) process-launch failures, credential-store portability, and a set of security/robustness follow-ups (secrets in argv, keyless integrity bypass, unvalidated cloud responses, atomic-write collisions, and update-notifier reliability on binary installs). These are regressions/omissions against shipped stories, not new product scope, and gate a trustworthy 1.0."
+    },
+    {
+      "id": "E17",
+      "title": "Spec currency & registry integration",
+      "goal": "Catch up to where the MCP protocol actually is (current stable 2025-11-25; breaking stateless-core revision 2026-07-28 finalizes July 2026) and plug into the official registry. Covers: pinning the CVE-exposed mcp-remote bridge, per-client native-remote-vs-shim folding, protocol-version negotiation instead of the pinned 2024-11-05 handshake, schema v2 (streamable-http naming, OAuth marker, sse deprecation) as the first real migration, stateless-core readiness, and `add --from-registry` mapping the registry's server.json (packages/remotes/environmentVariables[isSecret]) onto the canonical schema's pin/integrity/secret-ref invariants. Sourced from the July 2026 ecosystem research sweep."
+    },
+    {
+      "id": "E18",
+      "title": "Trust & governance leadership",
+      "goal": "Own the security lane the official registry explicitly left to the ecosystem (its ecosystem-vision doc pushes vetting to subregistries/tools). Extend TOFU from launch commands to tool-definition digests (rug-pull/tool-poisoning defense, OWASP MCP03, ETDI/SEP-1766 direction), ship a `scan` preflight that audits existing client configs for the verified incident root causes (plaintext secrets, unpinned @latest, known-vulnerable versions), add org-managed allow/deny policy enforced at sync/add/run (the #1 verified enterprise ask; cross-client parity with Claude Code managed-mcp and VS Code registry allowlists), a redacted runtime tool-call audit log at the proxy, and a public evidence-backed security-posture page."
+    },
+    {
+      "id": "E19",
+      "title": "Coverage breadth & adapter evidence",
+      "goal": "Keep the adapter moat from decaying against mcpm's 14+ clients and the clients' own absorption of config management. Adapter waves prioritized by verified demand (JetBrains AI Assistant, Visual Studio, Continue, Roo Code; then Goose/Codex CLI/LM Studio/Warp/opencode/Copilot CLI incl. YAML/TOML bespoke formats), project-scope support beyond the current user-scope-only majority, installed-app detection beyond config-file existence, a native-interpolation secret strategy exploiting per-client dialects (${env:VAR}, ${VAR:-default}, ${file:...}, $VAR), and an adapter-compat harness upgraded from hand-captured shape samples to live evidence with a public compat matrix."
+    },
+    {
+      "id": "E20",
+      "title": "Format stewardship & commercial completion",
+      "goal": "Resolve the strategic `.mcp.json` question (the ecosystem is converging on that filename via Claude Code and Visual Studio, and on cross-reading rather than a standard key) so mcpfold stewards the emerging standard instead of fighting it, and finish the commercial layer: Stripe wiring for the entitlements stub that currently grants everyone team tier, pending-invite token redemption, enterprise SSO, and operational polish (secret-provider child-process abort, cross-OS web e2e)."
     }
   ],
   "stories": [
@@ -3596,6 +3621,951 @@
       ],
       "definition_of_done": [
         "A privacy-friendly, reusable email/waitlist capture is available across the site."
+      ]
+    },
+    {
+      "id": "S16.1",
+      "epic": "E16",
+      "order": 1,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Wire CLI_VERSION from package.json at build time",
+      "user_story": "As a user, I want `mcpfold --version`, telemetry, and the update notifier to report the real published version so the tool doesn't misreport itself and nag about an update on every run.",
+      "context": "Review finding #1 (blocker). packages/cli/src/version.ts hardcodes `CLI_VERSION = '0.0.0'` with a comment promising S0.4/changesets would wire it from package.json — but nothing does; `build` is just `tsc`. The shipped 1.0.0 binary reports 0.0.0, so update-notifier's isNewer(cache.latest='1.0.0', current='0.0.0') is always true and prints 'Update available' on EVERY command for EVERY user, `mcpfold --version` is wrong, and telemetry cliVersion is useless. Follow-up against S0.4 (done) / S11.1 (done).",
+      "acceptance_criteria": [
+        "The built dist reports the same version as packages/cli/package.json (verified by executing the built binary, not by reading source).",
+        "version.ts is generated/injected from package.json at build time (prebuild script, JSON import, or define replacement) — no hardcoded literal that can drift.",
+        "`mcpfold --version` prints the package.json version; a test asserts parity.",
+        "update-notifier does NOT show 'update available' when the running version equals the latest published version.",
+        "telemetry/adoption events carry the real cliVersion.",
+        "A CI check fails if the built version and package.json version diverge (extend scripts/check-version-parity.mjs or add an equivalent)."
+      ],
+      "files_hint": [
+        "packages/cli/src/version.ts",
+        "packages/cli/package.json",
+        "scripts/check-version-parity.mjs",
+        "packages/cli/test/version.test.ts"
+      ],
+      "tests": [
+        "Unit/integration: built binary --version equals package.json version.",
+        "Unit: update notifier returns no notice when current === latest."
+      ],
+      "definition_of_done": [
+        "A freshly built binary reports the correct version and the update notifier is silent when up to date; parity is CI-guarded."
+      ]
+    },
+    {
+      "id": "S16.2",
+      "epic": "E16",
+      "order": 2,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Cross-platform executable resolution for spawned processes (Windows .cmd/npx)",
+      "user_story": "As a Windows user, I want `mcpfold run`/`test` to launch npx-based MCP servers successfully so the core shim works on my platform.",
+      "context": "Review finding #2 (blocker). No spawn call sets a shell or resolves Windows shims. On Windows, Node's spawn won't resolve `npx` -> `npx.cmd` and (post CVE-2024-27980) won't execute .cmd/.bat without shell:true, so `spawn('npx', ...)` and stdio commands like npx/uvx throw ENOENT. Since most MCP stdio servers launch via npx, `mcpfold run` — the shim clients point at — is broken on Windows. Affects run.ts (defaultSpawner, defaultProxySpawner, the http/sse `spawn('npx', ...)` bridge) and test.ts. Do NOT fix with blanket shell:true (reintroduces arg-injection); resolve the real executable via PATHEXT or a cross-spawn-style shim so args stay non-shell. Follow-up against S4.7 (done).",
+      "acceptance_criteria": [
+        "`mcpfold run <npx-server>` and `mcpfold test <npx-server>` succeed on Windows in CI (windows-latest matrix).",
+        "Bare commands (`npx`, `uvx`, `node`) resolve to the correct executable on win32 without passing untrusted args through a shell.",
+        "The http/sse bridge (`spawn('npx', remoteArgs)`) uses the same resolution.",
+        "macOS/Linux behavior is unchanged (regression tests stay green).",
+        "Executable resolution is centralized in one helper reused by every spawner (run plain, run proxy, test, and any future launcher)."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/run.ts",
+        "packages/cli/src/commands/test.ts",
+        "packages/cli/src/util/spawn.ts",
+        "packages/cli/test/run.test.ts",
+        "packages/cli/test/test-server.test.ts"
+      ],
+      "tests": [
+        "Windows integration: launching a real npx-based stdio server initializes and lists tools.",
+        "Unit: the resolver appends the right PATHEXT extension on win32 and is a no-op on posix."
+      ],
+      "definition_of_done": [
+        "The core `run` shim launches npx/uvx servers on all three OSes in the CI matrix, without a shell around untrusted args."
+      ]
+    },
+    {
+      "id": "S16.3",
+      "epic": "E16",
+      "order": 3,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Windows credential storage without a third-party PowerShell module",
+      "user_story": "As a Windows user on a stock machine, I want `mcpfold login`/`push`/`pull` to store my session securely without installing extra modules so cloud sync works out of the box.",
+      "context": "Review finding #3 (high). token-store.ts's win32 backend shells out to New-StoredCredential/Get-StoredCredential/Remove-StoredCredential, which come from the third-party `CredentialManager` PowerShell module that is NOT installed on stock Windows. On a clean machine, keychain set/get fails and login/push/pull error out. Provide a built-in fallback (Windows Credential Manager via a native/cmdkey path, or DPAPI Protect/Unprotect to an ACL'd file) or detect-and-guide. Follow-up against S6.3 (done).",
+      "acceptance_criteria": [
+        "On a clean Windows image with no extra PowerShell modules, `mcpfold login` stores and later reads back the session successfully.",
+        "The stored secret is protected (Credential Manager or DPAPI-encrypted, user-scoped) — never plaintext on disk.",
+        "If the chosen mechanism is genuinely unavailable, the user gets a clear, actionable error naming what to install — never a raw PowerShell stack trace.",
+        "macOS (security) and Linux (secret-tool) paths are unchanged.",
+        "keychainCommands unit coverage extended for the win32 path."
+      ],
+      "files_hint": [
+        "packages/cli/src/cloud/token-store.ts",
+        "packages/cli/test/token-store.test.ts"
+      ],
+      "tests": [
+        "Unit: win32 backend round-trips set/get/delete against a mocked runner using only built-in tooling.",
+        "Windows integration (CI): login stores and reads a session with no preinstalled credential module."
+      ],
+      "definition_of_done": [
+        "Cloud auth persists securely on a stock Windows machine with no third-party module dependency."
+      ]
+    },
+    {
+      "id": "S16.4",
+      "epic": "E16",
+      "order": 4,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Keep resolved auth secrets out of the child process command line",
+      "user_story": "As a user on a shared machine, I don't want my resolved bearer token visible in the process list so a local secret can't leak via `ps`/Task Manager.",
+      "context": "Review finding #4 (high). For http/sse servers, run.ts's remoteArgs() passes the resolved token as `--header \"Authorization: Bearer <token>\"` in the `npx mcp-remote` argv, so the plaintext secret is visible to any local user for the process lifetime — undercutting the otherwise-careful 'secret never printed' posture. Pass auth via env or a stdin/file channel that mcp-remote supports; if no such channel exists, document the exposure explicitly and constrain it. Follow-up against S4.7 (done) / E9.",
+      "acceptance_criteria": [
+        "Resolved secret VALUES no longer appear in the argv of any process mcpfold spawns (verified by inspecting the spawned command in a test).",
+        "Auth is delivered to mcp-remote via a non-argv channel (env or file/stdin) where supported.",
+        "If a transport genuinely requires argv auth, that limitation is documented and the token is still redacted from all mcpfold output/logs.",
+        "The ref-only and redaction invariants (E9) still hold on this path."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/run.ts",
+        "packages/cli/test/run.test.ts",
+        "docs/security.md"
+      ],
+      "tests": [
+        "Unit: the spawned bridge command's argv contains no resolved secret value; auth arrives via the chosen non-argv channel."
+      ],
+      "definition_of_done": [
+        "No resolved secret is observable in the process command line for any server transport, or the residual case is documented and redaction-safe."
+      ]
+    },
+    {
+      "id": "S16.5",
+      "epic": "E16",
+      "order": 5,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Separate unsigned-config acceptance from --yes on pull",
+      "user_story": "As a user pulling a config on a new machine, I don't want `--yes` to silently apply an unverifiable config AND auto-trust its launch commands, so a tampered cloud config can't gain code execution behind one flag.",
+      "context": "Review finding #5 (medium). In pull.ts, a machine without the per-user HMAC signing key applies a signed config with only a warning ('integrity not verified'), and `--yes` then auto-approves every pulled launch command in the TOFU trust store. So on a first-time (keyless) machine, `--yes` both skips signature verification and disables the trust gate that was the last backstop. Gate unverifiable application behind an explicit `--allow-unsigned` rather than folding it into `--yes`. Follow-up against S9.2 (done).",
+      "acceptance_criteria": [
+        "When a config is signed but no local key is present, `pull --yes` refuses to apply unless `--allow-unsigned` is also given (or the config is verified).",
+        "`--yes` alone still applies a config whose signature verifies.",
+        "Trust auto-approval on `--yes` is documented and only occurs for a verified (or explicitly allowed-unsigned) config.",
+        "Error/warning copy tells the user exactly why it stopped and which flag proceeds.",
+        "A signed config with an INVALID signature is still a hard reject regardless of flags (existing behavior preserved)."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/pull.ts",
+        "packages/cli/src/cli.ts",
+        "packages/cli/test/cloud.test.ts"
+      ],
+      "tests": [
+        "Unit: keyless + signed + --yes without --allow-unsigned → not applied, exit nonzero, clear message.",
+        "Unit: keyless + signed + --yes + --allow-unsigned → applied with warning.",
+        "Unit: invalid signature → hard reject under all flag combinations."
+      ],
+      "definition_of_done": [
+        "Applying an unverifiable config requires explicit opt-in; `--yes` no longer doubles as an integrity bypass."
+      ]
+    },
+    {
+      "id": "S16.6",
+      "epic": "E16",
+      "order": 6,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Validate cloud device-poll response before persisting a session",
+      "user_story": "As a user, I want a malformed login response to fail loudly at login rather than store a broken session that errors confusingly later.",
+      "context": "Review finding #6 (medium). api.ts pollDevice() casts body.access_token/refresh_token/expires_in with `as string`/`as number` and returns status 'complete' on any res.ok, with no runtime validation. A malformed 200 stores undefined tokens; loadSession only catches it later on read, deferring the failure into a confusing state. Validate the shape at the source and surface a clear error. Follow-up against S6.6 (done).",
+      "acceptance_criteria": [
+        "pollDevice only returns status 'complete' when access_token and refresh_token are non-empty strings and expires_in is a finite number.",
+        "A malformed 'complete' response raises a clear error instead of persisting an invalid session.",
+        "No undefined/empty token can be written to the keychain.",
+        "Existing successful and pending/error poll paths are unchanged."
+      ],
+      "files_hint": [
+        "packages/cli/src/cloud/api.ts",
+        "packages/cli/test/cloud.test.ts"
+      ],
+      "tests": [
+        "Unit: a 200 poll missing access_token/refresh_token yields an error, and saveSession is never called."
+      ],
+      "definition_of_done": [
+        "A malformed login response fails fast at login; only well-formed sessions are stored."
+      ]
+    },
+    {
+      "id": "S16.7",
+      "epic": "E16",
+      "order": 7,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Collision-safe temp filenames in atomicWrite",
+      "user_story": "As a user running sync --watch alongside a manual command, I don't want two writes to the same target to corrupt each other via a shared temp file.",
+      "context": "Review finding #7 (low). atomic-write.ts uses a fixed temp name `.<basename>.mcpfold.tmp` in the target dir. Two concurrent writes to the same target (e.g. `sync --watch` firing while a manual `sync`/`pull` runs) race on that single temp path — one can rename a partially written file. Add a pid/counter/random suffix so each write uses a unique temp file. Follow-up against S3.5 (done).",
+      "acceptance_criteria": [
+        "Each atomicWrite uses a unique temp filename (pid + counter or random suffix) in the target directory.",
+        "The write is still atomic (same-filesystem rename) and cleans up its temp file on failure.",
+        "Concurrent writes to the same target never leave a corrupt/partial file at the target path.",
+        "Temp files remain hidden/prefixed and gitignored."
+      ],
+      "files_hint": [
+        "packages/cli/src/io/atomic-write.ts",
+        "packages/cli/test/atomic-write.test.ts"
+      ],
+      "tests": [
+        "Unit: two overlapping atomicWrite calls to one target both use distinct temp files and the final content is one complete write, never a mix."
+      ],
+      "definition_of_done": [
+        "Overlapping writes to the same target cannot collide on a temp file; atomicity and cleanup are preserved."
+      ]
+    },
+    {
+      "id": "S16.8",
+      "epic": "E16",
+      "order": 8,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [
+        "S16.1"
+      ],
+      "title": "Reliable update-notifier refresh for standalone binary installs",
+      "user_story": "As a user of the standalone binary, I want the update check to keep refreshing so I still learn about new releases.",
+      "context": "Review finding #8 (low). cli.ts maybeNotifyUpdate spawns `process.execPath [process.argv[1]] __refresh-update`, but under a packaged single binary (pkg/yao-pkg) process.argv[1] is unreliable, so the guarded spawn silently no-ops and the version cache never refreshes for binary installs — notices only ever come from a stale/first cache. Depends on S16.1 so the current version is correct before wiring channel-aware refresh. Detect the binary channel (detectChannel already distinguishes 'binary') and refresh via a mechanism that works without a node script path. Follow-up against S11.3 (done).",
+      "acceptance_criteria": [
+        "On a standalone binary install, the background version-cache refresh actually runs (or an equivalent in-process refresh path is used) rather than silently no-opping.",
+        "npm/npx installs keep their existing detached-refresh behavior.",
+        "The refresh remains non-blocking, best-effort, and silent on failure; still off in CI/non-TTY and under DO_NOT_TRACK / MCPFOLD_NO_UPDATE_NOTIFIER.",
+        "detectChannel === 'binary' users receive up-to-date notices over time."
+      ],
+      "files_hint": [
+        "packages/cli/src/cli.ts",
+        "packages/cli/src/update-notifier.ts",
+        "packages/cli/test/update-notifier.test.ts"
+      ],
+      "tests": [
+        "Unit: the refresh trigger is invoked for a simulated binary install (argv[1] absent/unreliable) without blocking the command."
+      ],
+      "definition_of_done": [
+        "Standalone-binary users get a refreshing update check; other channels and all opt-outs are unaffected."
+      ]
+    },
+    {
+      "id": "S17.1",
+      "epic": "E17",
+      "order": 1,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Pin and version-gate the mcp-remote bridge (CVE-2025-6514 class)",
+      "user_story": "As a user whose remote servers are bridged through mcp-remote, I want mcpfold to spawn a pinned, known-good version so a compromised or vulnerable bridge can't execute code on my machine.",
+      "context": "Research finding (verified against NVD). mcp-remote 0.0.5-0.1.15 had a CVSS 9.6 OS-command-injection RCE (CVE-2025-6514: malicious server's OAuth authorization_endpoint -> command execution; fixed 0.1.16). mcpfold spawns it UNPINNED in two places: run.ts remoteArgs() uses `npx -y mcp-remote` and the Windsurf adapter writes `npx -y mcp-remote` wrappers into client configs. This violates our own global_definition_of_done ('no unpinned @latest where pin semantics apply'). Centralize the bridge spec (package + pinned version, single constant), enforce a floor >= 0.1.16 (current upstream ~0.1.38), and cover every emission site.",
+      "acceptance_criteria": [
+        "A single constant/module defines the mcp-remote package spec with a pinned exact version; no call site or adapter emits `mcp-remote` unpinned.",
+        "run.ts remoteArgs() and the Windsurf adapter both consume the shared pinned spec.",
+        "The pinned version is >= 0.1.16 and a comment cites CVE-2025-6514 so the floor is never lowered.",
+        "`mcpfold doctor` (or `scan` once it exists) warns when an existing client config contains an unpinned or known-vulnerable mcp-remote spec.",
+        "Adapter goldens/fixtures updated; render->parse round-trip still holds for the Windsurf wrapper."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/run.ts",
+        "packages/adapters/src/windsurf.ts",
+        "packages/core/src/bridge.ts",
+        "packages/cli/test/run.test.ts",
+        "packages/adapters/test/windsurf.test.ts"
+      ],
+      "tests": [
+        "Unit: every spawned/rendered mcp-remote reference carries the exact pinned version.",
+        "Unit: doctor flags an unpinned `npx -y mcp-remote` entry found in a client config."
+      ],
+      "definition_of_done": [
+        "No unpinned mcp-remote can be spawned or written by any mcpfold path; the version floor is CVE-documented and test-guarded."
+      ]
+    },
+    {
+      "id": "S17.2",
+      "epic": "E17",
+      "order": 2,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S17.1"
+      ],
+      "title": "Per-client native-remote vs mcp-remote-shim decision matrix",
+      "user_story": "As a user with remote MCP servers, I want each client to get a native URL entry when it supports remote+OAuth natively, and the bridge shim only where genuinely needed, so my configs have fewer moving parts and less attack surface.",
+      "context": "Research finding (verified primary docs, July 2026). mcp-remote is self-described transitional ('as soon as your client supports remote, authorized servers, you can remove it'); Claude Code, VS Code, Cursor, and Zed now support native HTTP remotes with OAuth. mcpfold currently bridges http/sse via `npx mcp-remote` at run time and the Windsurf adapter rewrites authed remotes to a shim wrapper. Encode a per-adapter capability (native remote: yes/no, native OAuth: yes/no, remote field shape: url vs serverUrl vs httpUrl vs type+url) and fold remote servers natively wherever possible, shimming only the residue. The capability table becomes part of each adapter's contract and the public coverage docs.",
+      "acceptance_criteria": [
+        "ClientAdapter (or adapter metadata) declares remote-transport capability: native-http, native-oauth, and the client's remote field shape.",
+        "Folding a remote server emits the client-native entry for capable clients (verified per client: Claude Code type+url, Cursor bare url, VS Code servers+type, Gemini httpUrl for streamable HTTP) and the pinned mcp-remote shim only for clients that cannot (e.g. Windsurf authed remotes).",
+        "`mcpfold run` for http servers prefers direct connection where the CLI itself can, falling back to the pinned bridge.",
+        "docs/coverage.md gains a remote-capability column per client.",
+        "Matrix goldens updated; round-trips hold for both native and shim forms."
+      ],
+      "files_hint": [
+        "packages/adapters/src/types.ts",
+        "packages/adapters/src/*.ts",
+        "packages/cli/src/commands/run.ts",
+        "docs/coverage.md",
+        "packages/adapters/test/matrix.test.ts"
+      ],
+      "tests": [
+        "Fixture: one canonical remote server folds to a native entry on Claude Code/Cursor/VS Code and to a pinned shim on Windsurf.",
+        "Unit: capability table drives the choice; overriding capability flips the rendered form."
+      ],
+      "definition_of_done": [
+        "Remote servers are folded natively wherever the client supports it, with the shim as a documented, pinned fallback — not the default."
+      ]
+    },
+    {
+      "id": "S17.3",
+      "epic": "E17",
+      "order": 3,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Adapter correctness fixes against verified mid-2026 client behavior",
+      "user_story": "As a user folding to real clients, I want each adapter to match the client's actually-documented current format so a fold never produces a config the client rejects.",
+      "context": "Research findings (all verified against primary vendor docs, July 2026): (1) Claude Code ERRORS on a remote entry with `url` but no `type` and accepts `streamable-http` as an alias for `http` — keep emitting explicit type and add a regression test + accept the alias on parse. (2) Gemini CLI uses `httpUrl` for streamable HTTP vs `url` for SSE — verify/fix the adapter distinguishes. (3) Windsurf's docs now redirect to docs.devin.ai (product absorbed into Devin/Cognition); verify paths (~/.codeium/windsurf/mcp_config.json) still hold, plan a devin alias, update docs/copy. (4) Zed needsRestart discrepancy: adapter says false (zed.ts:16), docs/coverage.md says yes, spec says no — resolve to one authoritative answer everywhere. (5) Stale 'The six clients' comment at packages/core/src/schema.ts:10 — there are 8.",
+      "acceptance_criteria": [
+        "Claude Code adapter: regression test locks explicit per-server `type`; parse accepts `streamable-http` alias.",
+        "Gemini CLI adapter renders/parses `httpUrl` (streamable HTTP) vs `url` (SSE) per current docs, fixture-proven.",
+        "Windsurf adapter paths re-verified against current (Devin) docs; findings recorded in docs/coverage.md; alias decision documented (implemented or explicitly deferred with rationale).",
+        "Zed needsRestart is consistent across adapter code, docs/coverage.md, and mcpfold-spec.md.",
+        "schema.ts CLIENT_IDS comment corrected; a test or lint note keeps the count claim in sync."
+      ],
+      "files_hint": [
+        "packages/adapters/src/claude-code.ts",
+        "packages/adapters/src/gemini-cli.ts",
+        "packages/adapters/src/windsurf.ts",
+        "packages/adapters/src/zed.ts",
+        "packages/core/src/schema.ts",
+        "docs/coverage.md"
+      ],
+      "tests": [
+        "Fixture regressions per adapter for each verified behavior above."
+      ],
+      "definition_of_done": [
+        "Every shipped adapter matches its client's current primary documentation, with regression tests naming the verified behavior."
+      ]
+    },
+    {
+      "id": "S17.4",
+      "epic": "E17",
+      "order": 4,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "MCP protocol-version negotiation (stop pinning 2024-11-05)",
+      "user_story": "As a user testing or proxying modern MCP servers, I want mcpfold to negotiate the protocol version rather than announce a two-generation-old one, so handshakes succeed against current servers.",
+      "context": "Research finding. packages/proxy/src/handshake.ts:11 pins protocolVersion '2024-11-05'. The lineage is 2024-11-05 -> 2025-03-26 -> 2025-06-18 (Final) -> 2025-11-25 (Current). The handshake used by `mcpfold test` (and any proxy-initiated initialize) should offer the newest supported version and accept the server's counter-offer per spec version-negotiation rules, and pass through the MCP-Protocol-Version header on HTTP where applicable. The generic proxy passthrough already forwards versions verbatim — this story is about what mcpfold itself initiates/announces.",
+      "acceptance_criteria": [
+        "Handshake offers a configurable preferred version defaulting to the newest supported stable (2025-11-25) and handles the server responding with an older mutually-supported version.",
+        "`mcpfold test` reports the negotiated version in its output/envelope.",
+        "HTTP transport paths send MCP-Protocol-Version on subsequent requests per the 2025-06-18+ requirement.",
+        "A table of supported versions lives in one exported constant with tests.",
+        "Old servers still pass `mcpfold test` (negotiation down to 2024-11-05 keeps working)."
+      ],
+      "files_hint": [
+        "packages/proxy/src/handshake.ts",
+        "packages/cli/src/commands/test.ts",
+        "packages/proxy/test/handshake.test.ts"
+      ],
+      "tests": [
+        "Unit: negotiation against fake servers speaking 2024-11-05, 2025-06-18, and 2025-11-25 each lands on the right version.",
+        "Unit: test command surfaces the negotiated version."
+      ],
+      "definition_of_done": [
+        "mcpfold-initiated handshakes negotiate; nothing hardcodes a single protocol date at a call site."
+      ]
+    },
+    {
+      "id": "S17.5",
+      "epic": "E17",
+      "order": 5,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Schema v2: streamable-http naming, OAuth marker, sse deprecation — the first real migration",
+      "user_story": "As a config author, I want the canonical schema to model today's transport and auth reality (streamable HTTP, client-native OAuth, deprecated SSE) so folds and doctor advice match the ecosystem, with `mcpfold migrate` upgrading my v1 file losslessly.",
+      "context": "Research findings. The spec's transports are stdio + Streamable HTTP (HTTP+SSE deprecated since 2025-11-25); Claude Code accepts `streamable-http` as alias; remote-server auth is OAuth 2.1 RS/AS discovered by the CLIENT, not a token mcpfold holds. Schema v1 models transports as http|sse and auth as bearer|header|none only — there is no way to declare 'this server uses client-native OAuth', so doctor pushes token refs at servers that don't need them. Ship version 2: accept `streamable-http` (canonicalizing `http`), add `auth.type: 'oauth'` as a declarative marker (no secret material; adapters fold the client-appropriate shape), deprecate `sse` (loads fine, doctor warns citing spec deprecation). This also converts the migrate runner's worked-example into the first REAL migration (1->2), proving S1.4/S0.9 end to end. Publish JSON schema v2 alongside v1.",
+      "acceptance_criteria": [
+        "SCHEMA_VERSION 2 with a real 1->2 migration; `mcpfold migrate` upgrades a v1 file with zero semantic loss (round-trip proven).",
+        "`streamable-http` accepted and canonical; `http` accepted as alias; adapters render each client's dialect (type http / bare url / httpUrl) from the canonical value.",
+        "auth.type 'oauth' validates with no token/headers required; adapters fold it to the client-native OAuth shape where supported; doctor stops warning about missing token refs for oauth servers.",
+        "`sse` still loads but doctor emits a deprecation warning citing the spec.",
+        "JSON Schema v2 published (mcpfold.com/schema/v2.json) and $schema-pointer handling covers both.",
+        "All adapters, diff, resolve, and the ref-only guards work identically on v2 (matrix goldens updated)."
+      ],
+      "files_hint": [
+        "packages/core/src/schema.ts",
+        "packages/core/src/migrate/migrations.ts",
+        "packages/schema/src/generate.ts",
+        "packages/adapters/src/*.ts",
+        "packages/cli/src/commands/doctor.ts",
+        "docs/config-format.md"
+      ],
+      "tests": [
+        "Migration: representative v1 fixtures upgrade to v2 and fold to byte-identical (or documented-improved) client outputs.",
+        "Unit: oauth marker folds correctly per client; sse deprecation warning fires; streamable-http canonicalization round-trips."
+      ],
+      "definition_of_done": [
+        "v2 ships with a lossless real migration, spec-current transport/auth modeling, and a published JSON schema; v1 continues to load."
+      ]
+    },
+    {
+      "id": "S17.6",
+      "epic": "E17",
+      "order": 6,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [
+        "S17.4"
+      ],
+      "title": "2026-07-28 stateless-core readiness (proxy + handshake dual-mode)",
+      "user_story": "As a user on clients/servers that adopt the 2026-07-28 revision, I want mcpfold's proxy and test handshake to keep working across the stateless transition so mcpfold is ready the day the spec finalizes.",
+      "context": "Research finding (verified: modelcontextprotocol.io draft changelog + RC blog). The 2026-07-28 revision (RC now; final ~July 28, 2026) is breaking: removes `initialize` and Mcp-Session-Id (version/identity/capabilities travel in `_meta` per request), adds mandatory `server/discover`, replaces server-initiated requests with MRTR (`resultType: 'input_required'` + client retry with inputResponses), moves tasks to an official extension, and deprecates Roots/Sampling/Logging and HTTP+SSE under a 12-month lifecycle. The proxy sits mid-conversation and must speak both worlds during the window: passthrough must not corrupt `_meta`, tools/list filtering must also apply to `server/discover` responses, and tools/call rejection must survive the new shapes. Handshake needs a discover-based path when initialize is absent. Explicit non-goal: do NOT build features on sampling/roots/logging (deprecated).",
+      "acceptance_criteria": [
+        "Proxy forwards stateless-core traffic (no initialize; `_meta`-carried version) without corruption; existing 2025-11-25-and-earlier behavior unchanged (dual-mode tests).",
+        "Tool filtering applies to `server/discover` responses equivalently to tools/list; denied tools/call rejection still enforced in stateless mode.",
+        "Handshake/test supports discover-based probing when a server has no initialize.",
+        "MRTR flows (input_required results) pass through the proxy unharmed.",
+        "A tracking checklist maps each RC changelog item to supported/passthrough/not-applicable, revisited when the final ships; deprecated features (sampling/roots/logging handling) explicitly listed as non-goals."
+      ],
+      "files_hint": [
+        "packages/proxy/src/proxy.ts",
+        "packages/proxy/src/handshake.ts",
+        "packages/proxy/src/filter.ts",
+        "packages/proxy/test/*",
+        "docs/roadmap.md"
+      ],
+      "tests": [
+        "Dual-mode proxy tests: identical filtering/enforcement outcomes for a 2025-11-25 session and a stateless-core session of the same server.",
+        "Unit: discover response filtering; MRTR passthrough integrity."
+      ],
+      "definition_of_done": [
+        "mcpfold proxies and tests servers on both sides of the 2026-07-28 transition, with the RC-item checklist closed out against the final spec."
+      ]
+    },
+    {
+      "id": "S17.7",
+      "epic": "E17",
+      "order": 7,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Official MCP registry integration: add --from-registry and search",
+      "user_story": "As a user adding a server, I want `mcpfold add --from-registry <name>` to resolve the official registry's metadata into a pinned, integrity-hashed, secret-ref'd canonical entry in one command, so the safest possible config is also the easiest.",
+      "context": "Research finding (verified: registry repo + server.json spec). The official registry (registry.modelcontextprotocol.io) API froze at v0.1 (Oct 2025) with a stability promise — safe to integrate. Its server.json (schema 2025-12-11) maps ~1:1 onto our schema: packages[] (registryType npm|pypi|cargo|nuget|oci|mcpb, identifier, transport, runtimeHint) -> stdio server + `pin` + `integrity` (SHA-256 present for mcpb); remotes[] (streamable-http|sse, url templating) -> remote server; environmentVariables[] with isSecret/isRequired/default -> env entries where isSecret becomes a ${scheme:path} secret REFERENCE (prompting provider choice), never a value. Vetting is explicitly a subregistry/tool concern — our pin+integrity+ref-only mapping IS the differentiation. No competitor in the sync niche has this. Fetch layer injectable; offline-friendly errors per the degraded-mode contract.",
+      "acceptance_criteria": [
+        "`mcpfold add <name> --from-registry` fetches by reverse-DNS name, maps packages[]/remotes[] to a canonical server with pin (exact version) and integrity (when provided), and converts isSecret env vars to secret refs via an interactive provider prompt (or --secret-scheme flag non-interactively).",
+        "`mcpfold search <query>` lists matching registry servers (name, description, latest version) human + --json.",
+        "A registry entry can never introduce a raw secret value or an unpinned package into the canonical config (test-proven).",
+        "Registry base URL overridable (env var) for subregistries/self-hosted mirrors.",
+        "Network failures produce actionable offline-contract errors; no partial config writes.",
+        "Docs page documents the mapping table server.json -> mcp.config."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/add.ts",
+        "packages/cli/src/registry/client.ts",
+        "packages/cli/src/registry/map.ts",
+        "packages/cli/test/registry.test.ts",
+        "docs/registry.md"
+      ],
+      "tests": [
+        "Unit: fixture server.json documents (npm, oci, mcpb, remotes variants) map to expected canonical entries.",
+        "Unit: isSecret -> ref conversion; refusal paths for value injection and unpinnable packages."
+      ],
+      "definition_of_done": [
+        "One command turns an official-registry listing into a pinned, integrity-hashed, ref-only canonical server, with search and docs shipped."
+      ]
+    },
+    {
+      "id": "S17.8",
+      "epic": "E17",
+      "order": 8,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S17.7"
+      ],
+      "title": "MCPB bundle support as an install source",
+      "user_story": "As a user with a .mcpb bundle (or a registry entry pointing at one), I want mcpfold to read its manifest and produce a canonical server whose sensitive user_config fields become keychain secret refs, so signed single-file installs flow through the same invariants.",
+      "context": "Research finding (verified: modelcontextprotocol/mcpb MANIFEST.md v0.3, CLI.md). MCPB (renamed from DXT, Sept 2025) is a signed ZIP bundle: manifest.json declares server.type (node|python|binary|uv), entry_point, mcp_config (command/args/${__dirname}/platform_overrides), and typed user_config where `sensitive: true` implies secure storage. `mcpb` is a first-class registryType in server.json with SHA-256 integrity hashes; signing is PKCS#7 appended after the ZIP with `mcpb verify`. Scope: parse manifest -> canonical mapping + signature verification surfacing; executing bundles is Claude Desktop's job, not ours.",
+      "acceptance_criteria": [
+        "`mcpfold add --from-mcpb <file|url>` parses manifest.json into a canonical stdio server (command/args/env from mcp_config with platform overrides applied for the current OS).",
+        "user_config fields with sensitive:true become ${keychain:...} (or user-chosen scheme) refs; non-sensitive prompts fill env/args defaults.",
+        "Bundle signature status (signed+verified / self-signed / unsigned) is verified and surfaced; integrity hash checked when installed via a registry entry.",
+        "Unsupported server types degrade with a clear error naming what IS supported."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/add.ts",
+        "packages/cli/src/registry/mcpb.ts",
+        "packages/cli/test/mcpb.test.ts",
+        "docs/registry.md"
+      ],
+      "tests": [
+        "Unit: fixture manifests (node/python/binary, platform_overrides, sensitive user_config) map correctly; signature states reported; tampered bundle rejected."
+      ],
+      "definition_of_done": [
+        "A .mcpb manifest becomes a ref-only canonical server with signature/integrity surfaced, sharing the add pipeline's guarantees."
+      ]
+    },
+    {
+      "id": "S18.1",
+      "epic": "E18",
+      "order": 1,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Tool-definition pinning: extend TOFU to tools/list digests (rug-pull defense)",
+      "user_story": "As a user of curated servers, I want mcpfold to remember the tool definitions I trusted and flag/block when they silently change, so a rug-pull or poisoned update can't inject new instructions behind my back.",
+      "context": "Research finding. Tool poisoning / rug pulls are OWASP MCP03:2025: malicious instructions live in tools/list DESCRIPTIONS and enter context before any call; servers mutate definitions after trust is established (postmark-mcp shipped a backdoor in v1.0.16 after 15 clean versions). Our TOFU (S9.2) covers the launch command only. Extend it: record a stable digest of the server's tool definitions (names + descriptions + schemas) at trust time; the proxy — which already intercepts tools/list — compares on session start and warns (default) or blocks (strict mode) on drift, prompting re-trust with a diff of what changed. This is the ETDI / SEP-1766 direction shipped ahead of the spec; no config manager has it.",
+      "acceptance_criteria": [
+        "`mcpfold trust <server>` (or a --tools flag) records a deterministic digest of the current tools/list surface alongside the launch-command signature.",
+        "Proxy compares live tools/list against the trusted digest: warn-by-default, block with `tools.strict` (config) or a global strict mode; drift shows a human diff (added/removed/changed tool, description delta).",
+        "Re-approval flow: `mcpfold trust <server>` after reviewing the diff updates the digest.",
+        "Digest is order-insensitive and whitespace-stable so benign reordering doesn't false-positive.",
+        "Works for proxied stdio servers today; documented as the enforcement point (non-proxied servers get doctor/test-time checking instead).",
+        "Threat-model doc updated to claim the rug-pull defense with its exact boundaries."
+      ],
+      "files_hint": [
+        "packages/cli/src/trust/tofu.ts",
+        "packages/proxy/src/proxy.ts",
+        "packages/cli/src/commands/trust.ts",
+        "packages/cli/src/commands/test.ts",
+        "docs/threat-model.md"
+      ],
+      "tests": [
+        "Unit: digest stability (reorder-safe), drift detection on description change, block vs warn modes, re-trust flow.",
+        "Integration: proxied fake server mutates a tool description mid-lifecycle -> flagged."
+      ],
+      "definition_of_done": [
+        "Trusted servers have their tool surface pinned; silent definition drift is detected and (optionally) blocked, with a reviewable diff."
+      ]
+    },
+    {
+      "id": "S18.2",
+      "epic": "E18",
+      "order": 2,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "mcpfold scan: preflight security audit of existing client configs",
+      "user_story": "As a user with MCP configs accumulated across clients, I want one command that audits them for the known incident root causes — plaintext secrets, unpinned packages, known-vulnerable versions — so mcpfold finds the problems, not just avoids creating them.",
+      "context": "Research finding. The verified 2025-26 incident root causes map to scannable config properties: cleartext creds in mcp.json files (Amazon Q auto-launch flaw, Knostic's 1,862 exposed servers with 0 auth), unpinned @latest stdio packages (postmark-mcp backdoor arrived via version churn; Shai-Hulud npm worm targets mcp-server packages), and known-vulnerable bridge versions (mcp-remote < 0.1.16, CVE-2025-6514). We already have the detection machinery: the S9.1 leak-harness scanner, adapters' parse() for every client format, and the redactor. Productize as `mcpfold scan`: read all detected clients' configs (and optionally the canonical file), report findings with severity + fix hints (including 'run mcpfold import to convert to refs'), exit nonzero on findings for CI. This is mcp-scan's niche done config-side and cross-client.",
+      "acceptance_criteria": [
+        "`mcpfold scan` audits every detected client's config files plus the canonical config; per-finding: severity, client, file, redacted evidence, and a concrete fix hint.",
+        "Checks (minimum): secret-shaped literal values in env/auth/headers; unpinned stdio package specs (@latest or bare); mcp-remote below the CVE floor; servers with neither pin nor integrity; report of tools directives absent on high-tool-count servers (informational).",
+        "Secret VALUES never appear in scan output (redactor-enforced, test-proven).",
+        "Exit-code contract: 0 clean, 1 findings, 2 error — CI-gateable; --json envelope supported.",
+        "A vulnerable-version table (package -> floor + advisory id) lives in one updatable module.",
+        "Docs page positions scan alongside doctor (config validity) as the security preflight."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/scan.ts",
+        "packages/cli/src/checks/security.ts",
+        "security/leak-harness.ts",
+        "packages/cli/test/scan.test.ts",
+        "docs/security.md"
+      ],
+      "tests": [
+        "Unit: fixture client configs seeded with each finding class produce the expected findings and exit code; sentinel secret never surfaces in output.",
+        "Contract: scan --json envelope snapshot."
+      ],
+      "definition_of_done": [
+        "One command surfaces the known config-level attack surface across all detected clients, redaction-safe and CI-gateable."
+      ]
+    },
+    {
+      "id": "S18.3",
+      "epic": "E18",
+      "order": 3,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Org-managed policy: server allow/deny lists enforced at sync, add, and run",
+      "user_story": "As a platform/security engineer, I want to publish an org policy of allowed/denied MCP servers that mcpfold enforces on every developer machine and in CI, so ungoverned servers can't quietly enter any client config we manage.",
+      "context": "Research finding. Registry+allowlist of approved servers is the single most-requested enterprise MCP control, and the clients shipped walled versions: Claude Code allowedMcpServers/deniedMcpServers + managed-mcp.json; VS Code 'restrict MCP access to registry servers' policy via MDM. Nobody offers it CROSS-client — exactly our shape. Ship a policy file (e.g. mcp.policy.jsonc, repo- or org-distributed; machine location for managed installs) with allow/deny rules by server name, package spec/prefix, registry namespace, or URL pattern; sync/add/run refuse (or strip, per mode) non-conforming servers; sync --check fails CI on violations. Composes with the trust store: policy is org-level intent, TOFU stays the per-machine approval. Extends the E12 team wedge.",
+      "acceptance_criteria": [
+        "Policy file schema (versioned, zod, published like the config schema) supporting allow and deny rules over name / package prefix / registry namespace / url pattern, with allow-list-only strict mode.",
+        "`sync` refuses to fold a violating server (or strips it with a loud warning in permissive mode); `add`/`add --from-registry` refuse violating additions; `run` refuses violating launches — one shared evaluator.",
+        "Policy discovery: project file, then MCPFOLD_POLICY path, then a machine-level managed location (documented per OS); precedence documented.",
+        "`sync --check` and `scan` report policy violations with rule provenance (which rule, from which file).",
+        "Policy file changes are TOFU-independent: deny always wins over local trust.",
+        "docs/team-config.md gains the org-policy story with a CI example."
+      ],
+      "files_hint": [
+        "packages/core/src/policy.ts",
+        "packages/cli/src/commands/sync.ts",
+        "packages/cli/src/commands/add.ts",
+        "packages/cli/src/commands/run.ts",
+        "packages/cli/test/policy.test.ts",
+        "docs/team-config.md"
+      ],
+      "tests": [
+        "Unit: rule matching (name/package/namespace/url), precedence, strict vs permissive modes.",
+        "Integration: sync/add/run each refuse a denied server; CI check exits 1 with rule provenance."
+      ],
+      "definition_of_done": [
+        "An org can publish one policy file that provably governs every mcpfold-managed client config and launch, cross-client and CI-enforced."
+      ]
+    },
+    {
+      "id": "S18.4",
+      "epic": "E18",
+      "order": 4,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Redacted runtime tool-call audit log at the proxy",
+      "user_story": "As a security engineer, I want an opt-in, redacted local log of tool calls made through mcpfold's proxy so I can audit agent behavior and feed a SIEM, without any secret material touching the log.",
+      "context": "Research finding. Audit logging / tool-call observability is a top-tier enterprise ask; Docker's gateway ships --log-calls interceptors. Our proxy already sits in the call path and the Redactor already guarantees output hygiene. Add opt-in JSONL logging at connectProxy: timestamp, server name, tool, duration, outcome (ok/error/denied), and argument SHAPE (keys/types, never values by default; values only with an explicit unsafe flag, still redactor-scrubbed). Denied-call attempts (S5.3 enforcement, S18.1 drift blocks) are first-class events — that's the security signal. Local file with rotation; SIEM shipping is the user's pipe, documented.",
+      "acceptance_criteria": [
+        "Opt-in via config or env; off by default; log path documented and overridable.",
+        "JSONL events for tools/call (ok/error/denied) and filter-drift warnings, with argument shapes only — a registered sentinel secret can never appear (leak-harness-style test).",
+        "Denied and drift events carry enough context to alert on (server, tool, rule/reason).",
+        "Size-based rotation; a corrupt/unwritable log never breaks the proxied session (best-effort, stderr note).",
+        "docs/security.md documents the format with a SIEM-ingestion example."
+      ],
+      "files_hint": [
+        "packages/proxy/src/proxy.ts",
+        "packages/proxy/src/audit.ts",
+        "packages/cli/src/commands/run.ts",
+        "packages/proxy/test/audit.test.ts",
+        "docs/security.md"
+      ],
+      "tests": [
+        "Unit: event emission per outcome class; sentinel never serialized; rotation; failure-tolerance (unwritable path)."
+      ],
+      "definition_of_done": [
+        "Proxied sessions can produce a redaction-safe, SIEM-ready audit trail, with denied calls as first-class events."
+      ]
+    },
+    {
+      "id": "S18.5",
+      "epic": "E18",
+      "order": 5,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Public security-posture page backed by the tests that prove each claim",
+      "user_story": "As an evaluating engineer or security reviewer, I want a page that states mcpfold's security properties and links each one to the test/code that proves it, so trust is verifiable rather than asserted.",
+      "context": "Research finding + internal inventory. mcpfold already exceeds most competitors on provable properties — call-level deny enforcement (not just list-hiding), the S9.1 sentinel leak harness (secret reaches zero artifacts), append-only signed config history, refresh-token rotation with reuse detection, ref-only guards client AND server side, TOFU trust — but none of it is presented as verifiable claims anywhere public. The security landscape (OWASP MCP Top 10, incident wave) makes 'provably safe' the differentiator enterprises shortlist on. Build the claims->evidence page (site + docs), each claim linking to the repo test/policy that enforces it, plus honest boundaries (what mcpfold does NOT defend against, from the threat model). Feeds E13's security page (S13.13) with substance; coordinate rather than duplicate.",
+      "acceptance_criteria": [
+        "A claims table: property -> mechanism -> evidence link (test file/CI job/policy) for at least: ref-only sync, leak-harness zero-artifact proof, call-level tool deny, TOFU (command + tool-digest once S18.1 lands), signed versions + reuse detection, redacted output/telemetry.",
+        "Explicit non-claims/boundaries section sourced from docs/threat-model.md.",
+        "Published on the site and in docs; linked from README and the S13.13 security page.",
+        "A CI-checkable manifest keeps evidence links from rotting (paths verified to exist)."
+      ],
+      "files_hint": [
+        "docs/security-posture.md",
+        "apps/site/src/*",
+        "docs/threat-model.md",
+        "scripts/check-evidence-links.mjs"
+      ],
+      "tests": [
+        "Link-manifest check: every referenced evidence path exists in the repo (CI-enforced)."
+      ],
+      "definition_of_done": [
+        "Every public security claim is one click from the code or test that proves it, boundaries stated, links CI-guarded."
+      ]
+    },
+    {
+      "id": "S19.1",
+      "epic": "E19",
+      "order": 1,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Adapter wave 1: JetBrains AI Assistant, Visual Studio, Continue, Roo Code",
+      "user_story": "As a user on JetBrains, Visual Studio, Continue, or Roo Code, I want first-class mcpfold adapters so my client is folded from the same canonical config as everything else.",
+      "context": "Research findings (JetBrains + Visual Studio verified against primary docs; Continue/Roo are the top long-standing roadmap asks and mcpm-supported). JetBrains AI Assistant: mcpServers-shaped paste-in JSON, global-vs-project levels — shared-factory friendly. Visual Studio (2026-05 docs): `servers` key (VS Code dialect) read from %USERPROFILE%\\.mcp.json, <SOLUTIONDIR>\\.mcp.json, .vs\\mcp.json, .vscode\\mcp.json, .cursor\\mcp.json — an adapter mostly REUSES the vscode render with different path resolution. Continue and Roo Code close the two most-cited roadmap gaps (docs/coverage.md 'Next candidates'; mcpm ships both). Each lands the S14.1 one-PR way: scaffold-adapter, CLIENT_IDS, ALL_ADAPTERS, fixtures, matrix golden, coverage docs, compat sample. Verify each client's current format against primary docs at implementation time — formats drift (see S17.3).",
+      "acceptance_criteria": [
+        "Four new adapters registered and fixture-tested (matrix count 8 -> 12), each with render->parse round-trip and per-OS path tests.",
+        "Visual Studio adapter documents its read-precedence relationship with vscode/cursor files (no double-write to a file another adapter owns).",
+        "detect-clients picks up all four; compat samples added; docs/coverage.md and the site matrix updated.",
+        "Each adapter's secret strategy chosen deliberately (native inputs where the client has them, shim otherwise) and noted in coverage."
+      ],
+      "files_hint": [
+        "packages/adapters/src/jetbrains.ts",
+        "packages/adapters/src/visual-studio.ts",
+        "packages/adapters/src/continue.ts",
+        "packages/adapters/src/roo-code.ts",
+        "packages/adapters/src/all.ts",
+        "packages/core/src/schema.ts",
+        "packages/adapters/test/matrix.test.ts",
+        "docs/coverage.md"
+      ],
+      "tests": [
+        "Per-adapter fixture suites + matrix goldens; detect-clients coverage for the new ids."
+      ],
+      "definition_of_done": [
+        "12 clients fold from one canonical config, each verified against current primary docs, with compat samples and public coverage updated."
+      ]
+    },
+    {
+      "id": "S19.2",
+      "epic": "E19",
+      "order": 2,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S19.1"
+      ],
+      "title": "Adapter wave 2: bespoke formats — Goose (YAML), Codex CLI (TOML), LM Studio, Warp, opencode, Copilot CLI",
+      "user_story": "As a user on the second ring of MCP clients — including ones with YAML/TOML configs — I want mcpfold coverage so no client in my toolbox is left hand-managed.",
+      "context": "Research findings. These six require bespoke render/parse beyond the mcpServers factory: Goose uses ~/.config/goose/config.yaml with an `extensions:` key (YAML); Codex CLI uses ~/.codex/config.toml [mcp_servers.<name>] tables (TOML) — both flagged unverified-this-session, so verification against primary docs is part of the story. LM Studio reportedly Cursor-compatible mcp.json; Warp, opencode, Copilot CLI round out the mcpm-parity + zero-mention gaps from the coverage audit. YAML/TOML introduce new parse dependencies — keep them in the adapters package (core stays pure) and preserve unmanaged keys when writing into shared config files (Goose settings hold non-MCP config, like Zed).",
+      "acceptance_criteria": [
+        "Six new adapters (matrix -> 18), each verified against current primary docs at implementation time with the verification recorded in coverage.md.",
+        "YAML/TOML round-trips preserve unmanaged keys and comments where feasible; parse dependencies live in packages/adapters only (core purity gate stays green).",
+        "detect-clients, compat samples, coverage docs, and the site matrix updated; adapter_request issue template choices refreshed.",
+        "Any client whose format proves unstable/undocumented is explicitly deferred with rationale in coverage.md rather than shipped speculatively."
+      ],
+      "files_hint": [
+        "packages/adapters/src/goose.ts",
+        "packages/adapters/src/codex-cli.ts",
+        "packages/adapters/src/lm-studio.ts",
+        "packages/adapters/src/warp.ts",
+        "packages/adapters/src/opencode.ts",
+        "packages/adapters/src/copilot-cli.ts",
+        "packages/adapters/test/*",
+        "docs/coverage.md"
+      ],
+      "tests": [
+        "Per-adapter fixtures incl. YAML/TOML round-trip with unmanaged-key preservation; matrix goldens."
+      ],
+      "definition_of_done": [
+        "mcpfold matches or exceeds the widest competitor's client coverage, including non-JSON formats, with every format claim doc-verified."
+      ]
+    },
+    {
+      "id": "S19.3",
+      "epic": "E19",
+      "order": 3,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Project-scope expansion and installed-app detection beyond config-file existence",
+      "user_story": "As a team member, I want project-scope folding for every client that supports it, and I want mcpfold to detect clients I have installed but haven't configured yet, so first-run setup and team workflows cover my real environment.",
+      "context": "Internal audit findings. Five of eight adapters throw on non-user scopes (claude-desktop, windsurf, zed, cline, gemini-cli) while teams live in project scope; some of those clients now have project-level stories worth re-verifying (research showed Gemini CLI supports .gemini/settings.json project scope). Separately, detect-clients only reports installed=true when the user CONFIG file already exists — an installed-but-unconfigured client (the exact user init --guided serves) is invisible. Add app-presence probes (per-OS install dirs / binaries on PATH / app bundles) as a second detection signal, distinguishing configured vs installed-only.",
+      "acceptance_criteria": [
+        "Each adapter's scope support re-verified against current docs; project scope implemented where the client supports it (at minimum Gemini CLI), and the 'throws on project' list in coverage.md shrinks accordingly.",
+        "DetectedClient distinguishes configured / installed-not-configured / not-found, via injectable OS probes (testable per platform).",
+        "init --guided offers installed-not-configured clients as fold targets.",
+        "status/doctor surface the richer detection without breaking existing --json consumers (envelope versioned or additive)."
+      ],
+      "files_hint": [
+        "packages/cli/src/util/detect-clients.ts",
+        "packages/adapters/src/*.ts",
+        "packages/cli/src/onboarding/guided.ts",
+        "packages/cli/test/detect-clients.test.ts",
+        "docs/coverage.md"
+      ],
+      "tests": [
+        "Unit: per-OS probe fixtures for each detection state; guided flow offers an installed-only client.",
+        "Fixture: project-scope render for newly supported clients."
+      ],
+      "definition_of_done": [
+        "Detection reflects what is actually installed, not just already-configured; project scope covers every client that documents it."
+      ]
+    },
+    {
+      "id": "S19.4",
+      "epic": "E19",
+      "order": 4,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Native-interpolation secret strategy (fold refs into each client's own dialect)",
+      "user_story": "As a user on a client with native env-var interpolation, I want mcpfold to fold my secret references into the client's own syntax instead of a shim process, so I get zero extra processes with the same no-plaintext guarantee.",
+      "context": "Research finding (verified per client). Interpolation dialects now documented: Cursor & VS Code `${env:VAR}`; Claude Code .mcp.json `${VAR}` / `${VAR:-default}`; Windsurf `${env:VAR}` + `${file:/path}`; Gemini CLI `$VAR`/`${VAR}`. For a canonical `${env:NAME}` secret ref, the shim adds a process for nothing — the client can resolve it natively. Add a `native-env` secret strategy: adapters that declare an interpolation dialect render env-scheme refs into that dialect; non-env schemes (infisical/keychain/op/dotenv) still require the shim (the client can't resolve those). Per-server/per-profile strategy override lets users choose. The leak harness must prove the strategy still yields zero plaintext artifacts.",
+      "acceptance_criteria": [
+        "Adapters can declare an interpolation dialect; a new native-env strategy renders ${env:NAME} refs into the client dialect (each verified by fixture against primary-doc syntax).",
+        "Non-env schemes fall back to shim automatically with a clear doctor explanation of why.",
+        "Strategy selectable per profile/server; default remains each adapter's current strategy (no silent behavior change).",
+        "Leak harness extended: sentinel via native-env reaches zero artifacts across all supporting adapters.",
+        "Round-trip: parsing a client file with native interpolation reconstructs the canonical ${env:NAME} ref."
+      ],
+      "files_hint": [
+        "packages/adapters/src/types.ts",
+        "packages/adapters/src/shared.ts",
+        "packages/adapters/src/*.ts",
+        "security/leak.test.ts",
+        "docs/secrets.md"
+      ],
+      "tests": [
+        "Fixture per dialect; round-trip reconstruction; leak-harness extension; shim-fallback for non-env schemes."
+      ],
+      "definition_of_done": [
+        "env-scheme secrets fold shim-free on every client with a documented dialect, leak-harness-proven, opt-in and round-trippable."
+      ]
+    },
+    {
+      "id": "S19.5",
+      "epic": "E19",
+      "order": 5,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Adapter-compat harness v2: live evidence and a public compat matrix",
+      "user_story": "As a user choosing a config manager, I want public, dated evidence that mcpfold's adapters match each client's current format, so currency is proven rather than promised.",
+      "context": "Internal audit + research. The weekly compat harness compares only top-level/entry KEY SHAPES against hand-captured samples — it cannot catch a value-position change (Windsurf serverUrl, Gemini httpUrl) or a path move (Windsurf->Devin docs migration), which are exactly the drifts that happened in 2025-26. Upgrade: (1) deepen the signature to include field-level shapes for remote entries and scope paths; (2) wire `type:'url'` live sources for every client with a fetchable schema/doc (VS Code, Cursor, Claude Code, Gemini publish primary docs) so drift is detected from upstream, not from our own stale samples; (3) publish the result as a dated public compat-matrix page (client x transport x scope x secret strategy x last-verified), generated from the harness output. Public evidence doubles as marketing (E13/E15 tie-in).",
+      "acceptance_criteria": [
+        "Signatures cover remote-entry field shapes and resolved path patterns, not just key names (the Windsurf serverUrl and Gemini httpUrl cases become detectable — regression-fixtured).",
+        "At least four clients gain url-sourced live checks; unreachable sources still degrade to skipped, never false-pass.",
+        "A generated compat-matrix page (docs + site) shows per-client capabilities with last-verified dates from harness runs.",
+        "The weekly issue-filing flow carries the richer diff so drift triage names the exact field."
+      ],
+      "files_hint": [
+        "packages/adapters/compat/check.ts",
+        "packages/adapters/compat/run.ts",
+        "packages/adapters/compat/samples/*",
+        ".github/workflows/adapter-compat.yml",
+        "docs/coverage.md",
+        "apps/site/src/*"
+      ],
+      "tests": [
+        "Unit: field-shape divergence detection on seeded drift fixtures; matrix-page generation snapshot."
+      ],
+      "definition_of_done": [
+        "Format drift in value positions is caught automatically from live sources, and coverage is published as dated, generated evidence."
+      ]
+    },
+    {
+      "id": "S20.1",
+      "epic": "E20",
+      "order": 1,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Decide and implement the .mcp.json interop strategy",
+      "user_story": "As a user in an ecosystem converging on `.mcp.json`, I want mcpfold to interoperate with that file first-class — import, export, or adopt — so choosing mcpfold never means fighting the emerging standard.",
+      "context": "Research finding (verified). Filename convergence is real: Claude Code writes project-scope .mcp.json and calls it 'a standardized format'; Visual Studio reads %USERPROFILE%\\.mcp.json AND <SOLUTIONDIR>\\.mcp.json (plus .vscode and .cursor files). Meanwhile the key-level standard is the mcpServers blob, and convergence happens by clients READING each other's files, not by spec. Our north star says 'own the neutral mcp.config.jsonc format' — that bet needs a conscious update: stewarding interop likely beats a filename war. DECISION story: evaluate (a) accept .mcp.json as an alternate canonical filename, (b) treat it as a first-class import/export peer while mcp.config.jsonc stays canonical (adds profiles/tags/refs the flat format lacks), or (c) status quo. Then implement the choice. Note .mcp.json is already claude-code's project-scope TARGET file — canonical-vs-target collision handling is part of the design.",
+      "acceptance_criteria": [
+        "A written decision doc (docs/ or ADR) weighing the three options with the research evidence, and the chosen strategy reflected in prd meta.north_star phrasing.",
+        "If (a): CONFIG_FILENAMES accepts it with collision rules vs the claude-code adapter target, doctor disambiguates, docs updated.",
+        "If (b): `mcpfold import` treats a bare .mcp.json as a first-class source and `mcpfold export --mcp-json` emits one (refs preserved as ${VAR} env-interpolation where possible); round-trip documented.",
+        "Either way: the site/docs explain mcpfold's relationship to .mcp.json in one paragraph a stranger can repeat.",
+        "Init/guided flows updated to match the decision."
+      ],
+      "files_hint": [
+        "docs/adr/mcp-json-interop.md",
+        "packages/cli/src/util/config.ts",
+        "packages/cli/src/commands/import.ts",
+        "packages/cli/src/commands/init.ts",
+        "docs/config-format.md"
+      ],
+      "tests": [
+        "Per the chosen option: filename acceptance + collision tests, or import/export round-trip tests."
+      ],
+      "definition_of_done": [
+        "mcpfold has an explicit, implemented, documented stance on .mcp.json that positions it as steward of the emerging standard."
+      ]
+    },
+    {
+      "id": "S20.2",
+      "epic": "E20",
+      "order": 2,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Wire Stripe billing into the entitlement stub",
+      "user_story": "As the maintainer, I want real entitlement checks backed by Stripe subscriptions so team features can be commercially gated instead of granting everyone the team tier forever.",
+      "context": "Internal audit finding. services/edge/lib/entitlements.ts is an explicit stub: tierFor returns 'team' for everyone, 'nothing is gated yet'; TeamConsole shows 'Billing integration is coming soon'. The roadmap names Stripe as chosen-but-unwired and docs/pricing-model.md defines the tiers. Wire it: Stripe customer + subscription per user/team, webhook -> entitlement state in Postgres (RLS-protected), edge entitlementChecker reads real state with a fail-open-to-free (not team) default, TeamConsole reflects tier + upgrade path via Stripe Checkout/Portal. Keep the OSS CLI fully functional — gating applies to cloud team features only (per license split in meta).",
+      "acceptance_criteria": [
+        "Stripe products/prices map to the documented tiers; webhook (signature-verified) maintains an entitlements table; RLS keeps entitlement rows owner/team-readable only.",
+        "entitlementChecker returns the real tier; default on missing/unknown state is FREE tier (the current all-team grant is removed); team endpoints enforce it server-side.",
+        "TeamConsole shows current tier, gates team creation/invites per tier, and links Checkout/Portal for upgrade/manage.",
+        "Local-first CLI paths (sync/diff/doctor/run/team-without-cloud) remain entirely ungated, test-asserted.",
+        "Webhook handler is replay-safe and idempotent; e2e mock mode covers tier transitions.",
+        "docs/pricing-model.md updated from design to implemented behavior."
+      ],
+      "files_hint": [
+        "services/edge/lib/entitlements.ts",
+        "services/edge/functions/billing/index.ts",
+        "supabase/migrations/*",
+        "apps/web/src/teams/TeamConsole.tsx",
+        "docs/pricing-model.md"
+      ],
+      "tests": [
+        "Edge unit: webhook idempotency, signature verification, tier resolution incl. missing-state -> free.",
+        "Web e2e (mock): tier-gated UI states and upgrade flow.",
+        "Regression: CLI features unaffected by entitlement state."
+      ],
+      "definition_of_done": [
+        "Entitlements are real, Stripe-backed, fail-closed-to-free, and gate only the cloud team surface; the stub grant is gone."
+      ]
+    },
+    {
+      "id": "S20.3",
+      "epic": "E20",
+      "order": 3,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Pending-invite redemption and enterprise SSO for teams",
+      "user_story": "As a team owner, I want to invite teammates who don't have accounts yet and let my org sign in with our identity provider, so team onboarding works the way enterprises expect.",
+      "context": "Internal audit + research. Today team-invite requires the invitee to already have an account (functions/teams/index.ts notes the pending-invite flow as future) — a real onboarding wall. Research shows enterprise-managed auth (Entra ID, Okta, Auth0) is a converging client-ecosystem expectation (VS Code shipped it June 2026) and SSO is a recurring MCP-governance ask. Two halves: (1) pending invites — single-use, expiring, 256-bit tokens (the security/tokens.ts machinery exists) stored hashed, redeemable at signup, surfacing in TeamConsole; (2) SSO — GoTrue already supports external IdPs; wire and document Entra/Okta OIDC for the hosted + self-hosted paths, mapping IdP identity to existing user rows safely (no account-takeover via email collision; verified-email linking rules).",
+      "acceptance_criteria": [
+        "Invite to an email with no account creates a hashed, expiring, single-use pending invite; redemption at signup joins the team with the invited role; TeamConsole lists/revokes pending invites.",
+        "Invite tokens never stored or logged in plaintext; redemption is idempotent and expiry-enforced (edge-tested).",
+        "OIDC SSO (at least Entra + Okta) configurable on hosted and self-hosted deployments, documented in docs/self-hosting.md; identity-linking rules prevent email-collision takeover (test-covered).",
+        "Device-code CLI login continues to work for SSO-provisioned users.",
+        "Audit view records invite created/redeemed/revoked events."
+      ],
+      "files_hint": [
+        "services/edge/functions/teams/index.ts",
+        "supabase/migrations/*",
+        "apps/web/src/teams/TeamConsole.tsx",
+        "apps/web/src/security/tokens.ts",
+        "docs/self-hosting.md"
+      ],
+      "tests": [
+        "Edge unit: invite lifecycle (create/redeem/expire/revoke/double-redeem), hashed storage.",
+        "Web e2e (mock): pending-invite UI; SSO login path; identity-linking collision case."
+      ],
+      "definition_of_done": [
+        "A no-account invitee can join a team through a secure redemption flow, and orgs can front the cloud with their own IdP on both hosted and self-hosted."
+      ]
+    },
+    {
+      "id": "S20.4",
+      "epic": "E20",
+      "order": 4,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Ops polish: kill timed-out provider children, cross-OS web e2e",
+      "user_story": "As a user and as CI, I want secret-provider timeouts to actually terminate hung child processes and the web app's e2e suite to run beyond ubuntu, so operational edges match the quality of the core.",
+      "context": "Internal audit findings. (1) The secrets resolver races a 10s timeout via Promise.race + AbortController, but env/dotenv/keychain/op providers don't honor the signal — a hung `op`/`security`/`secret-tool` child keeps running after the race rejects (orphaned process, held keychain locks). Plumb the signal into defaultExec and kill the child on abort. (2) Playwright web e2e runs ubuntu-only with mock auth; add at least one non-linux OS to the matrix (browser rendering + path assumptions) and document what mock mode does NOT cover so the gap is explicit rather than silent.",
+      "acceptance_criteria": [
+        "defaultExec accepts an AbortSignal and kills the child (with escalation to SIGKILL after grace) on timeout; all exec-backed providers pass it through.",
+        "A hung provider child is provably terminated when the resolver times out (integration test with a sleeping fake binary).",
+        "Resolver error messages distinguish 'timed out and terminated' from other failures.",
+        "Playwright job runs on ubuntu + at least windows (or macos) in CI; flake policy documented; mock-mode coverage boundaries written down in the e2e README."
+      ],
+      "files_hint": [
+        "packages/secrets/src/exec.ts",
+        "packages/secrets/src/resolver.ts",
+        "packages/secrets/test/resolver.test.ts",
+        ".github/workflows/ci.yml",
+        "apps/web/test/README.md"
+      ],
+      "tests": [
+        "Integration: sleeping fake provider binary is killed at timeout; no orphan remains (process-table assertion).",
+        "CI: cross-OS Playwright matrix green."
+      ],
+      "definition_of_done": [
+        "Timeouts terminate, not orphan; the web e2e story is cross-OS with explicit coverage boundaries."
       ]
     }
   ],
