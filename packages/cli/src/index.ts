@@ -32,15 +32,50 @@ export { buildDiagnoseBundle, diagnose, type DiagnoseBundle } from './commands/d
 export {
   runSync,
   runSyncCheck,
+  runSyncWatch,
   type SyncCheckData,
   type SyncCheckDeps,
   type SyncData,
   type SyncFileResult,
   type SyncOptions,
+  type WatchIo,
 } from './commands/sync.js';
+export { type FsWatcher, nodeFsWatcher, watchWithDebounce, type WatchHandle } from './io/watch.js';
 export { runDiff, type ClientDiff, type DiffData, type DiffOptions } from './commands/diff.js';
 export { runInit, starterConfig, type InitData, type InitOptions } from './commands/init.js';
+export {
+  applySafeFixes,
+  autoPrompter,
+  type GuidedOptions,
+  type GuidedResult,
+  type Prompter,
+  runGuided,
+  scriptedPrompter,
+  ttyPrompter,
+} from './onboarding/guided.js';
 export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';
+export {
+  buildSpec,
+  completionScript,
+  completionValues,
+  SHELLS,
+  type CompletionSpec,
+  type Shell,
+} from './commands/completions.js';
+export {
+  runTest,
+  type TestData,
+  type TestOptions,
+  type TestServerResult,
+  type TransportFactory,
+} from './commands/test.js';
+export {
+  runStatus,
+  type StatusClient,
+  type StatusCloud,
+  type StatusData,
+  type StatusOptions,
+} from './commands/status.js';
 export { runMigrate, type MigrateData, type MigrateOptions } from './commands/migrate.js';
 export {
   scaffoldAdapter,
@@ -77,7 +112,46 @@ export {
   type SecretTestData,
 } from './commands/secret.js';
 
+// Config-as-code trust + version signing (S9.2)
+export {
+  defaultTrustPath,
+  executableSignature,
+  fileTrustGate,
+  isExecutable,
+  memoryTrustGate,
+  untrustedServers,
+  type ExecutableEntry,
+  type TrustGate,
+  type TrustStatus,
+  type UntrustedServer,
+} from './trust/tofu.js';
+export {
+  getOrCreateSigningKey,
+  loadSigningKey,
+  signConfig,
+  verifyConfig,
+} from './trust/signing.js';
+export { runLogin, type LoginData, type LoginOptions } from './commands/login.js';
+export { runPush, type PushData, type PushOptions } from './commands/push.js';
+export { runPull, type PullData, type PullOptions } from './commands/pull.js';
+export { runTrust, type TrustData, type TrustOptions } from './commands/trust.js';
+
 // IO helpers (S3.5)
+export {
+  detectChannel,
+  getUpdateNotice,
+  isNewer,
+  isNotifierEnabled,
+  refreshUpdateCache,
+  upgradeCommand,
+  type UpdateChannel,
+} from './update-notifier.js';
 export { atomicWrite } from './io/atomic-write.js';
-export { backupIfExists } from './io/backup.js';
+export { backupIfExists, listBackups, restoreBackup, type BackupInfo } from './io/backup.js';
+export {
+  runRestore,
+  type RestoreData,
+  type RestoreOptions,
+  type RestoreTarget,
+} from './commands/restore.js';
 export { CONFIG_FILENAMES, findConfigPath, loadConfigFromDisk } from './util/config.js';

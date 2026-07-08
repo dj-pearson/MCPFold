@@ -1,0 +1,10 @@
+{
+  "client": "zed",
+  "source": {
+    "type": "captured",
+    "capturedAt": "2026-07-08"
+  },
+  "rootKeys": ["context_servers"],
+  "serverContainer": "context_servers",
+  "entryKeys": ["args", "command", "env", "url"]
+}

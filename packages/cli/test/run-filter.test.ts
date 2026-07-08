@@ -5,6 +5,9 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { connectProxy, streamTransport, type JsonRpcMessage } from '@mcpfold/proxy';
 import { runRun, shouldUseProxy, type ProxySpawner, type Spawner } from '../src/commands/run.js';
+import type { TrustGate } from '../src/trust/tofu.js';
+
+const trustAll: TrustGate = { status: () => 'trusted', isTrusted: () => true, approve: () => {} };
 
 let cwd: string;
 
@@ -38,7 +41,7 @@ describe('runRun routing (S5.3)', () => {
       return 0;
     });
     const spawnFn = vi.fn<Spawner>(async () => 0);
-    await runRun({ cwd, name: 'curated', providers: [], spawnFn, proxySpawnFn });
+    await runRun({ cwd, name: 'curated', providers: [], spawnFn, proxySpawnFn, trust: trustAll });
     expect(proxySpawnFn).toHaveBeenCalledTimes(1);
     expect(spawnFn).not.toHaveBeenCalled();
   });
@@ -46,7 +49,7 @@ describe('runRun routing (S5.3)', () => {
   it('routes a server WITHOUT a directive through the plain spawner (no proxy overhead)', async () => {
     const proxySpawnFn = vi.fn<ProxySpawner>(async () => 0);
     const spawnFn = vi.fn<Spawner>(async () => 0);
-    await runRun({ cwd, name: 'plain', providers: [], spawnFn, proxySpawnFn });
+    await runRun({ cwd, name: 'plain', providers: [], spawnFn, proxySpawnFn, trust: trustAll });
     expect(spawnFn).toHaveBeenCalledTimes(1);
     expect(proxySpawnFn).not.toHaveBeenCalled();
   });

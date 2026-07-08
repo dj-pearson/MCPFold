@@ -1,0 +1,5 @@
+# Cloudflare Pages config for the mcpfold.com marketing site (S13.1).
+# Deploy: wrangler pages deploy dist --project-name mcpfold-site
+name = "mcpfold-site"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = "dist"

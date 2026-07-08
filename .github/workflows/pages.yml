@@ -1,0 +1,47 @@
+name: Pages
+
+# Build the web console and deploy a Cloudflare Pages preview (S7.1). The build runs on every
+# push/PR (so a broken web build fails CI); the deploy only runs when the Cloudflare credentials
+# are configured as repo secrets — otherwise it's skipped, not failed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-deploy:
+    name: build + preview deploy
+    runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Builds @mcpfold/web and its workspace deps (@mcpfold/core) in dependency order.
+      - name: Build web console
+        run: pnpm --filter "@mcpfold/web..." build
+
+      - name: Deploy to Cloudflare Pages (preview)
+        if: env.CF_TOKEN != ''
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: mcpfold-web
+          directory: apps/web/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

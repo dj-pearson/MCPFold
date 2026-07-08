@@ -3,6 +3,7 @@ import { UsageError, type ResolvedServer, type ToolsDirective } from '@mcpfold/c
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import { connectProxy, streamTransport } from '@mcpfold/proxy';
 import { loadConfigFromDisk } from '../util/config.js';
+import { fileTrustGate, isExecutable, type TrustGate } from '../trust/tofu.js';
 
 /**
  * `mcpfold run <name>` (S4.7) — the shim launcher the `shim` strategy points clients at.
@@ -80,6 +81,8 @@ export interface RunOptions {
   spawnFn?: Spawner;
   /** Injectable proxy spawner for tests. */
   proxySpawnFn?: ProxySpawner;
+  /** Trust gate (TOFU); defaults to the per-machine trust store. Injectable for tests. */
+  trust?: TrustGate;
 }
 
 /** Rewrite an `@latest` package spec to the pinned version (supply-chain hygiene). */
@@ -110,6 +113,19 @@ export async function runRun(options: RunOptions): Promise<number> {
     throw new UsageError(`No server "${options.name}" in the canonical config.`, {
       hint: 'Check the server name, or add it and run `mcpfold sync`.',
     });
+  }
+
+  // Config-as-code TOFU gate (S9.2): never exec a launch command that hasn't been trusted.
+  if (isExecutable(server)) {
+    const trust = options.trust ?? fileTrustGate();
+    const entry = { command: server.command, args: server.args, pin: server.pin };
+    if (!trust.isTrusted(options.name, entry)) {
+      const st = trust.status(options.name, entry);
+      throw new UsageError(
+        `Refusing to run "${options.name}": its launch command is ${st === 'changed' ? 'CHANGED' : 'not yet trusted'}.`,
+        { hint: `Review it, then run \`mcpfold trust ${options.name}\` to approve.` },
+      );
+    }
   }
 
   const asResolved: ResolvedServer = {

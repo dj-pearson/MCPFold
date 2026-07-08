@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "github": {
+      "args": [
+        "run",
+        "github"
+      ],
+      "command": "mcpfold"
+    },
+    "playwright": {
+      "args": [
+        "-y",
+        "@playwright/mcp"
+      ],
+      "command": "npx"
+    }
+  }
+}

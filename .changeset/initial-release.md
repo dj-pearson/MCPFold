@@ -11,4 +11,5 @@ Initial public release: the canonical `mcp.config.jsonc` format, six client adap
 (Cursor, Claude Desktop, Claude Code, VS Code, Windsurf, Zed), the local-first CLI
 (`init`/`import`/`sync`/`diff`/`doctor`/`migrate`/`run`), fail-closed secret resolution
 (env/dotenv/infisical/keychain/1Password) with secrets kept off disk, and the
-tool-curation proxy.
+tool-curation proxy that cut tool-schema context by ~80% in our benchmark (45 tools →
+9; 7,476 → 1,497 tokens — see docs/benchmark.md).

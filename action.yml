@@ -1,0 +1,39 @@
+name: 'mcpfold config gate'
+description: 'Fail a PR when committed client configs drift from mcp.config.jsonc, or when doctor finds problems.'
+author: 'mcpfold'
+branding:
+  icon: 'git-merge'
+  color: 'blue'
+
+inputs:
+  version:
+    description: 'mcpfold version to install (a released version, or "latest").'
+    required: false
+    default: 'latest'
+  working-directory:
+    description: 'Directory containing mcp.config.jsonc.'
+    required: false
+    default: '.'
+  profile:
+    description: 'Limit the checks to a single profile (optional).'
+    required: false
+    default: ''
+  check:
+    description: 'Which checks to run: sync | doctor | both.'
+    required: false
+    default: 'both'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install mcpfold
+      shell: bash
+      # Skip if mcpfold is already on PATH (e.g. the repo's own self-test installs a local build).
+      run: command -v mcpfold >/dev/null 2>&1 || npm install -g "mcpfold@${{ inputs.version }}"
+    - name: Run mcpfold config gate
+      shell: bash
+      run: bash "${GITHUB_ACTION_PATH}/scripts/action-gate.sh"
+      env:
+        MCPFOLD_CWD: ${{ inputs.working-directory }}
+        MCPFOLD_PROFILE: ${{ inputs.profile }}
+        MCPFOLD_CHECK: ${{ inputs.check }}

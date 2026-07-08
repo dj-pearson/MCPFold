@@ -45,6 +45,25 @@ describe('renderWithStrategy — shim (S4.6)', () => {
   });
 });
 
+describe('renderWithStrategy — pin at fold time (S8.3)', () => {
+  const pinned: ResolvedServer = { ...plainStdio, pin: '1.4.2' };
+
+  it('rewrites @latest to the pinned version in the rendered client file', async () => {
+    const file = await renderWithStrategy(cursorAdapter, [pinned], { osContext: ctx });
+    expect(file.contents).toContain('@playwright/mcp@1.4.2');
+    expect(file.contents).not.toContain('@playwright/mcp@latest');
+    expect(JSON.parse(file.contents).mcpServers.playwright.args).toEqual([
+      '-y',
+      '@playwright/mcp@1.4.2',
+    ]);
+  });
+
+  it('leaves @latest untouched when no pin is declared', async () => {
+    const file = await renderWithStrategy(cursorAdapter, [plainStdio], { osContext: ctx });
+    expect(file.contents).toContain('@playwright/mcp@latest');
+  });
+});
+
 describe('renderWithStrategy — native-input (S4.6)', () => {
   it('emits VS Code ${input:} indirection, never a raw token', async () => {
     const file = await renderWithStrategy(vscodeAdapter, [{ ...githubSecret, client: 'vscode' }], {

@@ -4,6 +4,12 @@
 canonical config and folds it out to every client — loading only the tools each agent
 actually needs, and resolving secret _references_ instead of hardcoding values.
 
+<p align="center">
+  <img src="./docs/assets/demo.svg" alt="mcpfold demo: init → import → sync → diff, cutting tool-schema tokens ~80%" width="820" />
+</p>
+
+<sub>Demo regenerated from the real CLI with `pnpm demo:record` (an [asciinema cast](./demo/mcpfold.cast) + this SVG; a GIF renders in CI via [`demo/mcpfold.tape`](./demo/mcpfold.tape)). Server names shown are examples — no endorsement implied.</sub>
+
 > Status: ground-floor build. The canonical [`mcp.config.jsonc`](./docs/config-format.md)
 > format, the local-first CLI wedge, and (later) the cloud sync layer are being built
 > story-by-story from [`prd.json`](./prd.json). Full docs live in [`docs/`](./docs/index.md).
@@ -77,6 +83,15 @@ validation in editors that support it:
 (`packages/schema`) and a CI check fails if the committed
 [`mcp.config.schema.json`](./packages/schema/mcp.config.schema.json) drifts from it —
 regenerate with `pnpm --filter @mcpfold/schema generate`.
+
+## Pricing, funding & roadmap
+
+The CLI and everything local are **free forever and MIT-licensed**; the hosted cloud is the paid
+surface (and you can self-host it yourself for free). See the [pricing model](./docs/pricing-model.md),
+the public [roadmap](./docs/roadmap.md), and how the project is run in [governance](./docs/governance.md).
+
+If mcpfold saves you time, consider [sponsoring](https://github.com/sponsors/dj-pearson) — it funds
+the free, open-source core.
 
 ## Autonomous build loop
 

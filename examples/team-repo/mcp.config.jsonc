@@ -1,0 +1,36 @@
+// Team source of truth (S12.1) — committed to the repo. Every developer runs `mcpfold sync`
+// to fold this out to their editor, and CI runs `mcpfold sync --check` to fail on drift.
+// Project-scope profiles write repo-local files (.vscode/mcp.json, .cursor/mcp.json) that ARE
+// committed, so the gate compares those checked-in files against this canonical config.
+//
+// Secrets are references, never values: set GITHUB_TOKEN in your environment (or a .env).
+{
+  "$schema": "https://mcpfold.com/schema/v1.json",
+  "version": 1,
+  "servers": {
+    "github": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "pin": "2025.4.8",
+      "env": { "GITHUB_TOKEN": "${env:GITHUB_TOKEN}" },
+      "tags": ["code", "review"],
+    },
+    "playwright": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp"],
+      "pin": "0.0.41",
+      "tags": ["e2e"],
+    },
+  },
+  "profiles": {
+    "vscode-project": { "client": "vscode", "scope": "project", "path": ".", "include": ["code"] },
+    "cursor-project": {
+      "client": "cursor",
+      "scope": "project",
+      "path": ".",
+      "include": ["code", "e2e"],
+    },
+  },
+}
