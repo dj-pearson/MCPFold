@@ -15,6 +15,8 @@ export const CLIENT_IDS = [
   'vscode',
   'windsurf',
   'zed',
+  'cline',
+  'gemini-cli',
 ] as const;
 
 /** Secret-provider schemes understood by the resolver (E4). Parsing lives in secret-ref.ts. */

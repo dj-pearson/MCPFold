@@ -35,4 +35,6 @@ export { claudeCodeAdapter } from './claude-code.js';
 export { vscodeAdapter } from './vscode.js';
 export { windsurfAdapter } from './windsurf.js';
 export { zedAdapter } from './zed.js';
+export { clineAdapter } from './cline.js';
+export { geminiCliAdapter } from './gemini-cli.js';
 export { ALL_ADAPTERS, registerAll } from './all.js';

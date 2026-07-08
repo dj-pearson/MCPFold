@@ -132,7 +132,9 @@
                   "cursor",
                   "vscode",
                   "windsurf",
-                  "zed"
+                  "zed",
+                  "cline",
+                  "gemini-cli"
                 ]
               },
               "scope": {

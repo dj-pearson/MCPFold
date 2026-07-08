@@ -27,6 +27,7 @@ const NAV = [
   ['config-format.md', 'Config format'],
   ['secrets.md', 'Secrets'],
   ['adapters.md', 'Adapters'],
+  ['coverage.md', 'Adapter coverage'],
   ['benchmark.md', 'Benchmark'],
   ['cli-contract.md', 'CLI contract'],
   ['completions.md', 'Shell completions'],
