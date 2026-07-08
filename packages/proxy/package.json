@@ -1,0 +1,40 @@
+{
+  "name": "@mcpfold/proxy",
+  "version": "0.0.0",
+  "description": "Thin local MCP proxy for tool-level curation: transparent passthrough + tools/list filtering.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "bench": "WRITE_BENCH=1 vitest run test/benchmark.test.ts"
+  },
+  "dependencies": {
+    "@mcpfold/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dj-pearson/MCPFold.git",
+    "directory": "packages/proxy"
+  },
+  "homepage": "https://mcpfold.com",
+  "bugs": {
+    "url": "https://github.com/dj-pearson/MCPFold/issues"
+  }
+}

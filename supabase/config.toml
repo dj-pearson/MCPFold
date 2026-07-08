@@ -1,0 +1,42 @@
+# Supabase project config (S6.1). Consumed by the Supabase CLI (`supabase start`,
+# `supabase db push`). Self-hosted deployment lives in the compose files alongside this;
+# see docs/self-hosting.md. No secrets belong in this file — they come from env/Infisical.
+
+project_id = "mcpfold"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.migrations]
+# Migrations are plain SQL in ./migrations, applied in filename order. Both the Supabase
+# CLI (`supabase db push`) and the dependency-free ./scripts/migrate.sh understand them.
+schema_paths = ["./migrations"]
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+# The site the auth flow redirects back to. Overridden per-environment.
+site_url = "https://mcpfold.com"
+additional_redirect_urls = ["https://mcpfold.com/auth/callback"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.external.github]
+enabled = false
+# client_id / secret are read from env at deploy time, never committed:
+#   SUPABASE_AUTH_EXTERNAL_GITHUB_CLIENT_ID / _SECRET
+
+[realtime]
+enabled = true

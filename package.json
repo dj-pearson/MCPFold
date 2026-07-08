@@ -1,0 +1,47 @@
+{
+  "name": "mcpfold-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "One source of truth for your MCP servers. Write it once, fold it out to every client.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:watch": "vitest",
+    "lint": "eslint . --max-warnings=0 && pnpm run purity:check",
+    "purity:check": "node scripts/check-core-purity.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r typecheck",
+    "docs:build": "node scripts/build-docs.mjs",
+    "docs:check": "node scripts/build-docs.mjs --check",
+    "verify_all": "pnpm lint && pnpm typecheck && pnpm test && pnpm -r build",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm -r build && changeset publish"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.9",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "marked": "^12.0.2",
+    "prettier": "^3.4.2",
+    "publint": "^0.2.12",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@mcpfold/core": ["../packages/core/src/index.ts"],
+      "@mcpfold/adapters": ["../packages/adapters/src/index.ts"],
+      "@mcpfold/secrets": ["../packages/secrets/src/index.ts"],
+      "@mcpfold/proxy": ["../packages/proxy/src/index.ts"],
+      "mcpfold": ["../packages/cli/src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts"]
+}

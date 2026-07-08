@@ -1,0 +1,66 @@
+name: Deploy docs
+
+# Publishes the docs site (and the hosted JSON schema at /schema/v1.json) to GitHub Pages
+# on every push to main. The same build runs as a gate in ci.yml, so main only deploys
+# what already passed link-checking.
+#
+# One-time setup (repo admin): Settings → Pages → Source = "GitHub Actions". A custom
+# domain (mcpfold.com) is baked in via the CNAME file the build emits; point the DNS at
+# GitHub Pages to serve the schema at https://mcpfold.com/schema/v1.json.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel an in-flight deploy; let the current publish finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build docs
+        run: pnpm docs:build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-docs
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

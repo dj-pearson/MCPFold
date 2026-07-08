@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Cancel in-flight runs for the same ref when a new commit lands.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Cross-OS matrix — path resolution is central to this product, so the
+  # Windows/macOS/Linux matrix is non-negotiable. Any lint/type/test/build
+  # failure fails the build.
+  verify:
+    name: verify (${{ matrix.os }} · node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [20]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test (with coverage)
+        run: pnpm -r test --coverage
+
+      - name: Build
+        run: pnpm -r build
+
+  # Dedicated core-purity gate: packages/core must never import node:fs / node:os /
+  # node:path / net / http or any process/network lib. Runs the static check
+  # independently of the lint job so a lint-config regression can't hide a breach.
+  core-purity:
+    name: core purity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Assert core purity
+        run: node scripts/check-core-purity.mjs
+
+      - name: Assert formatting
+        run: pnpm format:check
+
+  # Docs build gate (S8.1): render the docs site and fail on any broken internal link,
+  # missing required page, or invalid hosted schema. The Pages deploy (docs.yml) reuses
+  # the same build, so a green docs job means the site is publishable.
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build docs (link-check + schema staging)
+        run: pnpm docs:build
+
+  # Database integration gate (S6.1): stand up the CI Supabase database from the same
+  # compose developers use, apply the migrations with the psql runner, and smoke-test the
+  # result (which also asserts the runner is idempotent). A broken migration fails here
+  # before it can reach the Coolify deployment.
+  db:
+    name: db integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start Supabase database
+        run: docker compose -f supabase/docker-compose.ci.yml up -d --wait
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:54322/postgres
+        run: bash supabase/scripts/migrate.sh
+
+      - name: Smoke test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:54322/postgres
+        run: bash supabase/scripts/smoke-test.sh
+
+      - name: RLS + immutability + reference-only tests
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:54322/postgres
+        run: bash supabase/scripts/test-rls.sh
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f supabase/docker-compose.ci.yml down -v

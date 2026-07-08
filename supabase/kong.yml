@@ -1,0 +1,32 @@
+# kong.yml (S6.1) — declarative API-gateway routes for the self-hosted stack. Fronts
+# GoTrue (auth), PostgREST (rest), and Realtime under one origin so the web app and CLI
+# talk to a single URL. Referenced by docker-compose.coolify.yml. No secrets here.
+_format_version: '2.1'
+
+services:
+  - name: auth
+    url: http://auth:9999/
+    routes:
+      - name: auth
+        strip_path: true
+        paths: ['/auth/v1']
+    plugins:
+      - name: cors
+
+  - name: rest
+    url: http://rest:3000/
+    routes:
+      - name: rest
+        strip_path: true
+        paths: ['/rest/v1']
+    plugins:
+      - name: cors
+
+  - name: realtime
+    url: http://realtime:4000/socket/
+    routes:
+      - name: realtime
+        strip_path: true
+        paths: ['/realtime/v1']
+    plugins:
+      - name: cors

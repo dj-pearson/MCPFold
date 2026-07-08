@@ -1,0 +1,40 @@
+{
+  "name": "@mcpfold/core",
+  "version": "0.0.0",
+  "description": "Pure, I/O-free engine for mcpfold: schema, resolution, drift diff, adapter/provider interfaces.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1",
+    "zod": "^3.24.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dj-pearson/MCPFold.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://mcpfold.com",
+  "bugs": {
+    "url": "https://github.com/dj-pearson/MCPFold/issues"
+  }
+}

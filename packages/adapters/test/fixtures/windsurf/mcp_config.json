@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "github": {
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://api.githubcopilot.com/mcp/",
+        "--header",
+        "Authorization: Bearer ${infisical:dev/mcp/GITHUB_PAT}"
+      ],
+      "command": "npx"
+    },
+    "playwright": {
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "command": "npx",
+      "env": {
+        "HEADLESS": "true"
+      }
+    }
+  }
+}
