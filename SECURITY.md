@@ -8,8 +8,7 @@ mcpfold manages MCP configuration that lives next to secrets, so we take reports
 
 - **GitHub private advisory** — the preferred path: open a draft advisory at
   <https://github.com/dj-pearson/MCPFold/security/advisories/new>.
-- **Email** — security@mcpfold.com (or the maintainer address listed on the repository
-  profile if that alias is not yet live).
+- **Email** — Dan Pearson <Dan@DanPearson.net>.
 
 Please include: affected version/commit, reproduction steps, and impact. We aim to
 acknowledge within 3 business days and to ship a fix or mitigation before any public
