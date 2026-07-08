@@ -3,6 +3,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Header, Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { ConfigEditor } from './editor/ConfigEditor';
+import { ProfileManager } from './profiles/ProfileManager';
 
 export function App() {
   return (
@@ -24,6 +25,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <ConfigEditor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profiles"
+            element={
+              <ProtectedRoute>
+                <ProfileManager />
               </ProtectedRoute>
             }
           />

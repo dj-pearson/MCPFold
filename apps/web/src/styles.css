@@ -164,6 +164,13 @@ select {
   color: var(--fg);
   font-size: 1rem;
 }
+.preview {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem 0;
+}
 
 .chips {
   list-style: none;

@@ -43,6 +43,7 @@ export function Header() {
       <nav className="nav">
         <Link to="/">Overview</Link>
         <Link to="/editor">Editor</Link>
+        <Link to="/profiles">Profiles</Link>
         <button className="link" onClick={() => void signOut()}>
           Sign out
         </button>
