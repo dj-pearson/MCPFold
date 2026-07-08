@@ -208,8 +208,8 @@ export async function pollDeviceAuth(
 
 /**
  * Step 4 — exchange a refresh token for a fresh access token. Rotation + reuse-detection
- * are hardened in S9.5; here the refresh token is validated, expiry/revocation checked, and
- * `last_used_at` recorded.
+ * are hardened in S9.5; here the presented refresh credential is looked up, its expiry and
+ * revocation are checked, and `last_used_at` is recorded.
  */
 export async function refreshSession(
   sql: Sql,

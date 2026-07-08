@@ -30,6 +30,7 @@ const NAV = [
   ['cli-contract.md', 'CLI contract'],
   ['offline-contract.md', 'Offline contract'],
   ['self-hosting.md', 'Self-hosting'],
+  ['security.md', 'Security'],
   ['ci.md', 'CI'],
 ];
 

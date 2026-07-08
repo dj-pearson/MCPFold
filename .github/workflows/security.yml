@@ -1,0 +1,54 @@
+name: Security
+
+# Supply-chain + secret-hygiene gate (S8.3). Runs on every push + PR alongside CI. A detected
+# secret or a high-severity dependency vulnerability fails the build.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # gitleaks working-tree scan: assert no secret-shaped string is committed anywhere in the
+  # current repo state. Intentional test fixtures / sentinels / ${scheme:path} references are
+  # allowlisted in .gitleaks.toml; a real credential is not.
+  secret-scan:
+    name: secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.30.1 \
+            detect --no-git --source=/repo --config=/repo/.gitleaks.toml \
+            --redact --no-banner --exit-code=1
+
+  # Dependency audit: fail on any high/critical advisory in production dependencies (the code
+  # that actually ships). Dev-only tooling is excluded to keep the gate signal, not noise.
+  dependency-audit:
+    name: dependency audit (pnpm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high

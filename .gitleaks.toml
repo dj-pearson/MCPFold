@@ -1,0 +1,35 @@
+# gitleaks configuration (S8.3). Extends the default ruleset and allowlists the intentional,
+# non-secret test data this repo commits: sentinel values used by the leak harness, obviously
+# fake provider tokens in tests/fixtures, ${scheme:path} secret REFERENCES (which are the whole
+# point of mcpfold — a reference is not a secret), and throwaway CI/test constants.
+#
+# A REAL leaked credential still fails the gate — the allowlist targets known fixtures only.
+
+title = "mcpfold"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Intentional non-secret test data, fixtures, and references"
+regexTarget = "match"
+paths = [
+  '''.*\.test\.ts$''',
+  '''.*/test/.*''',
+  '''.*/fixtures/.*''',
+  '''security/leak-harness\.ts''',
+  '''supabase/scripts/test-rls\.sh''',
+  '''supabase/\.env\.example''',
+  '''\.github/workflows/ci\.yml''',
+]
+regexes = [
+  # ${scheme:path} references are not secrets — they are mcpfold's core design.
+  '''\$\{[a-z0-9_-]+:[^}]*\}''',
+  # Leak-harness sentinels and obviously-fake fixture tokens.
+  '''SENTINEL[A-Za-z0-9]*''',
+  '''ghp_(SUPERSECRET|abcdef|ABCDEF|A)[A-Za-z0-9]*''',
+  '''github_pat_[A-Za-z0-9_]*''',
+  # Throwaway CI/test constant (documented, never a real secret).
+  '''test-jwt-secret-at-least-32-chars-long-000''',
+  '''postgres://postgres:postgres@''',
+]

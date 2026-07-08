@@ -1968,7 +1968,7 @@
       "epic": "E8",
       "order": 52,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S4.6",
         "S6.4",
