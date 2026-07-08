@@ -32,6 +32,7 @@ const NAV = [
   ['team-config-as-code.md', 'Team config-as-code'],
   ['offline-contract.md', 'Offline contract'],
   ['self-hosting.md', 'Self-hosting'],
+  ['site-hosting.md', 'Site hosting'],
   ['coolify-edge-service.md', 'Edge service'],
   ['security.md', 'Security'],
   ['security-at-rest.md', 'At-rest hardening'],

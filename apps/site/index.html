@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0d12" />
+
+    <!-- SEO baseline (S13.1) — the Seo component keeps these in sync per route on client nav. -->
+    <title>mcpfold — one config for every MCP client</title>
+    <meta
+      name="description"
+      content="Connect every MCP server without paying the context-window tax. One canonical config, folded out to every client, with secret references instead of hardcoded values."
+    />
+    <link rel="canonical" href="https://mcpfold.com/" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="mcpfold" />
+    <meta property="og:title" content="mcpfold — one config for every MCP client" />
+    <meta
+      property="og:description"
+      content="Connect every MCP server without paying the context-window tax."
+    />
+    <meta property="og:url" content="https://mcpfold.com/" />
+    <meta property="og:image" content="https://mcpfold.com/og.svg" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="mcpfold — one config for every MCP client" />
+    <meta
+      name="twitter:description"
+      content="Connect every MCP server without paying the context-window tax."
+    />
+    <meta name="twitter:image" content="https://mcpfold.com/og.svg" />
+
+    <!-- Privacy-friendly analytics (S13.1): cookieless, no PII. Enabled only when the site is
+         built with VITE_ANALYTICS_SRC + VITE_ANALYTICS_DOMAIN (see src/analytics.ts + docs). -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

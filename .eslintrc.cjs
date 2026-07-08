@@ -55,6 +55,7 @@ module.exports = {
     '**/fixtures/**',
     'services/edge/', // Deno service — linted/formatted by `deno lint` / `deno fmt`
     'apps/web/', // React app — typechecked by its own tsc; not covered by the core eslint config
+    'apps/site/', // marketing site — typechecked by its own tsc; not covered by the core eslint config
   ],
   rules: {
     '@typescript-eslint/no-unused-vars': [

@@ -18,6 +18,9 @@ coverage/
 apps/web/test-results/
 apps/web/playwright-report/
 apps/web/dist/
+apps/site/test-results/
+apps/site/playwright-report/
+apps/site/.lighthouseci/
 
 # Standalone binary build artifacts (S11.1)
 build/
