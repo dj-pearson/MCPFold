@@ -1,19 +1,45 @@
 import { Command } from 'commander';
-import { UsageError } from '@mcpfold/core';
 import { diagnose } from './commands/diagnose.js';
-import { runSync } from './commands/sync.js';
+import { runSync, runSyncWatch } from './commands/sync.js';
 import { runDiff } from './commands/diff.js';
 import { runInit } from './commands/init.js';
+import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
+import { runStatus } from './commands/status.js';
+import { runTest } from './commands/test.js';
+import { runRestore } from './commands/restore.js';
+import {
+  buildSpec,
+  completionScript,
+  completionValues,
+  SHELLS,
+  type Shell,
+} from './commands/completions.js';
+import {
+  defaultCachePath,
+  getUpdateNotice,
+  isNotifierEnabled,
+  isRefreshDue,
+  refreshUpdateCache,
+} from './update-notifier.js';
+import { spawn } from 'node:child_process';
 import { runImport } from './commands/import.js';
 import { runAdd } from './commands/add.js';
 import { runRun } from './commands/run.js';
 import { runMigrate } from './commands/migrate.js';
 import { scaffoldAdapter } from './commands/scaffold-adapter.js';
 import { runSecretSet, runSecretTest } from './commands/secret.js';
+import { runLogin } from './commands/login.js';
+import { runPush } from './commands/push.js';
+import { runPull } from './commands/pull.js';
+import { runTrust } from './commands/trust.js';
+import { httpCloudApi } from './cloud/api.js';
+import { osKeychainBackend } from './cloud/token-store.js';
+import { resolveEndpoint } from './cloud/session.js';
+import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { toEnvelopeError } from './output/envelope.js';
-import { runCommand, type Writer } from './output/render.js';
+import { processWriter, runCommand, type Writer } from './output/render.js';
 import { EXIT, type ExitCode } from './output/exit-codes.js';
 import { enableDebug } from './util/debug.js';
 import { CLI_VERSION } from './version.js';
@@ -101,13 +127,28 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     program
       .command('sync')
       .description('fold the canonical config out to client files, with backups')
-      .option(
-        '--check',
-        'exit nonzero if client files differ from canonical; write nothing',
-        false,
-      ),
-  ).action(async (opts: GlobalFlags) => {
+      .option('--check', 'exit nonzero if client files differ from canonical; write nothing', false)
+      .option('--watch', 're-fold automatically when the config changes (Ctrl-C to stop)', false),
+  ).action(async (opts: GlobalFlags & { check?: boolean; watch?: boolean }) => {
     const ctx = resolve(opts);
+    if (opts.watch) {
+      // Long-running: fold on change until a signal, then stop cleanly. (Not a --json command.)
+      const w = writer ?? processWriter;
+      await new Promise<void>((res) => {
+        const handle = runSyncWatch(
+          { cwd: ctx.cwd, profile: ctx.profile, dryRun: ctx.dryRun },
+          { write: (line) => w.out(`${line}\n`) },
+        );
+        const shutdown = () => {
+          handle.stop();
+          w.out('\nStopped watching.\n');
+          res();
+        };
+        process.once('SIGINT', shutdown);
+        process.once('SIGTERM', shutdown);
+      });
+      return;
+    }
     setExit(
       await runCommand(
         'sync',
@@ -139,9 +180,24 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     program
       .command('init')
       .description('scaffold mcp.config.jsonc and detect installed clients')
-      .option('-f, --force', 'overwrite an existing config', false),
-  ).action(async (opts: GlobalFlags & { force?: boolean }) => {
+      .option('-f, --force', 'overwrite an existing config', false)
+      .option('--guided', 'walk through detect → import → fix → sync → savings', false)
+      .option('--yes', 'accept all guided prompts (non-interactive / CI)', false),
+  ).action(async (opts: GlobalFlags & { force?: boolean; guided?: boolean; yes?: boolean }) => {
     const ctx = resolve(opts);
+    if (opts.guided) {
+      // Interactive golden path (not a --json command). Non-interactive with --yes or no TTY.
+      const w = writer ?? processWriter;
+      const prompt =
+        opts.yes || !process.stdin.isTTY
+          ? autoPrompter(opts.yes ? true : undefined)
+          : ttyPrompter();
+      await runGuided(
+        { cwd: ctx.cwd, dryRun: ctx.dryRun },
+        { prompt, write: (line) => w.out(`${line}\n`) },
+      );
+      return;
+    }
     setExit(
       await runCommand(
         'init',
@@ -175,6 +231,78 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     const ctx = resolve(opts);
     setExit(await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer));
   });
+
+  addGlobalFlags(
+    program
+      .command('status')
+      .description('at-a-glance health: detected clients, drift, config health, cloud state'),
+  ).action(async (opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('status', ctx.json, () => runStatus({ cwd: ctx.cwd }), writer));
+  });
+
+  addGlobalFlags(
+    program
+      .command('test [server]')
+      .description('connect to a server and confirm it initializes + lists tools'),
+  ).action(async (server: string | undefined, opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'test',
+        ctx.json,
+        () => runTest({ cwd: ctx.cwd, server, profile: ctx.profile }),
+        writer,
+      ),
+    );
+  });
+
+  program
+    .command('completions <shell>')
+    .description(`print a shell completion script (${SHELLS.join(' | ')})`)
+    .action((shell: string) => {
+      const w = writer ?? processWriter;
+      if (!(SHELLS as readonly string[]).includes(shell)) {
+        w.err(`Unknown shell "${shell}". Supported: ${SHELLS.join(', ')}.\n`);
+        setExit(EXIT.ERROR);
+        return;
+      }
+      w.out(completionScript(shell as Shell, buildSpec(program)));
+    });
+
+  // Hidden: emit dynamic completion candidates from the shell's current directory (the user's
+  // project) for the generated scripts to consume.
+  program.command('__complete <kind>', { hidden: true }).action((kind: string) => {
+    const w = writer ?? processWriter;
+    if (kind !== 'profiles' && kind !== 'servers') return;
+    for (const v of completionValues(kind, process.cwd())) w.out(`${v}\n`);
+  });
+
+  // Hidden: refresh the cached "latest version" in a detached background process (S11.3).
+  program.command('__refresh-update', { hidden: true }).action(async () => {
+    await refreshUpdateCache();
+  });
+
+  addGlobalFlags(
+    program
+      .command('restore [profile]')
+      .description('roll a client file back to a mcpfold backup')
+      .option('--list', 'list available backups without restoring', false)
+      .option('--at <timestamp>', 'restore a specific backup (default: the latest)'),
+  ).action(
+    async (profile: string | undefined, opts: GlobalFlags & { list?: boolean; at?: string }) => {
+      const ctx = resolve(opts);
+      setExit(
+        await runCommand(
+          'restore',
+          ctx.json,
+          () =>
+            runRestore({ cwd: ctx.cwd, profile, list: opts.list, at: opts.at, dryRun: ctx.dryRun }),
+          writer,
+        ),
+      );
+    },
+  );
 
   addGlobalFlags(
     program
@@ -244,28 +372,6 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     );
   });
 
-  // ---- Stubbed commands (implemented in later stories) ------------------------
-
-  const stub = (name: string, description: string, story: string): void => {
-    addGlobalFlags(program.command(name).description(description)).action(
-      async (opts: GlobalFlags) => {
-        const ctx = resolve(opts);
-        setExit(
-          await runCommand(
-            name,
-            ctx.json,
-            () => {
-              throw new UsageError(`\`mcpfold ${name}\` is not implemented yet (${story}).`, {
-                hint: 'Track progress in prd.json / ralph/PROGRESS.md.',
-              });
-            },
-            writer,
-          ),
-        );
-      },
-    );
-  };
-
   addGlobalFlags(
     program
       .command('scaffold-adapter')
@@ -332,9 +438,93 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     },
   );
 
-  stub('login', 'authenticate to the mcpfold cloud (device-code OAuth)', 'S6.6');
-  stub('push', 'push the canonical config to the cloud', 'S6.6');
-  stub('pull', 'pull the canonical config from the cloud', 'S6.6');
+  // ---- Config-as-code trust (S9.2) --------------------------------------------
+  addGlobalFlags(
+    program
+      .command('trust')
+      .description('approve new or changed server launch commands (config-as-code TOFU)')
+      .argument('[name]', 'a single server to trust; omit to trust all untrusted'),
+  ).action(async (name: string | undefined, opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('trust', ctx.json, () => runTrust({ cwd: ctx.cwd, name }), writer));
+  });
+
+  // ---- Cloud sync: login / push / pull (S6.6) ---------------------------------
+  const outWrite = (text: string): void =>
+    (writer?.out ?? ((t: string) => process.stdout.write(t)))(text);
+
+  addGlobalFlags(
+    program.command('login').description('authenticate to the mcpfold cloud (device-code OAuth)'),
+  ).action(async (opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    const endpoint = resolveEndpoint();
+    setExit(
+      await runCommand(
+        'login',
+        ctx.json,
+        () =>
+          runLogin({
+            api: httpCloudApi(endpoint),
+            backend: osKeychainBackend(),
+            endpoint,
+            machineName: hostname(),
+            print: (m) => outWrite(`${m}\n`),
+          }),
+        writer,
+      ),
+    );
+  });
+
+  addGlobalFlags(
+    program
+      .command('push')
+      .description('push the canonical config to the cloud (refs only, new version)')
+      .option('--team <id>', 'push to a team config instead of your personal one'),
+  ).action(async (opts: GlobalFlags & { team?: string }) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'push',
+        ctx.json,
+        () =>
+          runPush({
+            cwd: ctx.cwd,
+            api: httpCloudApi(resolveEndpoint()),
+            backend: osKeychainBackend(),
+            machineName: hostname(),
+            teamId: opts.team,
+          }),
+        writer,
+      ),
+    );
+  });
+
+  addGlobalFlags(
+    program
+      .command('pull')
+      .description('pull the canonical config from the cloud and diff/apply it')
+      .option('--yes', 'apply the pulled config without confirmation', false)
+      .option('--team <id>', 'pull a team config instead of your personal one')
+      .option('--config-version <n>', 'pull a specific version instead of the latest'),
+  ).action(async (opts: GlobalFlags & { yes?: boolean; team?: string; configVersion?: string }) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'pull',
+        ctx.json,
+        () =>
+          runPull({
+            cwd: ctx.cwd,
+            api: httpCloudApi(resolveEndpoint()),
+            backend: osKeychainBackend(),
+            yes: opts.yes,
+            teamId: opts.team,
+            version: opts.configVersion !== undefined ? Number(opts.configVersion) : undefined,
+          }),
+        writer,
+      ),
+    );
+  });
 
   return { program, getExitCode: () => exitCode };
 }
@@ -356,6 +546,33 @@ export async function run(argv: string[], writer?: Writer): Promise<ExitCode> {
     }
     // Unknown command / missing argument / bad option → commander already printed guidance.
     return EXIT.ERROR;
+  } finally {
+    maybeNotifyUpdate(argv[0], writer ?? processWriter);
   }
   return getExitCode();
+}
+
+/**
+ * Non-blocking update notice (S11.3): print the cached notice to stderr, then kick off a detached
+ * background refresh so the check never delays the command. Best-effort — never throws, never runs
+ * for machine-facing commands, and (via isNotifierEnabled) never runs in CI / non-TTY.
+ */
+function maybeNotifyUpdate(command: string | undefined, w: Writer): void {
+  try {
+    if (!command || command.startsWith('__') || command === 'completions') return;
+    const notice = getUpdateNotice({ currentVersion: CLI_VERSION });
+    if (notice) w.err(`${notice}\n`);
+
+    if (!isNotifierEnabled(process.env, Boolean(process.stdout.isTTY))) return;
+    if (!isRefreshDue(defaultCachePath(), new Date())) return;
+    const bin = process.argv[1];
+    if (!bin) return;
+    const child = spawn(process.execPath, [bin, '__refresh-update'], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+  } catch {
+    // an update check must never affect the command
+  }
 }

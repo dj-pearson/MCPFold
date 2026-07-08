@@ -1,0 +1,74 @@
+name: Site
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/site/**', '.github/workflows/site.yml']
+  pull_request:
+    paths: ['apps/site/**', '.github/workflows/site.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Build + Playwright + a Lighthouse performance/accessibility budget on every PR.
+  build:
+    name: build + budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mcpfold/site build
+      - name: Build docs (unified shell + search) so the docs e2e can run
+        run: pnpm docs:build
+      - name: Playwright e2e (homepage, theme, SEO, docs)
+        run: |
+          pnpm --filter @mcpfold/site exec playwright install --with-deps chromium
+          pnpm --filter @mcpfold/site e2e
+      - name: Prerender e2e (SSG content + JSON-LD + hydration, S15.1)
+        run: pnpm --filter @mcpfold/site e2e:prerender
+      - name: Lighthouse budget (perf + a11y thresholds)
+        run: npx --yes @lhci/cli@0.14.x autorun --config=apps/site/lighthouserc.json
+
+  # Deploy the built site to Cloudflare Pages: production on main, a preview URL per PR.
+  # Gated on the Cloudflare secrets — skipped (not failed) until they're configured.
+  deploy:
+    name: deploy (Cloudflare Pages)
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mcpfold/site build
+      - name: Mount docs under /docs (unified site, S13.4)
+        run: |
+          pnpm docs:build
+          cp -r dist-docs apps/site/dist/docs
+      - name: Publish to Cloudflare Pages
+        # NEEDS (user, one-time): CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID repo secrets and a
+        # `mcpfold-site` Pages project. Until set, this step is skipped rather than failing the run.
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/site/dist --project-name=mcpfold-site

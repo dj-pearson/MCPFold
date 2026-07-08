@@ -1,0 +1,10 @@
+{
+  "client": "cline",
+  "source": {
+    "type": "captured",
+    "capturedAt": "2026-07-08"
+  },
+  "rootKeys": ["mcpServers"],
+  "serverContainer": "mcpServers",
+  "entryKeys": ["args", "command", "env", "url"]
+}

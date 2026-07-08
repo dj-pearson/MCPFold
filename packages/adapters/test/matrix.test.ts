@@ -14,6 +14,8 @@ import { claudeCodeAdapter } from '../src/claude-code.js';
 import { vscodeAdapter } from '../src/vscode.js';
 import { windsurfAdapter } from '../src/windsurf.js';
 import { zedAdapter } from '../src/zed.js';
+import { clineAdapter } from '../src/cline.js';
+import { geminiCliAdapter } from '../src/gemini-cli.js';
 
 /**
  * Cross-adapter fixture harness (S2.8). A single canonical fixture is folded through every
@@ -44,6 +46,8 @@ const ADAPTERS: { adapter: ClientAdapter; golden: string }[] = [
   { adapter: vscodeAdapter, golden: 'fixtures/matrix/vscode.json' },
   { adapter: windsurfAdapter, golden: 'fixtures/matrix/windsurf.json' },
   { adapter: zedAdapter, golden: 'fixtures/matrix/zed.json' },
+  { adapter: clineAdapter, golden: 'fixtures/matrix/cline.json' },
+  { adapter: geminiCliAdapter, golden: 'fixtures/matrix/gemini-cli.json' },
 ];
 
 describe('cross-adapter matrix (S2.8)', () => {
@@ -72,7 +76,7 @@ describe('cross-adapter matrix (S2.8)', () => {
     });
   }
 
-  it('covers all six adapters', () => {
-    expect(ADAPTERS).toHaveLength(6);
+  it('covers every registered adapter', () => {
+    expect(ADAPTERS).toHaveLength(8);
   });
 });

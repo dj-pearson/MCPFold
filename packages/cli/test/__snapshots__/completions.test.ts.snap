@@ -1,0 +1,107 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`completion scripts (S11.2) > generates a stable bash script from the command tree 1`] = `
+"# bash completion for mcpfold — eval "$(mcpfold completions bash)"
+_mcpfold_complete() {
+  local cur prev
+  cur="\${COMP_WORDS[COMP_CWORD]}"
+  prev="\${COMP_WORDS[COMP_CWORD-1]}"
+  local commands="diagnose sync diff init import doctor status test completions restore migrate run secret scaffold-adapter add trust login push pull"
+  local flags="--at --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --package --pin --profile --tag --team --token-ref --transport --url --version --watch --yes"
+  case "$prev" in
+    -p|--profile) COMPREPLY=( $(compgen -W "$(mcpfold __complete profiles 2>/dev/null)" -- "$cur") ); return;;
+    test|restore) COMPREPLY=( $(compgen -W "$(mcpfold __complete servers 2>/dev/null)" -- "$cur") ); return;;
+  esac
+  if [[ "$cur" == -* ]]; then
+    COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+  else
+    COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
+  fi
+}
+complete -F _mcpfold_complete mcpfold mcpf
+"
+`;
+
+exports[`completion scripts (S11.2) > generates a stable fish script from the command tree 1`] = `
+"# fish completion for mcpfold — mcpfold completions fish > ~/.config/fish/completions/mcpfold.fish
+function __mcpfold_no_subcommand
+  set -l cmd (commandline -opc)
+  test (count $cmd) -eq 1
+end
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'diagnose' -d 'print a redaction-safe diagnostic bundle for bug reports'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'sync' -d 'fold the canonical config out to client files, with backups'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'diff' -d 'show drift between the canonical config and on-disk client files'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'init' -d 'scaffold mcp.config.jsonc and detect installed clients'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'import' -d 'adopt existing client configs into the canonical file'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'doctor' -d 'validate config and catch silent failures'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'status' -d 'at-a-glance health: detected clients, drift, config health, cloud state'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'test' -d 'connect to a server and confirm it initializes + lists tools'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'completions' -d 'print a shell completion script (bash | zsh | fish | pwsh)'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'restore' -d 'roll a client file back to a mcpfold backup'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'migrate' -d 'upgrade an outdated mcp.config.jsonc to the current schema version'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'run' -d 'internal shim launcher (resolve secrets, inject, exec the server)'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'secret' -d 'wire up and verify secret providers'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'scaffold-adapter' -d 'generate a new client adapter module + test (contributor on-ramp)'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'add' -d 'add a server by URL or npm package (guided or scripted)'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'trust' -d 'approve new or changed server launch commands (config-as-code TOFU)'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'login' -d 'authenticate to the mcpfold cloud (device-code OAuth)'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'push' -d 'push the canonical config to the cloud (refs only, new version)'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'pull' -d 'pull the canonical config from the cloud and diff/apply it'
+complete -c mcpfold -l profile -x -a '(mcpfold __complete profiles)'
+complete -c mcpfold -n '__fish_seen_subcommand_from test restore' -x -a '(mcpfold __complete servers)'
+"
+`;
+
+exports[`completion scripts (S11.2) > generates a stable pwsh script from the command tree 1`] = `
+"# PowerShell completion for mcpfold — mcpfold completions pwsh | Out-String | Invoke-Expression
+Register-ArgumentCompleter -Native -CommandName mcpfold,mcpf -ScriptBlock {
+  param($wordToComplete, $commandAst, $cursorPosition)
+  $commands = @('diagnose','sync','diff','init','import','doctor','status','test','completions','restore','migrate','run','secret','scaffold-adapter','add','trust','login','push','pull')
+  $flags = @('--at','--auth-type','--check','--config','--config-version','--cwd','--debug','--dry-run','--force','--guided','--help','--json','--list','--package','--pin','--profile','--tag','--team','--token-ref','--transport','--url','--version','--watch','--yes')
+  $candidates = if ($wordToComplete -like '-*') { $flags } else { $commands }
+  $candidates | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+    [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+  }
+}
+"
+`;
+
+exports[`completion scripts (S11.2) > generates a stable zsh script from the command tree 1`] = `
+"#compdef mcpfold mcpf
+# zsh completion for mcpfold — add to your fpath, or: mcpfold completions zsh > ~/.zsh/_mcpfold
+_mcpfold() {
+  local -a commands
+  commands=(
+    'diagnose:print a redaction-safe diagnostic bundle for bug reports'
+    'sync:fold the canonical config out to client files, with backups'
+    'diff:show drift between the canonical config and on-disk client files'
+    'init:scaffold mcp.config.jsonc and detect installed clients'
+    'import:adopt existing client configs into the canonical file'
+    'doctor:validate config and catch silent failures'
+    'status:at-a-glance health: detected clients, drift, config health, cloud state'
+    'test:connect to a server and confirm it initializes + lists tools'
+    'completions:print a shell completion script (bash | zsh | fish | pwsh)'
+    'restore:roll a client file back to a mcpfold backup'
+    'migrate:upgrade an outdated mcp.config.jsonc to the current schema version'
+    'run:internal shim launcher (resolve secrets, inject, exec the server)'
+    'secret:wire up and verify secret providers'
+    'scaffold-adapter:generate a new client adapter module + test (contributor on-ramp)'
+    'add:add a server by URL or npm package (guided or scripted)'
+    'trust:approve new or changed server launch commands (config-as-code TOFU)'
+    'login:authenticate to the mcpfold cloud (device-code OAuth)'
+    'push:push the canonical config to the cloud (refs only, new version)'
+    'pull:pull the canonical config from the cloud and diff/apply it'
+  )
+  _arguments -C '1:command:->cmds' '*::options:->opts'
+  case $state in
+    cmds) _describe 'command' commands ;;
+    opts)
+      case $words[1] in
+        test|restore) compadd $(mcpfold __complete servers 2>/dev/null) ;;
+        *) compadd --at --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --package --pin --profile --tag --team --token-ref --transport --url --version --watch --yes ;;
+      esac ;;
+  esac
+}
+compdef _mcpfold mcpfold mcpf
+"
+`;

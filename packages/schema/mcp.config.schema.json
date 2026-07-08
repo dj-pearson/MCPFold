@@ -79,6 +79,9 @@
               "pin": {
                 "type": "string"
               },
+              "integrity": {
+                "type": "string"
+              },
               "tools": {
                 "type": "object",
                 "properties": {
@@ -129,7 +132,9 @@
                   "cursor",
                   "vscode",
                   "windsurf",
-                  "zed"
+                  "zed",
+                  "cline",
+                  "gemini-cli"
                 ]
               },
               "scope": {

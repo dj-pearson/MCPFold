@@ -109,6 +109,24 @@ jobs:
       - name: Build docs (link-check + schema staging)
         run: pnpm docs:build
 
+      # Deployment bootstrap (S8.5): the runbook's env matrix must stay in sync with the real
+      # sources, and the secret-minting script must be shellcheck-clean.
+      - name: Deployment env matrix in sync
+        run: node scripts/check-deploy-env.mjs
+      - name: shellcheck the cloud-env bootstrap script
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck scripts/gen-cloud-env.sh
+
+      # Terminal demo (S11.4): rebuild the CLI, regenerate the recording from the real CLI, and
+      # fail if the committed cast/SVG drifted — so the demo can never lie about actual output.
+      - name: Build workspace (for demo recorder)
+        run: pnpm -r build
+      - name: Demo is up to date (no drift from real CLI)
+        run: |
+          pnpm demo:record
+          git diff --exit-code demo/mcpfold.cast docs/assets/demo.svg apps/site/public/demo.svg
+
   # Database integration gate (S6.1): stand up the CI Supabase database from the same
   # compose developers use, apply the migrations with the psql runner, and smoke-test the
   # result (which also asserts the runner is idempotent). A broken migration fails here
@@ -137,6 +155,78 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost:54322/postgres
         run: bash supabase/scripts/test-rls.sh
 
+      # Edge functions are Deno (services/edge), outside the pnpm workspace. Their unit tests
+      # (crypto/JWT) plus the device-code auth integration test (S6.3) run against the same
+      # live database the migrations were applied to.
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Edge function tests (device-code auth)
+        working-directory: services/edge
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:54322/postgres
+          JWT_SECRET: test-jwt-secret-at-least-32-chars-long-000
+        run: deno test --allow-net --allow-env
+
+      # Encrypted-backup encrypt→restore round-trip (S9.4). Runs the pg client inside the DB
+      # container so pg_dump matches the server version.
+      - name: Encrypted backup round-trip
+        run: |
+          CID=$(docker compose -f supabase/docker-compose.ci.yml ps -q db)
+          MCPFOLD_PG_CONTAINER="$CID" bash supabase/backup/test-backup.sh
+
       - name: Tear down
         if: always()
         run: docker compose -f supabase/docker-compose.ci.yml down -v
+
+  # Side edge service container (S6.5): build the Deno image, stand it up with Postgres via
+  # docker-compose, and prove the JWT/RLS contract over HTTP (health + unauth-rejected +
+  # authenticated push/pull round-trip) before it can ship.
+  edge-container:
+    name: edge container (side service)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Container smoke (build + health + auth push/pull)
+        run: bash services/edge/scripts/container-smoke.sh
+
+  # Web console e2e (S7.1): Playwright drives the login flow + gated-route redirect against a Vite
+  # dev server with mock auth (VITE_E2E=1) — no live Supabase needed.
+  web-e2e:
+    name: web e2e (playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The dev server imports @mcpfold/core, so build it first.
+      - name: Build core
+        run: pnpm --filter @mcpfold/core build
+
+      - name: Install Playwright browser
+        run: pnpm --filter @mcpfold/web exec playwright install --with-deps chromium
+
+      - name: Run web e2e
+        run: pnpm --filter @mcpfold/web e2e

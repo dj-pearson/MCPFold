@@ -1,0 +1,85 @@
+import { expect, test } from '@playwright/test';
+
+/**
+ * S15.1 — true SSG. Proves every marketing route serves its real content and structured data in the
+ * initial HTML (no JS), and that the same HTML hydrates cleanly. Runs against `vite preview` (the
+ * built dist/), see playwright.prerender.config.ts.
+ */
+
+// A no-JS fetch: page.request.get returns the raw served HTML without executing any script.
+async function rawHtml(request: import('@playwright/test').APIRequestContext, path: string) {
+  const res = await request.get(path);
+  expect(res.status(), `GET ${path}`).toBe(200);
+  return res.text();
+}
+
+function jsonLdBlocks(html: string): Array<Record<string, unknown>> {
+  const blocks: Array<Record<string, unknown>> = [];
+  const re = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) blocks.push(JSON.parse(m[1]!));
+  return blocks;
+}
+
+test('homepage: real content + SoftwareApplication JSON-LD in no-JS HTML', async ({ request }) => {
+  const html = await rawHtml(request, '/');
+  // Hero/body text is present without running JS (rendered at build time).
+  expect(html).toContain('one config for every MCP client');
+  expect(html).toContain('<title>mcpfold — one config for every MCP client</title>');
+  // The React root is NOT an empty shell.
+  expect(html).not.toMatch(/<div id="root"><\/div>/);
+
+  const blocks = jsonLdBlocks(html);
+  const app = blocks.find((b) => b['@type'] === 'SoftwareApplication');
+  expect(app, 'SoftwareApplication JSON-LD').toBeTruthy();
+  expect(app!['@context']).toBe('https://schema.org');
+  expect(app!.name).toBe('mcpfold');
+});
+
+test('/directory: heading + ItemList JSON-LD in no-JS HTML', async ({ request }) => {
+  const html = await rawHtml(request, '/directory');
+  expect(html).toContain('MCP server directory');
+
+  const list = jsonLdBlocks(html).find((b) => b['@type'] === 'ItemList');
+  expect(list, 'ItemList JSON-LD').toBeTruthy();
+  const items = list!.itemListElement as Array<Record<string, unknown>>;
+  expect(Array.isArray(items)).toBe(true);
+  expect(items.length).toBeGreaterThan(0);
+  expect(items[0]!['@type']).toBe('ListItem');
+  expect(items[0]!.position).toBe(1);
+});
+
+test('/directory/:id: entry content + BreadcrumbList JSON-LD in no-JS HTML', async ({
+  request,
+}) => {
+  const html = await rawHtml(request, '/directory/filesystem');
+  // The entry's own name is server-rendered (not just a client-side lookup).
+  expect(html.toLowerCase()).toContain('filesystem');
+  expect(html).toContain('MCP server · mcpfold');
+
+  const crumb = jsonLdBlocks(html).find((b) => b['@type'] === 'BreadcrumbList');
+  expect(crumb, 'BreadcrumbList JSON-LD').toBeTruthy();
+  const trail = crumb!.itemListElement as Array<Record<string, unknown>>;
+  expect(trail[0]!.name).toBe('Directory');
+  expect(String(trail[1]!.item)).toContain('/directory/filesystem');
+});
+
+test('prerendered pages hydrate with no console errors or mismatch warnings', async ({ page }) => {
+  const problems: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error' || msg.type() === 'warning') problems.push(msg.text());
+  });
+  page.on('pageerror', (err) => problems.push(String(err)));
+
+  for (const path of ['/', '/directory', '/directory/filesystem', '/install']) {
+    await page.goto(path);
+    // Wait for hydration to attach (an interactive control from the shared header).
+    await expect(page.getByTestId('theme-toggle')).toBeVisible();
+  }
+
+  const hydrationIssues = problems.filter(
+    (t) => /hydrat/i.test(t) || /did not match/i.test(t) || /server rendered/i.test(t),
+  );
+  expect(hydrationIssues, `hydration issues:\n${hydrationIssues.join('\n')}`).toEqual([]);
+  expect(problems, `console problems:\n${problems.join('\n')}`).toEqual([]);
+});

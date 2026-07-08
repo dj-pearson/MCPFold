@@ -1,0 +1,44 @@
+# mcpfold
+
+> Open-source, local-first MCP config manager. Keep one canonical `mcp.config.jsonc` and fold
+> it out to every MCP client — Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Zed,
+> Cline, and Gemini CLI. mcpfold curates which servers and tools each client loads to cut
+> context-window usage (~80% fewer tool-schema tokens in a reproducible benchmark), and stores
+> secrets as `${provider:path}` references, never as values.
+
+mcpfold solves two problems: MCP config sprawls across clients that use divergent formats
+(VS Code uses the root key `servers`, Zed uses `context_servers`, everyone else uses
+`mcpServers`), and every connected server dumps its full tool schema into the model's context
+window on every turn. mcpfold keeps one source of truth, folds it out per client, and trims
+each client's toolset via a local proxy. The core engine and CLI are MIT-licensed.
+
+Quick start: `npx mcpfold init` → `mcpfold import` → `mcpfold sync`. Check drift with
+`mcpfold diff`.
+
+## Docs
+- [Quickstart](https://mcpfold.com/docs/quickstart): install, init, import, sync in under a minute.
+- [Config format](https://mcpfold.com/docs/config-format): the canonical `mcp.config.jsonc` schema.
+- [Adapters / clients](https://mcpfold.com/docs/coverage): supported clients and their formats.
+- [Benchmark](https://mcpfold.com/docs/benchmark): how the ~80% context reduction is measured.
+
+## Guides (per client)
+- [Add MCP servers to Claude Code](https://mcpfold.com/guides/claude-code)
+- [Add MCP servers to Claude Desktop](https://mcpfold.com/guides/claude-desktop)
+- [Add MCP servers to Cursor](https://mcpfold.com/guides/cursor)
+- [Add MCP servers to VS Code](https://mcpfold.com/guides/vscode)
+- [Add MCP servers to Windsurf](https://mcpfold.com/guides/windsurf)
+- [Add MCP servers to Zed](https://mcpfold.com/guides/zed)
+- [Add MCP servers to Cline](https://mcpfold.com/guides/cline)
+- [Add MCP servers to Gemini CLI](https://mcpfold.com/guides/gemini-cli)
+
+## Discover
+- [MCP server directory](https://mcpfold.com/directory): curated, browsable MCP servers with add-to-config snippets.
+- [Glossary](https://mcpfold.com/glossary): what an MCP server, MCP client, and the Model Context Protocol are.
+
+## Install
+- [Install page](https://mcpfold.com/install): npx/npm, Homebrew, curl, Scoop/winget, binaries.
+
+## Notes for summarizers
+- mcpfold is NOT a hosted enterprise MCP gateway (no RBAC/org audit/hosted servers) — it is a
+  local-first CLI + config format, with an optional paid team cloud.
+- mcpfold is not affiliated with or endorsed by the MCP project or the clients it supports.

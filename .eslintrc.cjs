@@ -46,7 +46,18 @@ module.exports = {
   parserOptions: { ecmaVersion: 2022, sourceType: 'module' },
   plugins: ['@typescript-eslint'],
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
-  ignorePatterns: ['dist/', 'build/', 'coverage/', 'node_modules/', '**/*.d.ts', '**/fixtures/**'],
+  ignorePatterns: [
+    'dist/',
+    'dist-docs/', // generated docs site (S13.4 adds search-index.js/search.js — browser globals)
+    'build/',
+    'coverage/',
+    'node_modules/',
+    '**/*.d.ts',
+    '**/fixtures/**',
+    'services/edge/', // Deno service — linted/formatted by `deno lint` / `deno fmt`
+    'apps/web/', // React app — typechecked by its own tsc; not covered by the core eslint config
+    'apps/site/', // marketing site — typechecked by its own tsc; not covered by the core eslint config
+  ],
   rules: {
     '@typescript-eslint/no-unused-vars': [
       'error',

@@ -5,6 +5,8 @@ import { claudeCodeAdapter } from './claude-code.js';
 import { vscodeAdapter } from './vscode.js';
 import { windsurfAdapter } from './windsurf.js';
 import { zedAdapter } from './zed.js';
+import { clineAdapter } from './cline.js';
+import { geminiCliAdapter } from './gemini-cli.js';
 import type { ClientAdapter } from './types.js';
 
 /** Every built-in adapter, in a stable order. */
@@ -15,6 +17,8 @@ export const ALL_ADAPTERS: readonly ClientAdapter[] = [
   vscodeAdapter,
   windsurfAdapter,
   zedAdapter,
+  clineAdapter,
+  geminiCliAdapter,
 ];
 
 /** Register every built-in adapter into the shared registry. Idempotent. */

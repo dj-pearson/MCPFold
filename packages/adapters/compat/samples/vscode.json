@@ -1,0 +1,10 @@
+{
+  "client": "vscode",
+  "source": {
+    "type": "captured",
+    "capturedAt": "2026-07-08"
+  },
+  "rootKeys": ["inputs", "servers"],
+  "serverContainer": "servers",
+  "entryKeys": ["args", "command", "env", "headers", "type", "url"]
+}

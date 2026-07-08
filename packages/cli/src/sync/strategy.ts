@@ -33,6 +33,17 @@ function hasSecrets(server: ResolvedServer): boolean {
   return findSecretRefs(server).length > 0;
 }
 
+/**
+ * Supply-chain hygiene (S8.3): when a server declares a `pin`, rewrite `@latest` to the
+ * pinned version AT FOLD TIME, so every rendered client file launches a fixed version — not
+ * whatever `@latest` resolves to at run time (the April-2026 unpinned-stdio RCE lesson). The
+ * shim path applies the same rewrite at launch (run.ts); this covers directly-rendered servers.
+ */
+function applyPinAtFold(server: ResolvedServer): ResolvedServer {
+  if (!server.pin || !server.args) return server;
+  return { ...server, args: server.args.map((a) => a.replace(/@latest$/, `@${server.pin}`)) };
+}
+
 /** Rewrite a server's launch to the shim: `mcpfold run <name>` (no secret on disk). */
 function toShim(server: ResolvedServer): ResolvedServer {
   return {
@@ -83,22 +94,24 @@ export async function renderWithStrategy(
   options: StrategyOptions = {},
 ): Promise<RenderedFile> {
   const ctx = options.osContext ?? realOsContext();
+  // Pin @latest → the fixed version at fold time, before any strategy transform.
+  const pinned = servers.map(applyPinAtFold);
 
   if (adapter.secretStrategy === 'shim') {
-    const transformed = servers.map((s) => (hasSecrets(s) ? toShim(s) : s));
+    const transformed = pinned.map((s) => (hasSecrets(s) ? toShim(s) : s));
     return adapter.render(transformed, ctx);
   }
 
   if (adapter.secretStrategy === 'native-input') {
     // The adapter itself emits the client's secret indirection — never a raw token.
-    return adapter.render(servers, ctx);
+    return adapter.render(pinned, ctx);
   }
 
   // inline
   if (!options.resolve) {
     throw new Error('inline strategy requires a secret resolver (providers) to be supplied.');
   }
-  const resolved = (await options.resolve(servers)).map(toInline);
+  const resolved = (await options.resolve(pinned)).map(toInline);
   const file = adapter.render(resolved, ctx);
   const gitignored = (options.isGitignored ?? defaultGitignored)(file.path);
   if (!gitignored) {

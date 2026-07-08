@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
 
 concurrency:
   group: release-${{ github.workflow }}-${{ github.ref }}
@@ -26,10 +29,17 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
+      - name: Version parity across install channels (npm/homebrew/scoop)
+        run: pnpm check:version-parity
       - name: publint (publish-readiness lint)
         run: pnpm --filter "./packages/*" exec publint
       - name: Dry-run publish (no registry writes)
         run: pnpm -r publish --dry-run --no-git-checks
+      # Post-install smoke (S8.4): pack every publishable package, install the tarballs into a
+      # clean project, and run the published `mcpfold` binary through init → doctor → sync. This
+      # catches a broken bin path / missing `files` entry / bad dep version before it hits npm.
+      - name: Post-install smoke test
+        run: node scripts/pack-smoke.mjs
 
   # Publish on merge to main: Changesets opens/updates a "Version Packages" PR, and when that
   # PR merges (bumped versions, no pending changesets) it publishes to npm with provenance.
@@ -65,3 +75,38 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
+
+  # Standalone binaries (S11.1): on a published GitHub Release, build a native binary for every
+  # OS/arch (pkg cross-compiles from one runner), checksum each, and attach them to the release —
+  # the source the curl|sh installer, Homebrew formula, and Scoop manifest all download from.
+  binaries:
+    name: standalone binaries
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - name: Build standalone binaries + checksums
+        run: pnpm build:binaries
+      - name: Attach binaries to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/mcpfold-*-*
+            build/mcpfold-*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # NEEDS (user, one-time): a HOMEBREW_TAP_TOKEN + a dj-pearson/homebrew-tap repo and a
+      # dj-pearson/scoop-bucket repo, then a step here to bump + push packaging/homebrew/mcpfold.rb
+      # and packaging/scoop/mcpfold.json (version + sha256) to them so `brew`/`scoop` auto-update.

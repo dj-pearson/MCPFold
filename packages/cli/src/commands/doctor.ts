@@ -7,6 +7,7 @@ import { Redactor } from '../util/redact.js';
 import { checkClientFiles } from '../checks/clients.js';
 import {
   checkHardcodedSecrets,
+  checkPinIntegrity,
   checkSecretSchemes,
   checkUnpinnedLatest,
 } from '../checks/servers.js';
@@ -56,6 +57,7 @@ export function runDoctor(options: DoctorOptions): CommandOutput<DoctorData> {
     if (result.ok) {
       const config = result.config;
       findings.push(...checkUnpinnedLatest(config, configPath));
+      findings.push(...checkPinIntegrity(config, configPath));
       findings.push(...checkHardcodedSecrets(config, configPath));
       findings.push(...checkSecretSchemes(config, configPath));
       findings.push(...checkClientFiles(config, ctx));

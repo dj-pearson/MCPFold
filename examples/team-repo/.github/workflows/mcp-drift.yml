@@ -1,0 +1,24 @@
+# MCP config drift gate (S12.1) — copy this into your own repo.
+#
+# Fails the build when the committed editor configs (.vscode/mcp.json, .cursor/mcp.json) no longer
+# match the canonical mcp.config.jsonc — i.e. someone edited a client file by hand, or changed the
+# canonical config without re-folding. Keeps every teammate's MCP setup identical, no backend.
+name: MCP config drift
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # `sync --check` writes nothing and exits non-zero on any drift (the CI gate).
+      # It never resolves secret values, so no tokens are needed here.
+      - name: Check MCP configs are in sync with mcp.config.jsonc
+        run: npx --yes mcpfold sync --check

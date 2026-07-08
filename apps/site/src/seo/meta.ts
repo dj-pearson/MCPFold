@@ -1,0 +1,107 @@
+import { DIRECTORY } from '@mcpfold/core';
+import { POSTS } from '../blog/posts';
+
+/**
+ * Single source of truth for per-route <title>/description/canonical (S15.1).
+ *
+ * Both the runtime <RouteHead> (SPA navigation) and the build-time prerender (scripts/prerender.mjs)
+ * resolve meta through this one function, so there is no divergence between what a crawler sees in
+ * the initial HTML and what the hydrated app renders. `path` is a pathname without query/hash.
+ */
+export const SITE_URL = 'https://mcpfold.com';
+
+export interface RouteMeta {
+  title: string;
+  description: string;
+  /** Absolute canonical URL. */
+  canonical: string;
+}
+
+const HOME_DESC =
+  'Connect every MCP server without paying the context-window tax. One canonical config, folded out to every client, with secret references instead of hardcoded values.';
+
+function meta(title: string, description: string, path: string): RouteMeta {
+  return { title, description, canonical: `${SITE_URL}${path}` };
+}
+
+/** Resolve the canonical <title>/description/canonical for a pathname. Never throws. */
+export function resolveMeta(path: string): RouteMeta {
+  // Normalize a trailing slash (except the root) so "/install/" and "/install" agree.
+  const p = path !== '/' && path.endsWith('/') ? path.slice(0, -1) : path;
+
+  if (p === '/') {
+    return meta('mcpfold — one config for every MCP client', HOME_DESC, '/');
+  }
+  if (p === '/install') {
+    return meta(
+      'Install mcpfold — every channel, one copy-paste',
+      'Install mcpfold via npx, npm, Homebrew, curl | sh, Scoop, winget, or a standalone binary — then init, import, and sync.',
+      '/install',
+    );
+  }
+  if (p === '/directory') {
+    return meta(
+      'MCP server directory — browse and add servers',
+      'Browse a curated directory of MCP servers and add any of them to your config in one command. A neutral, community-maintained list.',
+      '/directory',
+    );
+  }
+  if (p.startsWith('/directory/')) {
+    const id = p.slice('/directory/'.length);
+    const entry = DIRECTORY.find((e) => e.id === id);
+    if (entry) {
+      return meta(
+        `${entry.name} — MCP server · mcpfold`,
+        entry.description,
+        `/directory/${entry.id}`,
+      );
+    }
+    return meta('Server not found — mcpfold directory', 'No such server.', p);
+  }
+  if (p === '/pricing') {
+    return meta(
+      'Pricing — mcpfold',
+      'The CLI and everything local is free forever and MIT-licensed. The hosted team cloud — shared configs, audit trail, sync — is the paid surface. Self-host it yourself for free.',
+      '/pricing',
+    );
+  }
+  if (p === '/blog') {
+    return meta(
+      'Blog — mcpfold',
+      'Launches, deep-dives, and release notes from the mcpfold project.',
+      '/blog',
+    );
+  }
+  if (p.startsWith('/blog/')) {
+    const slug = p.slice('/blog/'.length);
+    const post = POSTS.find((e) => e.slug === slug);
+    if (post) {
+      return meta(`${post.title} — mcpfold`, post.description, `/blog/${post.slug}`);
+    }
+    return meta('Post not found — mcpfold', 'No such post.', p);
+  }
+  if (p === '/changelog') {
+    return meta(
+      'Changelog — mcpfold',
+      'Human-readable release notes for mcpfold, derived from the CHANGELOG source.',
+      '/changelog',
+    );
+  }
+
+  // Unknown route: keep a sane, non-empty default rather than an empty <title>.
+  return meta('mcpfold', HOME_DESC, p);
+}
+
+/** Every concrete pathname the site prerenders — static routes plus data-derived pages. */
+export function allRoutes(): string[] {
+  return [
+    '/',
+    '/install',
+    '/directory',
+    '/pricing',
+    '/blog',
+    '/changelog',
+    ...DIRECTORY.map((e) => `/directory/${e.id}`),
+    ...POSTS.map((p) => `/blog/${p.slug}`),
+  ];
+}

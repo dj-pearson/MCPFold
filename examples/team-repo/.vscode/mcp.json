@@ -1,0 +1,16 @@
+{
+  "inputs": [],
+  "servers": {
+    "github": {
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "command": "npx",
+      "env": {
+        "GITHUB_TOKEN": "${env:GITHUB_TOKEN}"
+      },
+      "type": "stdio"
+    }
+  }
+}
