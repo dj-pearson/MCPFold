@@ -21,6 +21,7 @@
     "dev": "node --experimental-strip-types src/bin.ts"
   },
   "dependencies": {
+    "@mcpfold/adapters": "workspace:*",
     "@mcpfold/core": "workspace:*",
     "commander": "^12.1.0"
   },

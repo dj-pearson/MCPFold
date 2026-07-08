@@ -35,8 +35,37 @@ describe('run() — real arg parsing (guards option placement)', () => {
     expect(out.join('')).not.toContain('envelopeVersion');
   });
 
-  it('sync --check exits 0 with nothing to render yet', async () => {
-    const { writer } = capture();
-    expect(await run(['sync', '--check'], writer)).toBe(EXIT.SUCCESS);
+  it('sync without a config exits 2 (usage error), pointing at init', async () => {
+    const { writer, out } = capture();
+    const code = await run(
+      ['sync', '--check', '--cwd', '/nonexistent-mcpfold-dir', '--json'],
+      writer,
+    );
+    expect(code).toBe(EXIT.ERROR);
+    const env = JSON.parse(out.join(''));
+    expect(env.ok).toBe(false);
+    expect(env.errors[0].code).toBe('USAGE');
+  });
+
+  it('lists all spec §8 commands in --help', async () => {
+    const { writer, out, err } = capture();
+    // exitOverride throws helpDisplayed; run() maps it to SUCCESS.
+    await run(['--help'], writer);
+    const help = out.join('') + err.join('');
+    for (const name of [
+      'init',
+      'import',
+      'add',
+      'sync',
+      'diff',
+      'doctor',
+      'secret',
+      'run',
+      'login',
+      'push',
+      'pull',
+    ]) {
+      expect(help).toContain(name);
+    }
   });
 });

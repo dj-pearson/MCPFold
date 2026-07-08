@@ -44,6 +44,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@mcpfold/adapters':
+        specifier: workspace:*
+        version: link:../adapters
       '@mcpfold/core':
         specifier: workspace:*
         version: link:../core

@@ -93,3 +93,14 @@ export {
   type CheckStatus,
   type FileReader,
 } from './check.js';
+
+// Drift-diff engine (S1.6)
+export {
+  diffRendered,
+  type ConfigDiff,
+  type FieldChange,
+  type ParseCapable,
+  type RenderedLike,
+  type ServerDiff,
+  type ServerDiffStatus,
+} from './diff.js';

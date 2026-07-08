@@ -1,47 +1,182 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { checkRendered, hasDrift, type CheckableFile, type CheckResult } from '@mcpfold/core';
+import {
+  diffRendered,
+  resolveProfile,
+  UnknownProfileError,
+  checkRendered,
+  hasDrift,
+  type CheckableFile,
+  type CheckResult,
+  type ConfigDiff,
+} from '@mcpfold/core';
+import { realOsContext, registerAll, requireAdapter, type OsContext } from '@mcpfold/adapters';
+import { loadConfigFromDisk } from '../util/config.js';
+import { atomicWrite } from '../io/atomic-write.js';
+import { backupIfExists } from '../io/backup.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
 
 /**
- * `mcpfold sync --check` (S0.8) — the CI-gateable drift check.
+ * `mcpfold sync [--profile p]` (S3.5) — the core value loop. Resolves each profile,
+ * renders it via its adapter, backs up any existing target (timestamped), writes
+ * atomically, and reports which clients need a restart. `--dry-run` previews the diff and
+ * writes nothing; `--check` is the CI drift gate (exit 1, writes nothing).
  *
- * Compares the files mcpfold WOULD render against what is on disk and exits nonzero
- * (EXIT.DIFF) when any file drifts or is missing, writing nothing. The determinism
- * invariant (serialize.ts) guarantees the comparison is stable. Real per-client rendering
- * is supplied by adapters at S3.5; here the rendered set is injected, so the check
- * plumbing and exit-code contract are complete and tested ahead of the adapters.
+ * Secrets remain unresolved references at this stage — the per-adapter secret strategies
+ * (shim / native-input / inline) are wired at E4. Until then rendered files carry
+ * `${scheme:path}` references, which is safe (no values on disk).
  */
 
-export interface SyncCheckDeps {
-  /** The files that would be written (produced by adapters at S3.5). */
-  rendered: CheckableFile[];
-  /** Injectable disk reader; defaults to fs. */
-  readFile?: (path: string) => string | undefined;
+export type SyncAction = 'written' | 'unchanged' | 'preview';
+
+export interface SyncFileResult {
+  profile: string;
+  client: string;
+  path: string;
+  action: SyncAction;
+  needsRestart: boolean;
+  backup: string | null;
+  diff?: ConfigDiff;
 }
 
+export interface SyncData {
+  results: SyncFileResult[];
+  drift: boolean;
+  wrote: boolean;
+}
+
+export interface SyncOptions {
+  cwd: string;
+  profile?: string;
+  dryRun?: boolean;
+  check?: boolean;
+  /** Injectable for tests (tmp HOME); defaults to the real OS. */
+  osContext?: OsContext;
+  /** Injectable clock for deterministic backup names. */
+  now?: Date;
+}
+
+export function runSync(options: SyncOptions): CommandOutput<SyncData> {
+  registerAll();
+  const ctx = options.osContext ?? realOsContext();
+  const { config } = loadConfigFromDisk(options.cwd);
+
+  if (options.profile && !config.profiles[options.profile]) {
+    throw new UnknownProfileError(options.profile, Object.keys(config.profiles));
+  }
+  const profileNames = options.profile ? [options.profile] : Object.keys(config.profiles).sort();
+  const preview = Boolean(options.dryRun || options.check);
+
+  const results: SyncFileResult[] = [];
+  let drift = false;
+  let wrote = false;
+
+  for (const name of profileNames) {
+    const profile = config.profiles[name]!;
+    const adapter = requireAdapter(profile.client);
+    const servers = resolveProfile(config, name);
+    const file = adapter.render(servers, ctx);
+    const onDisk = existsSync(file.path) ? readFileSync(file.path, 'utf8') : undefined;
+
+    if (preview) {
+      const diff = diffRendered(file, onDisk, adapter);
+      if (diff.hasDrift) drift = true;
+      results.push({
+        profile: name,
+        client: profile.client,
+        path: file.path,
+        action: 'preview',
+        needsRestart: file.needsRestart,
+        backup: null,
+        diff,
+      });
+      continue;
+    }
+
+    if (onDisk === file.contents) {
+      results.push({
+        profile: name,
+        client: profile.client,
+        path: file.path,
+        action: 'unchanged',
+        needsRestart: false,
+        backup: null,
+      });
+    } else {
+      const backup = backupIfExists(file.path, options.now);
+      atomicWrite(file.path, file.contents);
+      wrote = true;
+      results.push({
+        profile: name,
+        client: profile.client,
+        path: file.path,
+        action: 'written',
+        needsRestart: file.needsRestart,
+        backup,
+      });
+    }
+  }
+
+  const restartClients = [
+    ...new Set(
+      results.filter((r) => r.action === 'written' && r.needsRestart).map((r) => r.client),
+    ),
+  ];
+  const human = renderHuman(results, { preview, drift, restartClients });
+  // --check is the CI gate; --dry-run is informational (always exits 0).
+  const exit = options.check && drift ? EXIT.DIFF : EXIT.SUCCESS;
+
+  return { data: { results, drift, wrote }, human, exit };
+}
+
+function renderHuman(
+  results: SyncFileResult[],
+  meta: { preview: boolean; drift: boolean; restartClients: string[] },
+): string {
+  if (results.length === 0) return 'No profiles to sync.';
+  const lines = results.map((r) => {
+    if (r.action === 'preview') {
+      const d = r.diff!;
+      const summary = d.fileMissing
+        ? 'would create'
+        : d.hasDrift
+          ? `${d.servers.length} change(s)`
+          : 'up to date';
+      return `  ${r.client} (${r.profile}) → ${r.path}: ${summary}`;
+    }
+    const tag = r.action === 'written' ? 'wrote' : 'unchanged';
+    const bak = r.backup ? ` (backup: ${r.backup})` : '';
+    return `  ${r.client} (${r.profile}) → ${r.path}: ${tag}${bak}`;
+  });
+  const footer: string[] = [];
+  if (meta.preview) {
+    footer.push(
+      '',
+      meta.drift ? 'Drift detected. Run `mcpfold sync` to apply.' : 'Everything is up to date.',
+    );
+  } else if (meta.restartClients.length > 0) {
+    footer.push('', `Restart required for: ${meta.restartClients.join(', ')}.`);
+  }
+  return [meta.preview ? 'Sync preview:' : 'Synced:', ...lines, ...footer].join('\n');
+}
+
+/** Lower-level check helper retained for the S0.10 conformance test + external callers. */
+export interface SyncCheckDeps {
+  rendered: CheckableFile[];
+  readFile?: (path: string) => string | undefined;
+}
 export interface SyncCheckData {
   results: CheckResult[];
   drift: boolean;
 }
-
-function symbol(status: CheckResult['status']): string {
-  return status === 'ok' ? '✓' : status === 'drift' ? '✗ drift  ' : '✗ missing';
-}
-
 export function runSyncCheck(deps: SyncCheckDeps): CommandOutput<SyncCheckData> {
   const read =
     deps.readFile ?? ((p: string) => (existsSync(p) ? readFileSync(p, 'utf8') : undefined));
   const results = checkRendered(deps.rendered, read);
   const drift = hasDrift(results);
-
   const human =
     results.length === 0
-      ? 'Nothing to check — no client files would be rendered yet (adapters land in S3.5).'
-      : results.map((r) => `  ${symbol(r.status)}  ${r.path}`).join('\n') +
-        (drift
-          ? '\n\nDrift detected. Run `mcpfold sync` to update client files.'
-          : '\n\nAll client files are up to date.');
-
+      ? 'Nothing to check — no client files would be rendered.'
+      : results.map((r) => `  ${r.status}  ${r.path}`).join('\n');
   return { data: { results, drift }, human, exit: drift ? EXIT.DIFF : EXIT.SUCCESS };
 }

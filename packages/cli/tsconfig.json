@@ -5,7 +5,8 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@mcpfold/core": ["../core/src/index.ts"]
+      "@mcpfold/core": ["../core/src/index.ts"],
+      "@mcpfold/adapters": ["../adapters/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]

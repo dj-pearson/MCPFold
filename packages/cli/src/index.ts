@@ -23,4 +23,18 @@ export { debug, enableDebug, isDebugEnabled } from './util/debug.js';
 
 // Commands
 export { buildDiagnoseBundle, diagnose, type DiagnoseBundle } from './commands/diagnose.js';
-export { runSyncCheck, type SyncCheckData, type SyncCheckDeps } from './commands/sync.js';
+export {
+  runSync,
+  runSyncCheck,
+  type SyncCheckData,
+  type SyncCheckDeps,
+  type SyncData,
+  type SyncFileResult,
+  type SyncOptions,
+} from './commands/sync.js';
+export { runDiff, type ClientDiff, type DiffData, type DiffOptions } from './commands/diff.js';
+
+// IO helpers (S3.5)
+export { atomicWrite } from './io/atomic-write.js';
+export { backupIfExists } from './io/backup.js';
+export { CONFIG_FILENAMES, findConfigPath, loadConfigFromDisk } from './util/config.js';
