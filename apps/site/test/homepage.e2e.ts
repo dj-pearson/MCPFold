@@ -21,11 +21,17 @@ test('theme toggle flips the color theme', async ({ page }) => {
 test('SEO: title, description, and Open Graph tags are present', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle(/mcpfold/);
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /context-window/);
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    'content',
+    /context-window/,
+  );
   await expect(page.locator('meta[property="og:title"]')).toHaveCount(1);
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
     'content',
     'summary_large_image',
   );
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://mcpfold.com/');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    'href',
+    'https://mcpfold.com/',
+  );
 });

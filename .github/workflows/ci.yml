@@ -116,7 +116,7 @@ jobs:
       - name: Demo is up to date (no drift from real CLI)
         run: |
           pnpm demo:record
-          git diff --exit-code demo/mcpfold.cast docs/assets/demo.svg
+          git diff --exit-code demo/mcpfold.cast docs/assets/demo.svg apps/site/public/demo.svg
 
   # Database integration gate (S6.1): stand up the CI Supabase database from the same
   # compose developers use, apply the migrations with the psql runner, and smoke-test the

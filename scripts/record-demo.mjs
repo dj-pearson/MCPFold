@@ -137,11 +137,14 @@ function renderSvg(rows) {
 `;
 }
 const svg = renderSvg(svgLines);
-const svgOut = join(ROOT, 'docs/assets/demo.svg');
 if (outArg === -1) {
-  mkdirSync(dirname(svgOut), { recursive: true });
-  writeFileSync(svgOut, svg);
-  console.log(`✓ wrote ${svgOut} (${svgLines.length} lines)`);
+  // Same asset for the docs README and the marketing-site hero (S13.2), from one source.
+  for (const dest of ['docs/assets/demo.svg', 'apps/site/public/demo.svg']) {
+    const p = join(ROOT, dest);
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, svg);
+    console.log(`✓ wrote ${dest} (${svgLines.length} lines)`);
+  }
 }
 
 // --- Optional: render the GIF for the README if vhs is available ----------------------------

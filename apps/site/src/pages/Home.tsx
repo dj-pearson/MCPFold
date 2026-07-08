@@ -1,8 +1,10 @@
-import { Badge, Button, Container } from '../design/components';
+import { Container } from '../design/components';
 import { Seo } from '../seo/Seo';
+import { Hero } from '../home/Hero';
+import { Calculator } from '../benchmark/Calculator';
 
-/** Homepage (S13.1 shell). The interactive context-window benchmark and richer hero land in S13.2;
- * this establishes the above-the-fold value prop, the design language, and the CTA. */
+/** Homepage (S13.2): hero + recorded demo, an interactive benchmark calculator, and the feature
+ * grid. Numbers come from the committed benchmark so the site and docs never disagree. */
 export function Home() {
   return (
     <>
@@ -12,62 +14,10 @@ export function Home() {
         path="/"
       />
 
-      <Container style={{ padding: 'var(--space-16) var(--space-6)', textAlign: 'center' }}>
-        <Badge>Open source · local-first</Badge>
-        <h1
-          style={{
-            fontSize: 'clamp(2rem, 5vw, 3.4rem)',
-            lineHeight: 1.1,
-            margin: 'var(--space-6) 0',
-          }}
-        >
-          Connect every MCP server without paying the
-          <span style={{ color: 'var(--accent)' }}> context-window tax</span>.
-        </h1>
-        <p
-          style={{
-            fontSize: '1.2rem',
-            color: 'var(--fg-muted)',
-            maxWidth: 640,
-            margin: '0 auto var(--space-8)',
-          }}
-        >
-          One canonical <code>mcp.config.jsonc</code>, folded out to every client — loading only the
-          tools each agent needs and resolving secret <em>references</em> instead of hardcoded
-          values.
-        </p>
+      <Hero />
 
-        <p
-          data-testid="benchmark-headline"
-          style={{ fontSize: '1.1rem', marginBottom: 'var(--space-8)' }}
-        >
-          Curating the toolset cuts tool-schema tokens by <strong>~80%</strong>{' '}
-          <span style={{ color: 'var(--fg-muted)' }}>(7,476 → 1,497)</span>.
-        </p>
-
-        <div
-          style={{
-            display: 'flex',
-            gap: 'var(--space-4)',
-            justifyContent: 'center',
-            flexWrap: 'wrap',
-          }}
-        >
-          <Button href="/docs/install.html">Install</Button>
-          <Button href="/docs" variant="ghost">
-            Read the docs
-          </Button>
-        </div>
-
-        <p
-          style={{
-            marginTop: 'var(--space-4)',
-            color: 'var(--fg-muted)',
-            fontFamily: 'var(--font-mono)',
-          }}
-        >
-          <code>npx mcpfold init</code>
-        </p>
+      <Container style={{ padding: 'var(--space-8) var(--space-6)' }}>
+        <Calculator />
       </Container>
 
       <Container style={{ paddingBottom: 'var(--space-16)' }}>
