@@ -29,6 +29,7 @@ const NAV = [
   ['adapters.md', 'Adapters'],
   ['benchmark.md', 'Benchmark'],
   ['cli-contract.md', 'CLI contract'],
+  ['completions.md', 'Shell completions'],
   ['team-config-as-code.md', 'Team config-as-code'],
   ['offline-contract.md', 'Offline contract'],
   ['self-hosting.md', 'Self-hosting'],

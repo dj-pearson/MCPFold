@@ -81,8 +81,10 @@ complete -F _${spec.bin}_complete ${spec.bin} mcpf
 `;
 }
 
-function zsh(spec: CompletionSpec, names: string[]): string {
-  const described = spec.commands.map((c) => `    '${c.name}:${c.description.replace(/'/g, '')}'`).join('\n');
+function zsh(spec: CompletionSpec, _names: string[]): string {
+  const described = spec.commands
+    .map((c) => `    '${c.name}:${c.description.replace(/'/g, '')}'`)
+    .join('\n');
   return `#compdef ${spec.bin} mcpf
 # zsh completion for ${spec.bin} — add to your fpath, or: ${spec.bin} completions zsh > ~/.zsh/_${spec.bin}
 _${spec.bin}() {

@@ -262,15 +262,13 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       w.out(completionScript(shell as Shell, buildSpec(program)));
     });
 
-  // Hidden: emit dynamic completion candidates for the generated scripts to consume.
-  program
-    .command('__complete <kind>', { hidden: true })
-    .option('-C, --cwd <dir>')
-    .action((kind: string, opts: { cwd?: string }) => {
-      const w = writer ?? processWriter;
-      if (kind !== 'profiles' && kind !== 'servers') return;
-      for (const v of completionValues(kind, opts.cwd ?? process.cwd())) w.out(`${v}\n`);
-    });
+  // Hidden: emit dynamic completion candidates from the shell's current directory (the user's
+  // project) for the generated scripts to consume.
+  program.command('__complete <kind>', { hidden: true }).action((kind: string) => {
+    const w = writer ?? processWriter;
+    if (kind !== 'profiles' && kind !== 'servers') return;
+    for (const v of completionValues(kind, process.cwd())) w.out(`${v}\n`);
+  });
 
   addGlobalFlags(
     program

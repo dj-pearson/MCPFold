@@ -55,6 +55,14 @@ export {
 } from './onboarding/guided.js';
 export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';
 export {
+  buildSpec,
+  completionScript,
+  completionValues,
+  SHELLS,
+  type CompletionSpec,
+  type Shell,
+} from './commands/completions.js';
+export {
   runTest,
   type TestData,
   type TestOptions,
