@@ -1,0 +1,17 @@
+{
+  "context_servers": {
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "playwright": {
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "command": "npx",
+      "env": {
+        "HEADLESS": "true"
+      }
+    }
+  }
+}

@@ -685,7 +685,7 @@
       "epic": "E2",
       "order": 11,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S1.4",
         "S0.8"
@@ -719,7 +719,7 @@
       "epic": "E2",
       "order": 12,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S2.1"
       ],
@@ -750,7 +750,7 @@
       "epic": "E2",
       "order": 13,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S2.1"
       ],
@@ -780,7 +780,7 @@
       "epic": "E2",
       "order": 14,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S2.1"
       ],
@@ -811,7 +811,7 @@
       "epic": "E2",
       "order": 15,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S2.1"
       ],
@@ -843,7 +843,7 @@
       "epic": "E2",
       "order": 16,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S2.1"
       ],
@@ -874,7 +874,7 @@
       "epic": "E2",
       "order": 17,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S2.1"
       ],
@@ -905,7 +905,7 @@
       "epic": "E2",
       "order": 18,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S2.2",
         "S2.3",

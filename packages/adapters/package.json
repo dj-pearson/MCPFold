@@ -1,0 +1,30 @@
+{
+  "name": "@mcpfold/adapters",
+  "version": "0.0.0",
+  "description": "Client adapters: render canonical mcpfold config to each client's native format and back.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mcpfold/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

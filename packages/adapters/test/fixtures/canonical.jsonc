@@ -1,0 +1,22 @@
+{
+  // The single canonical fixture folded through every adapter (S2.8).
+  "version": 1,
+  "servers": {
+    "github": {
+      "transport": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "auth": { "type": "bearer", "token": "${infisical:dev/mcp/GITHUB_PAT}" },
+      "tags": ["all"]
+    },
+    "playwright": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "env": { "HEADLESS": "true" },
+      "tags": ["all"]
+    }
+  },
+  "profiles": {
+    "everywhere": { "client": "cursor", "scope": "user", "include": ["all"] }
+  }
+}
