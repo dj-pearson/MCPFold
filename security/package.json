@@ -1,0 +1,18 @@
+{
+  "name": "@mcpfold/security",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cross-cutting security suite: the suite-wide secret-leak assertion harness (S9.1).",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mcpfold/core": "workspace:*",
+    "@mcpfold/adapters": "workspace:*",
+    "@mcpfold/secrets": "workspace:*",
+    "mcpfold": "workspace:*"
+  }
+}

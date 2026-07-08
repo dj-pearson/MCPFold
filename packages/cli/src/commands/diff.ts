@@ -7,7 +7,7 @@ import {
   type ResolvedServer,
 } from '@mcpfold/core';
 import { realOsContext, registerAll, requireAdapter, type OsContext } from '@mcpfold/adapters';
-import { defaultProviders, resolveSecrets } from '@mcpfold/secrets';
+import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import { loadConfigFromDisk } from '../util/config.js';
 import { renderWithStrategy } from '../sync/strategy.js';
 import { Redactor } from '../util/redact.js';
@@ -37,6 +37,7 @@ export interface DiffOptions {
   cwd: string;
   profile?: string;
   osContext?: OsContext;
+  providers?: SecretProvider[];
 }
 
 export async function runDiff(options: DiffOptions): Promise<CommandOutput<DiffData>> {
@@ -49,8 +50,9 @@ export async function runDiff(options: DiffOptions): Promise<CommandOutput<DiffD
   }
   const profileNames = options.profile ? [options.profile] : Object.keys(config.profiles).sort();
 
+  const providers = options.providers ?? defaultProviders(options.cwd);
   const resolve = (servers: ResolvedServer[]): Promise<ResolvedServer[]> =>
-    resolveSecrets(servers, { providers: defaultProviders(options.cwd) });
+    resolveSecrets(servers, { providers });
 
   const clients: ClientDiff[] = [];
   let drift = false;

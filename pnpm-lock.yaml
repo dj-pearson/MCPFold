@@ -85,6 +85,21 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  security:
+    dependencies:
+      '@mcpfold/adapters':
+        specifier: workspace:*
+        version: link:../packages/adapters
+      '@mcpfold/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@mcpfold/secrets':
+        specifier: workspace:*
+        version: link:../packages/secrets
+      mcpfold:
+        specifier: workspace:*
+        version: link:../packages/cli
+
 packages:
 
   '@ampproject/remapping@2.3.0':

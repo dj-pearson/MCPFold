@@ -11,7 +11,7 @@ import {
   type ResolvedServer,
 } from '@mcpfold/core';
 import { realOsContext, registerAll, requireAdapter, type OsContext } from '@mcpfold/adapters';
-import { defaultProviders, resolveSecrets } from '@mcpfold/secrets';
+import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import { loadConfigFromDisk } from '../util/config.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import { backupIfExists } from '../io/backup.js';
@@ -57,6 +57,8 @@ export interface SyncOptions {
   osContext?: OsContext;
   /** Injectable clock for deterministic backup names. */
   now?: Date;
+  /** Injectable secret providers (used only by the inline strategy). Defaults to env+dotenv. */
+  providers?: SecretProvider[];
 }
 
 export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncData>> {
@@ -76,8 +78,9 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
   let wrote = false;
 
   // Only the `inline` strategy resolves values; shim/native-input never do.
+  const providers = options.providers ?? defaultProviders(options.cwd);
   const resolve = (servers: ResolvedServer[]): Promise<ResolvedServer[]> =>
-    resolveSecrets(servers, { providers: defaultProviders(options.cwd) });
+    resolveSecrets(servers, { providers });
 
   for (const name of profileNames) {
     const profile = config.profiles[name]!;
