@@ -42,7 +42,7 @@ Every command accepts `--json` and then prints exactly **one** envelope to stdou
 
 - `--json` — machine-readable output (above).
 - `--debug` (or `MCPFOLD_DEBUG=1`) — verbose logging to **stderr**, always redacted
-  (no secret value or ref path can appear; see [redaction](#redaction)).
+  (no secret value or ref path can appear; see [redaction](#redaction-s06-enforced-again-at-s93)).
 - `-v, --version`, `-h, --help` — standard.
 
 ## Redaction (S0.6, enforced again at S9.3)

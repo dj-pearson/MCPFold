@@ -81,3 +81,30 @@ jobs:
 
       - name: Assert formatting
         run: pnpm format:check
+
+  # Docs build gate (S8.1): render the docs site and fail on any broken internal link,
+  # missing required page, or invalid hosted schema. The Pages deploy (docs.yml) reuses
+  # the same build, so a green docs job means the site is publishable.
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build docs (link-check + schema staging)
+        run: pnpm docs:build

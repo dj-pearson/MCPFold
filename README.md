@@ -1,20 +1,30 @@
 # mcpfold
 
-**One source of truth for your MCP servers.** Write it once, _fold_ it out to every
-client — secrets never hardcoded, only the tools you need loaded.
+**Connect every MCP server without paying the context-window tax.** `mcpfold` keeps one
+canonical config and folds it out to every client — loading only the tools each agent
+actually needs, and resolving secret _references_ instead of hardcoding values.
 
-> Status: ground-floor build. The canonical [`mcp.config.jsonc`](./docs) format, the
-> local-first CLI wedge, and (later) the cloud sync layer are being built story-by-story
-> from [`prd.json`](./prd.json).
+> Status: ground-floor build. The canonical [`mcp.config.jsonc`](./docs/config-format.md)
+> format, the local-first CLI wedge, and (later) the cloud sync layer are being built
+> story-by-story from [`prd.json`](./prd.json). Full docs live in [`docs/`](./docs/index.md).
 
-## Why
+## The context-window tax
 
-MCP config sprawls across clients (Claude Code, Cursor, VS Code, Windsurf, Zed, …).
-The formats have quietly diverged (VS Code uses root key `servers`, Zed uses
-`context_servers`, everyone else uses `mcpServers`), secrets get hardcoded into
-plaintext JSON, and tool schemas eat the context window. `mcpfold` keeps one canonical
-file and folds it out to each client — resolving secret _references_ (never values) and
-curating which servers and tools each client loads.
+Every MCP server you connect dumps its full tool schema into your agent's context window
+on every turn — used or not. `mcpfold`'s local proxy curates the toolset per client. In a
+[reproducible benchmark](./docs/benchmark.md) — github (20 tools), supabase (15),
+playwright (10), **45 tools** total — curating down to the **9** actually needed cuts
+tool-schema tokens by **~80%** (7,476 → 1,497), with no extra config because the shim
+already in the launch path does the filtering.
+
+## …and one config for every client
+
+MCP config sprawls across clients (Claude Code, Cursor, VS Code, Windsurf, Zed, …), and
+the formats have quietly diverged: VS Code uses the root key `servers`, Zed uses
+`context_servers`, everyone else uses `mcpServers`. Secrets get hardcoded into plaintext
+JSON. `mcpfold` keeps one canonical file and folds it out to each client — resolving
+secret _references_ (never values) and curating which servers and tools each client loads.
+New to it? Start with the [Quickstart](./docs/quickstart.md).
 
 ## Monorepo layout
 

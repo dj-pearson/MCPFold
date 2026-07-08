@@ -1,8 +1,8 @@
 # Add a new client in one PR
 
-A client adapter is one small module that renders the canonical `mcp.config.jsonc` to a
-client's native format and parses it back. Adding a client touches ~3 files and no engine
-code. (Expanded in the docs site — S8.1.)
+A client adapter is one small module that renders the canonical
+[`mcp.config.jsonc`](./config-format.md) to a client's native format and parses it back.
+Adding a client touches ~3 files and no engine code.
 
 ## 1. Scaffold
 

@@ -1901,7 +1901,7 @@
       "epic": "E8",
       "order": 50,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S3.7",
         "S1.5"

@@ -13,6 +13,19 @@ CI runs on every push and pull request via [`.github/workflows/ci.yml`](../.gith
   (static assertion that `packages/core` imports no `node:fs`/`node:os`/`node:path`/
   network/process modules) plus `pnpm format:check`. Independent of the lint job so a
   lint-config regression cannot hide a purity breach.
+- **`docs`** — runs `pnpm docs:build` (`scripts/build-docs.mjs`), which renders the
+  docs site and **fails on any broken internal link, missing required page, or invalid
+  hosted schema**. The same build backs the Pages deploy, so a green `docs` job means the
+  site is publishable.
+
+## Docs deployment (GitHub Pages)
+
+[`docs.yml`](../.github/workflows/docs.yml) publishes the docs site to GitHub Pages on
+every push to `main`, including the generated JSON Schema at the stable path
+`/schema/v1.json`. One-time setup (repo admin): **Settings → Pages → Source = "GitHub
+Actions"**. The build emits a `CNAME` for `mcpfold.com`; pointing that domain's DNS at
+GitHub Pages makes the schema live at `https://mcpfold.com/schema/v1.json` — the URL
+`mcpfold init` writes into every scaffolded config.
 
 ## Branch protection (required setup)
 
@@ -25,6 +38,7 @@ GitHub → Settings → Branches → Branch protection rules for `main`:
   - `verify (macos-latest · node 20)`
   - `verify (windows-latest · node 20)`
   - `core purity`
+  - `docs`
 - ✅ Require branches to be up to date before merging.
 - ✅ Do not allow bypassing the above settings.
 
