@@ -61,6 +61,8 @@ describe('scaffoldAdapter (S0.5)', () => {
 
   it('errors when run outside the repo (no adapters package)', () => {
     const h = harness([]); // src dir does not exist
-    expect(() => scaffoldAdapter({ name: 'continue', ...h.opts })).toThrow(/Adapters package not found/);
+    expect(() => scaffoldAdapter({ name: 'continue', ...h.opts })).toThrow(
+      /Adapters package not found/,
+    );
   });
 });
