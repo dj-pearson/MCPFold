@@ -118,6 +118,11 @@ migrations, runs the smoke test (which also asserts `migrate.sh` is idempotent),
 edge-function tests, and the encrypted-backup round-trip, failing the build on any error. So a
 broken migration is caught before it reaches the deployment.
 
+## Cloud API
+
+The device-code auth + config push/pull API runs either inside the managed Supabase Edge runtime
+or as a standalone container — see [Edge service](coolify-edge-service.md) for the Coolify deploy.
+
 ## Hardening
 
 Before serving real traffic, work through [At-rest hardening](security-at-rest.md): LUKS

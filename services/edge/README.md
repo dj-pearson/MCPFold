@@ -76,6 +76,21 @@ Design properties:
   base simply creates a newer version — nothing is lost, and the audit trail (S6.2) shows every
   version.
 
+## Side Docker service (S6.5)
+
+The same handlers run as a standalone container (`Dockerfile`) — the "side service" — for hosting
+anywhere Coolify runs containers, sharing the exact JWT/RLS contract. `main.ts` → `src/server.ts`
+serves `/health` + auth/push/pull with graceful shutdown (SIGTERM drains + closes the DB pool).
+
+```bash
+docker build -t mcpfold-edge .                 # non-root deno user, HEALTHCHECK on /health
+bash scripts/container-smoke.sh                # build + run + assert the contract over HTTP
+```
+
+`scripts/container-smoke.sh` (CI **edge container** job) stands up Postgres + the container via
+`docker-compose.ci.yml` and proves: `/health` answers, unauthenticated push is rejected (401), and
+an authenticated push→pull round-trips. See `docs/coolify-edge-service.md` for the Coolify deploy.
+
 ## Configuration (environment only — never committed)
 
 | Var            | Purpose                                             |

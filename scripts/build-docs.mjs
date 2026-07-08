@@ -30,6 +30,7 @@ const NAV = [
   ['cli-contract.md', 'CLI contract'],
   ['offline-contract.md', 'Offline contract'],
   ['self-hosting.md', 'Self-hosting'],
+  ['coolify-edge-service.md', 'Edge service'],
   ['security.md', 'Security'],
   ['security-at-rest.md', 'At-rest hardening'],
   ['ci.md', 'CI'],

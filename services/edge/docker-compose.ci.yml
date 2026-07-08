@@ -1,0 +1,31 @@
+# docker-compose.ci.yml (S6.5) — brings up Postgres + the side edge service container so an
+# integration test can exercise a real push/pull cycle against the built image (locally and in
+# CI). The db exposes a host port so migrations can be applied from the runner; the edge service
+# talks to the db over the compose network. Throwaway credentials only.
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "55433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  edge:
+    build: .
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/postgres
+      JWT_SECRET: ${JWT_SECRET:-test-jwt-secret-at-least-32-chars-long-000}
+      SITE_URL: https://mcpfold.com
+      PORT: "8000"
+    ports:
+      - "8787:8000"
+    depends_on:
+      db:
+        condition: service_healthy

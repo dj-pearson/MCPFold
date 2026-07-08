@@ -162,3 +162,20 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose -f supabase/docker-compose.ci.yml down -v
+
+  # Side edge service container (S6.5): build the Deno image, stand it up with Postgres via
+  # docker-compose, and prove the JWT/RLS contract over HTTP (health + unauth-rejected +
+  # authenticated push/pull round-trip) before it can ship.
+  edge-container:
+    name: edge container (side service)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Container smoke (build + health + auth push/pull)
+        run: bash services/edge/scripts/container-smoke.sh
