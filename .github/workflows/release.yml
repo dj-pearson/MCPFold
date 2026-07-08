@@ -50,7 +50,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      id-token: write # npm provenance
+      id-token: write # OIDC: publishes via npm Trusted Publishers (no token) + provenance
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,7 +62,8 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          registry-url: https://registry.npmjs.org
+          # No registry-url on purpose: it writes an .npmrc with a token authToken, which makes npm
+          # use token auth and skip OIDC. Publishing goes through npm Trusted Publishers (OIDC).
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
       - name: Create Release PR or publish
@@ -78,8 +79,9 @@ jobs:
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Publishing uses OIDC Trusted Publishers (configured per package on npmjs.com for this
+          # repo + workflow) — no NPM_TOKEN. REQUIRES every published package (mcpfold and all five
+          # @mcpfold/* packages) to have a trusted publisher set, or its publish will 403.
           NPM_CONFIG_PROVENANCE: 'true'
 
   # Standalone binaries (S11.1): on a published GitHub Release, build a native binary for every
