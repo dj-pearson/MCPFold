@@ -66,7 +66,8 @@ describe('generated JSON Schema (S1.5)', () => {
   });
 
   it('committed mcp.config.schema.json matches the generated schema (drift check)', () => {
-    const committed = readFileSync(committedPath, 'utf8');
+    // Normalize CRLF → LF so the check is robust to git autocrlf on Windows checkouts.
+    const committed = readFileSync(committedPath, 'utf8').replace(/\r\n/g, '\n');
     expect(committed).toBe(generateSchemaText());
   });
 });
