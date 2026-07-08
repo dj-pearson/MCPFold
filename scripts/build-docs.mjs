@@ -33,6 +33,7 @@ const NAV = [
   ['coolify-edge-service.md', 'Edge service'],
   ['security.md', 'Security'],
   ['security-at-rest.md', 'At-rest hardening'],
+  ['threat-model.md', 'Threat model'],
   ['ci.md', 'CI'],
 ];
 

@@ -65,6 +65,9 @@ Windows/macOS/Linux matrix.
 
 ## Threat model
 
+The consolidated, all-surfaces view — including the web console — lives in
+[Threat model](threat-model.md). A summary of the executable surfaces follows.
+
 ### Shim launcher (`mcpfold run <name>`)
 
 The shim resolves a server's secret refs and execs the real server, keeping tokens off disk.
