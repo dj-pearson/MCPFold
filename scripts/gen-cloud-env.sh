@@ -46,7 +46,8 @@ SERVICE_ROLE_KEY="$(mint_jwt service_role)"
 
 # --- domains (override via env if yours differ) ------------------------------------------------
 : "${APEX:=mcpfold.com}"
-: "${API_HOST:=api.${APEX}}"
+: "${API_HOST:=api.${APEX}}"          # Supabase (Kong)
+: "${EDGE_HOST:=functions.${APEX}}"   # side edge service (its own host)
 
 cat <<EOF
 # ===============================================================================================
@@ -72,8 +73,10 @@ GITHUB_OAUTH_CLIENT_ID=
 GITHUB_OAUTH_SECRET=
 DISABLE_SIGNUP=false
 
-# ---- Side edge service (Coolify env for services/edge) ----------------------------------------
-# DATABASE_URL: prefer the internal Docker network host over the public one.
+# ---- Side edge service (Coolify env for services/edge) — runs on ${EDGE_HOST} -----------------
+# DATABASE_URL host: use the internal Docker DB host. For this repo's Supabase compose that's
+# 'db'. For Coolify's one-click Supabase it's the DB container name (docker ps | grep supabase-db),
+# and the edge must share that network. JWT_SECRET must match the Supabase JWT_SECRET exactly.
 DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
 JWT_SECRET=${JWT_SECRET}
 SITE_URL=https://${APEX}
@@ -84,7 +87,7 @@ PORT=8000
 # ANON_KEY is a public JWT (safe in the browser; RLS enforces access).
 VITE_SUPABASE_URL=https://${API_HOST}
 VITE_SUPABASE_ANON_KEY=${ANON_KEY}
-# VITE_API_URL only if the edge is on a different origin than Supabase (see docs/deployment.md §3)
+VITE_API_URL=https://${EDGE_HOST}
 
 # ---- Reminders --------------------------------------------------------------------------------
 # * Marketing site (mcpfold-site) needs NO secrets — optional VITE_ANALYTICS_SRC / _DOMAIN only.
