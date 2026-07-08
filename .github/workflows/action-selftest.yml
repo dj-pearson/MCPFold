@@ -1,0 +1,61 @@
+name: Action self-test
+
+# Exercises the packaged Action (action.yml) on the example repo: a clean checkout passes, a
+# drifted one fails with annotations. Uses a local build (put on PATH), so the Action's install
+# step is skipped and we test the current code rather than a published version.
+on:
+  pull_request:
+    paths:
+      [
+        'action.yml',
+        'scripts/action-gate.sh',
+        '.github/workflows/action-selftest.yml',
+        'examples/**',
+      ]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+      - name: Put the local mcpfold build on PATH
+        run: |
+          printf '#!/usr/bin/env bash\nexec node "%s/packages/cli/dist/bin.js" "$@"\n' "$GITHUB_WORKSPACE" | sudo tee /usr/local/bin/mcpfold >/dev/null
+          sudo chmod +x /usr/local/bin/mcpfold
+          mcpfold --version
+
+      - name: Clean fixture passes the gate
+        uses: ./
+        with:
+          working-directory: examples/team-repo
+
+      - name: Prepare a drifted fixture
+        run: |
+          cp -r examples/team-repo "$RUNNER_TEMP/drift"
+          node -e "const f='$RUNNER_TEMP/drift/.cursor/mcp.json';const j=require(f);j.mcpServers.rogue={command:'evil'};require('fs').writeFileSync(f,JSON.stringify(j))"
+
+      - name: Drifted fixture fails the gate (expected)
+        id: drift
+        continue-on-error: true
+        uses: ./
+        with:
+          working-directory: ${{ runner.temp }}/drift
+
+      - name: Assert the drifted run failed
+        run: |
+          test "${{ steps.drift.outcome }}" = "failure" \
+            || { echo "The gate should have failed on the drifted fixture."; exit 1; }
+          echo "✓ clean passed, drift failed — the Action gates correctly."

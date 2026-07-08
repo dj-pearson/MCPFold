@@ -31,6 +31,7 @@ const NAV = [
   ['cli-contract.md', 'CLI contract'],
   ['completions.md', 'Shell completions'],
   ['team-config-as-code.md', 'Team config-as-code'],
+  ['github-action.md', 'GitHub Action'],
   ['offline-contract.md', 'Offline contract'],
   ['self-hosting.md', 'Self-hosting'],
   ['site-hosting.md', 'Site hosting'],
