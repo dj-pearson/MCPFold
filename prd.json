@@ -14,7 +14,7 @@
       "core_and_cli": "MIT",
       "cloud": "commercial-closed"
     },
-    "north_star": "Ship the local-first CLI wedge (schema + adapters + sync/diff/import/doctor + secrets) to an OSS launch, then layer the Cloudflare Pages + self-hosted Supabase cloud on top. Own the neutral mcp.config.jsonc format.",
+    "north_star": "Ship the local-first CLI wedge (schema + adapters + sync/diff/import/doctor + secrets) to an OSS launch, then layer the Cloudflare Pages + self-hosted Supabase cloud on top. Steward the neutral config format — canonical mcp.config.jsonc, first-class .mcp.json interop (import/export peer; see docs/adr/mcp-json-interop.md).",
     "headline_metric": "Cut MCP tool-schema context from ~72% to <20% via server + tool curation.",
     "non_goals": [
       "Server-side enterprise gateway features (RBAC, org audit, hosted servers) \u2014 that is the Composio/MintMCP space, not ours.",
@@ -4445,7 +4445,7 @@
       "epic": "E20",
       "order": 1,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Decide and implement the .mcp.json interop strategy",
       "user_story": "As a user in an ecosystem converging on `.mcp.json`, I want mcpfold to interoperate with that file first-class — import, export, or adopt — so choosing mcpfold never means fighting the emerging standard.",

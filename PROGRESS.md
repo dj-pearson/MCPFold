@@ -60,3 +60,54 @@ land on a genuinely green suite):**
   re-captured (`npx tsx compat/run.ts --capture`) in a follow-up.
 - S19.2 (adapter wave 2), now unblocked, and S19.4 (native-interpolation secrets, would upgrade
   Continue/VS from shim to native refs).
+
+---
+
+## S20.1 — Decide and implement the `.mcp.json` interop strategy
+
+**Started** 2026-07-09 · branch `story/S20.1-mcp-json-interop` · priority p1, deps: none.
+
+**Done** 2026-07-09.
+
+**Decision: option (b)** — `mcp.config.jsonc` stays the single canonical format (a superset with
+profiles/tags/secret-refs the flat file can't express); `.mcp.json` becomes a first-class
+**import source + export target**. Full rationale in `docs/adr/mcp-json-interop.md` (ADR 0001).
+Rejected (a) alternate-canonical-filename (collides with claude-code's own project target and
+throws away profiles/tags/refs) and (c) status quo (reads as fighting the emerging standard).
+
+Implemented:
+
+- **`mcpfold export --mcp-json`** (new command, `packages/cli/src/commands/export.ts`) — renders
+  every server (or one `--profile`) to a flat `.mcp.json`. Bearer/header/env secret refs are
+  preserved as env interpolation where possible (`${env:NAME}` → `${NAME}`); non-env schemes
+  (`infisical`/`op`/`keychain`/`dotenv`) are left verbatim and **reported** (never downgraded to a
+  value). Refuses to write onto a canonical filename; `--force`/`--dry-run`/`-o` supported.
+- **`mcpfold import`** extended — a bare `<cwd>/.mcp.json` is adopted as a first-class source (tag +
+  profile `mcp-json`), `${VAR}` → canonical `${env:VAR}`. Refactored the per-source merge into a
+  shared `ingestSource`. Also hardened `redactSecrets` to never destroy a value that already embeds
+  a ref (e.g. `Authorization: Bearer ${env:X}`).
+- **north_star** updated (prd meta): "own" → "steward the neutral config format — canonical
+  `mcp.config.jsonc`, first-class `.mcp.json` interop."
+- Docs: ADR 0001 + a "Relationship to `.mcp.json`" section in `docs/config-format.md` (one paragraph
+  a stranger can repeat). `init` and guided flows now point at import/export of `.mcp.json`.
+
+Tests: `export.test.ts` (all-servers, env-vs-non-env ref handling, `--profile`, `--dry-run`,
+overwrite guard, canonical-filename guard, export→import round-trip) + `import.test.ts` (bare
+`.mcp.json` pickup, `${VAR}` normalization, unreadable-file skip). Completion snapshots + the
+`--help` command-list test updated for the new `export` command.
+
+`verify_all` green (lint + purity, typecheck ×8 workspaces, `pnpm -r test` — cli now 218, +10 —
+and `pnpm -r build`), plus `docs:build` link-check and Prettier `--check`. End-to-end smoke-tested
+against the built binary (`export --mcp-json` → `import` round-trip).
+
+**Out-of-scope tree repair (pre-existing CI bug exposed by this story):** the new `init` next-steps
+lines changed the golden terminal demo, so `demo/mcpfold.cast` + both `demo.svg` copies were
+regenerated (`pnpm demo:record`). Regenerating `apps/site/public/demo.svg` triggered the `site.yml`
+workflow, which has been red on **every** `main` commit for days. Two chronic bugs fixed: (1) it
+built the site without its workspace deps (`pnpm --filter @mcpfold/site build`) so it couldn't
+resolve `@mcpfold/core`'s dist → `--filter "@mcpfold/site..."` (deps-first, like `pages.yml` for
+`@mcpfold/web`); (2) the Lighthouse config's `staticDistDir` pointed at `dist` (repo root) instead of
+`apps/site/dist`. This unblocks the site pipeline for the remaining E13/E15 site stories too.
+
+**Follow-ups (not blocking):** S20.2 (Stripe billing) and S20.3 (SSO) remain; S19.4 would let
+export target native `${{ secrets }}` interpolation for Continue instead of shim.

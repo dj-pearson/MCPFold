@@ -95,3 +95,55 @@ describe('runImport (S3.3)', () => {
     expect(result.human).toContain('Would write');
   });
 });
+
+describe('runImport — bare .mcp.json source (S20.1)', () => {
+  it('adopts a bare <cwd>/.mcp.json as a first-class source with an mcp-json profile', () => {
+    writeFileSync(
+      join(cwd, '.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          fs: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem'] },
+        },
+      }),
+    );
+    const { data } = runImport({ cwd, osContext: ctx });
+    expect(data.sources).toContain('mcp-json');
+    expect(data.profiles).toContain('mcp-json');
+    expect(data.servers).toContain('fs');
+
+    const written = loadConfig(readFileSync(join(cwd, 'mcp.config.jsonc'), 'utf8'));
+    expect(written.ok).toBe(true);
+    if (written.ok) {
+      expect(written.config.servers.fs?.tags).toContain('mcp-json');
+      expect(written.config.profiles['mcp-json']?.scope).toBe('user');
+    }
+  });
+
+  it('normalizes ${VAR} env interpolation to a canonical ${env:VAR} ref', () => {
+    writeFileSync(
+      join(cwd, '.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          gh: {
+            type: 'http',
+            url: 'https://api.githubcopilot.com/mcp/',
+            headers: { Authorization: 'Bearer ${GITHUB_PAT}' },
+          },
+        },
+      }),
+    );
+    const { data } = runImport({ cwd, osContext: ctx });
+    expect(data.servers).toContain('gh');
+    const written = readFileSync(join(cwd, 'mcp.config.jsonc'), 'utf8');
+    expect(written).toContain('${env:GITHUB_PAT}');
+    expect(written).not.toContain('${GITHUB_PAT}');
+  });
+
+  it('an unreadable .mcp.json is skipped, not fatal', () => {
+    writeFileSync(join(cwd, '.mcp.json'), '{ this is not valid json ');
+    const { data } = runImport({ cwd, osContext: ctx });
+    expect(data.sources).not.toContain('mcp-json');
+    // The adapter sources still import fine.
+    expect(data.sources.sort()).toEqual(['cursor', 'vscode']);
+  });
+});

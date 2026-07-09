@@ -55,6 +55,7 @@ describe('run() — real arg parsing (guards option placement)', () => {
     for (const name of [
       'init',
       'import',
+      'export',
       'add',
       'sync',
       'diff',

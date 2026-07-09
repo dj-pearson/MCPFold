@@ -206,5 +206,8 @@ export async function runGuided(
   // --- Step 4: the payoff --------------------------------------------------------------------
   write(SAVINGS);
   write('Done. Try `mcpfold status` any time to check your setup.');
+  write(
+    'Need to hand a tool the flat standard file? `mcpfold export --mcp-json` writes a .mcp.json.',
+  );
   return result;
 }

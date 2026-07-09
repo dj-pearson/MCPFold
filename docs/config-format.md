@@ -156,3 +156,26 @@ disagree.
 `version` is `1` today. When the format changes, `mcpfold migrate` upgrades an older file
 in place (with a backup), and `loadConfig` refuses a file newer than the running CLI
 understands — with an upgrade hint rather than a confusing parse error.
+
+## Relationship to `.mcp.json`
+
+mcpfold's canonical file is `mcp.config.jsonc` — a neutral **superset** that adds profiles,
+tags, and secret references the flat `.mcp.json` can't express. `.mcp.json` is the ecosystem's
+emerging lingua franca (Claude Code writes it; Visual Studio reads it), so mcpfold treats it
+first-class **at the edges**: `mcpfold import` reads one, and `mcpfold export --mcp-json` writes
+one. You keep the rich source of truth; the flat file is how mcpfold interoperates with everything
+that speaks `.mcp.json`. The full decision record is at `docs/adr/mcp-json-interop.md`.
+
+- **Import** — a bare `.mcp.json` in the working directory is adopted as a first-class source
+  (tag + profile `mcp-json`), alongside your installed clients' own configs. `${VAR}` env
+  interpolation is normalized to a canonical `${env:VAR}` ref.
+- **Export** — `mcpfold export --mcp-json` renders every server (or one `--profile`) to a flat
+  `.mcp.json`. Secret refs are preserved as env interpolation where possible (`${env:NAME}` →
+  `${NAME}`); refs to schemes a plain `.mcp.json` can't resolve (`infisical`, `op`, `keychain`,
+  `dotenv`) are left verbatim and reported, so a secret is never silently downgraded to a value.
+- **Canonical is never `.mcp.json`.** mcpfold reads/writes `mcp.config.jsonc`, so there is no
+  collision with the file Claude Code and Visual Studio already target.
+
+Round-tripping `export --mcp-json` → `import` is lossy only where the flat format is inherently
+poorer: profiles collapse into a single `mcp-json` profile, and non-env secret schemes need
+re-resolution. The rich structure lives in `mcp.config.jsonc`.

@@ -9,6 +9,13 @@ import { ConfigValidationError, loadConfig, UsageError, type Config } from '@mcp
  */
 export const CONFIG_FILENAMES = ['mcp.config.jsonc', 'mcp.config.json'] as const;
 
+/**
+ * The flat ecosystem-standard file (Claude Code's project target; one of Visual Studio's read
+ * paths). mcpfold treats it as a first-class import source / export target, never as canonical —
+ * see docs/adr/mcp-json-interop.md.
+ */
+export const MCP_JSON_FILENAME = '.mcp.json';
+
 export function findConfigPath(cwd: string): string | null {
   for (const name of CONFIG_FILENAMES) {
     const candidate = join(cwd, name);

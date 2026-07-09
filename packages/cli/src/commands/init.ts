@@ -111,6 +111,8 @@ function renderHuman(
       : 'No installed clients detected (that is fine — add profiles for the clients you use).',
     '',
     'Next: edit the config, then run `mcpfold sync` to fold it out.',
+    'Already have a .mcp.json? Run `mcpfold import` to adopt it. Need one for another tool?',
+    '`mcpfold export --mcp-json` writes one.',
   );
   return lines.join('\n');
 }
