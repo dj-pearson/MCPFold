@@ -1,5 +1,6 @@
 import { Container } from '../design/components';
 import { TIERS } from './tiers';
+import { FaqSection } from '../seo/FaqSection';
 
 /**
  * Pricing page (S13.6) — contrasts the free OSS/local CLI with the paid team cloud, renders the
@@ -96,39 +97,9 @@ export function PricingPage() {
             </section>
           ))}
         </div>
-
-        <section style={{ maxWidth: 720, margin: 'var(--space-16) auto 0' }}>
-          <h2>FAQ</h2>
-          {FAQ.map((item) => (
-            <details
-              key={item.q}
-              style={{ borderBottom: '1px solid var(--border)', padding: 'var(--space-4) 0' }}
-            >
-              <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{item.q}</summary>
-              <p style={{ color: 'var(--fg-muted)', marginBottom: 0 }}>{item.a}</p>
-            </details>
-          ))}
-        </section>
       </Container>
+
+      <FaqSection path="/pricing" />
     </>
   );
 }
-
-const FAQ = [
-  {
-    q: 'Can I self-host the cloud?',
-    a: 'Yes — the whole cloud (Supabase + edge service) is MIT-licensed and self-hostable at no cost. See the self-hosting docs. The paid tiers are the convenience of us running it, plus team features.',
-  },
-  {
-    q: 'What is the license?',
-    a: 'The CLI, adapters, core, and the self-hostable cloud are MIT. Only the hosted mcpfold.com service and its Team/Enterprise features are commercial. See docs/governance.md.',
-  },
-  {
-    q: 'What data does the cloud store?',
-    a: 'Only your canonical config with secret references (${provider:path}) — never secret values. Everything sensitive stays on your machine and is resolved at launch time.',
-  },
-  {
-    q: 'Is the free tier really free forever?',
-    a: 'Yes. The entire local CLI — all adapters, sync, diff, doctor, watch, the config-as-code drift gate — is free forever with no account.',
-  },
-];

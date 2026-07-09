@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Container } from '../design/components';
 import { CopyBlock } from './CopyBlock';
+import { FaqSection } from '../seo/FaqSection';
 import { detectOS, OS_LABEL, type OS } from './os';
 
 /**
@@ -168,6 +169,8 @@ export function InstallPage() {
           </p>
         </section>
       </Container>
+
+      <FaqSection path="/install" />
     </>
   );
 }

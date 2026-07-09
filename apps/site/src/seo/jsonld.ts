@@ -1,6 +1,7 @@
 import { DIRECTORY } from '@mcpfold/core';
 import { POSTS } from '../blog/posts';
 import { SITE_URL } from './meta';
+import { faqPageJsonLd, faqsForPath } from './faq';
 
 /**
  * Per-page-type JSON-LD structured data (S15.1). Emitted into the initial HTML by the prerender and
@@ -63,9 +64,12 @@ function breadcrumb(trail: Array<{ name: string; path: string }>): JsonLd {
 /** Structured-data nodes for a pathname (may be empty). */
 export function jsonLdForPath(path: string): JsonLd[] {
   const p = path !== '/' && path.endsWith('/') ? path.slice(0, -1) : path;
+  // GEO (S15.2): any page with FAQ units also emits a FAQPage node.
+  const faqs = faqsForPath(p);
+  const faqNode = faqs.length > 0 ? [faqPageJsonLd(faqs, p)] : [];
 
-  if (p === '/') return [softwareApplication()];
-  if (p === '/directory') return [directoryItemList()];
+  if (p === '/') return [softwareApplication(), ...faqNode];
+  if (p === '/directory') return [directoryItemList(), ...faqNode];
 
   if (p.startsWith('/directory/')) {
     const entry = DIRECTORY.find((e) => e.id === p.slice('/directory/'.length));
@@ -89,7 +93,8 @@ export function jsonLdForPath(path: string): JsonLd[] {
     ];
   }
 
-  return [];
+  // Pages with FAQ units but no other structured data (e.g. /install, /pricing).
+  return faqNode;
 }
 
 /** Serialize the JSON-LD nodes for a path into <script type="application/ld+json"> tags (SSG use). */

@@ -83,3 +83,48 @@ test('prerendered pages hydrate with no console errors or mismatch warnings', as
   expect(hydrationIssues, `hydration issues:\n${hydrationIssues.join('\n')}`).toEqual([]);
   expect(problems, `console problems:\n${problems.join('\n')}`).toEqual([]);
 });
+
+// ------------------------------------------------------------------------------------------------
+// GEO answer layer (S15.2): llms.txt, FAQPage JSON-LD, AI-crawler robots policy
+// ------------------------------------------------------------------------------------------------
+test('/llms.txt and /llms-full.txt resolve with the summary + canonical links', async ({
+  request,
+}) => {
+  const llms = await rawHtml(request, '/llms.txt');
+  expect(llms).toContain('# mcpfold');
+  expect(llms).toContain('mcpfold is a free, open-source CLI');
+  // Canonical link map is present.
+  for (const link of ['/install', '/directory', '/pricing', '/docs']) {
+    expect(llms, `llms.txt links to ${link}`).toContain(`https://mcpfold.com${link}`);
+  }
+  expect(llms).toContain('/llms-full.txt');
+
+  const full = await rawHtml(request, '/llms-full.txt');
+  expect(full).toContain('## Answers');
+  expect(full).toContain('What is mcpfold?');
+});
+
+test('robots.txt allows the major AI crawlers and links the sitemap', async ({ request }) => {
+  const robots = await rawHtml(request, '/robots.txt');
+  for (const bot of ['GPTBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended']) {
+    expect(robots, `robots.txt names ${bot}`).toContain(`User-agent: ${bot}`);
+  }
+  expect(robots).toContain('Sitemap: https://mcpfold.com/sitemap.xml');
+});
+
+test('homepage + core pages carry FAQPage JSON-LD with self-contained answers (no-JS)', async ({
+  request,
+}) => {
+  for (const path of ['/', '/install', '/pricing', '/directory']) {
+    const html = await rawHtml(request, path);
+    const faq = jsonLdBlocks(html).find((b) => b['@type'] === 'FAQPage');
+    expect(faq, `FAQPage JSON-LD on ${path}`).toBeTruthy();
+    const entities = faq!.mainEntity as Array<Record<string, unknown>>;
+    expect(entities.length).toBeGreaterThan(0);
+    expect(entities[0]!['@type']).toBe('Question');
+    const answer = (entities[0]!.acceptedAnswer as Record<string, unknown>).text as string;
+    expect(answer.length, 'answer is a real, self-contained sentence').toBeGreaterThan(40);
+    // The visible FAQ section exists in the no-JS HTML too (not just the JSON-LD).
+    expect(html).toContain('Frequently asked questions');
+  }
+});
