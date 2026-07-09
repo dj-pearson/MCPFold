@@ -1,5 +1,14 @@
 import { isResponse, type JsonRpcId, type JsonRpcMessage } from './jsonrpc.js';
+import type { McpTool } from './filter.js';
 import type { MessageTransport } from './transport/types.js';
+
+/** Coerce a tools/list or discover result's `tools` into a typed array (drops malformed entries). */
+function toolsFrom(result: { tools?: unknown[] } | null): McpTool[] {
+  if (!Array.isArray(result?.tools)) return [];
+  return result!.tools!.filter(
+    (t): t is McpTool => Boolean(t) && typeof (t as { name?: unknown }).name === 'string',
+  );
+}
 
 /**
  * MCP initialize + tools/list handshake (S10.4) over any {@link MessageTransport}. Transport-
@@ -46,6 +55,8 @@ export interface HandshakeResult {
   /** True when the negotiated version is one mcpfold supports. */
   protocolSupported?: boolean;
   toolCount?: number;
+  /** The raw tool definitions returned by tools/list or server/discover (S18.1 pinning probe). */
+  tools?: McpTool[];
   /** Present when unreachable — a message safe to print (never the resolved token). */
   error?: string;
 }
@@ -121,12 +132,14 @@ export async function handshake(
       const discover = (await request('server/discover', {
         _meta: { [META_PROTOCOL_VERSION_KEY]: offeredVersion },
       })) as { tools?: unknown[] } | null;
+      const discoverTools = toolsFrom(discover);
       return {
         reachable: true,
         protocolVersion: offeredVersion,
         offeredVersion,
         protocolSupported: isSupportedProtocolVersion(offeredVersion),
-        toolCount: Array.isArray(discover?.tools) ? discover!.tools!.length : 0,
+        toolCount: discoverTools.length,
+        tools: discoverTools,
       };
     }
 
@@ -145,12 +158,14 @@ export async function handshake(
     transport.send({ jsonrpc: '2.0', method: 'notifications/initialized' });
 
     const tools = (await request('tools/list', {})) as { tools?: unknown[] } | null;
+    const toolList = toolsFrom(tools);
     return {
       reachable: true,
       protocolVersion: negotiated,
       offeredVersion,
       protocolSupported: isSupportedProtocolVersion(negotiated),
-      toolCount: Array.isArray(tools?.tools) ? tools!.tools!.length : 0,
+      toolCount: toolList.length,
+      tools: toolList,
     };
   } catch (err) {
     return { reachable: false, error: err instanceof Error ? err.message : String(err) };

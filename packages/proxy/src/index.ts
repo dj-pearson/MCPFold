@@ -12,8 +12,25 @@ export {
   type JsonRpcId,
   type JsonRpcMessage,
 } from './jsonrpc.js';
-export { connectProxy, DISCOVER_METHOD, TOOLS_LIST_METHOD, type ProxyOptions } from './proxy.js';
+export {
+  connectProxy,
+  DISCOVER_METHOD,
+  TOOLS_LIST_METHOD,
+  type PinnedToolsOptions,
+  type ProxyOptions,
+} from './proxy.js';
 export { filterTools, isToolAllowed, type McpTool } from './filter.js';
+export {
+  canonicalizeTools,
+  diffToolSurface,
+  digestOfCanonical,
+  hasToolDrift,
+  renderToolSurfaceDiff,
+  toolDefinitionsDigest,
+  type CanonicalTool,
+  type ChangedTool,
+  type ToolSurfaceDiff,
+} from './tool-digest.js';
 export { streamTransport } from './transport/stdio.js';
 export { MemoryTransport } from './transport/memory.js';
 export type { MessageTransport } from './transport/types.js';

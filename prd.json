@@ -4124,7 +4124,7 @@
       "epic": "E18",
       "order": 1,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Tool-definition pinning: extend TOFU to tools/list digests (rug-pull defense)",
       "user_story": "As a user of curated servers, I want mcpfold to remember the tool definitions I trusted and flag/block when they silently change, so a rug-pull or poisoned update can't inject new instructions behind my back.",

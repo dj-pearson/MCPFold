@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { Config, ServerConfig } from '@mcpfold/core';
+import { digestOfCanonical, type CanonicalTool } from '@mcpfold/proxy';
 
 /**
  * Trust-on-first-use for config-as-code (S9.2). `mcpfold run` execs a server's `command`/`args`,
@@ -36,15 +37,32 @@ export function executableSignature(entry: ExecutableEntry): string {
   return createHash('sha256').update(stable).digest('hex');
 }
 
+/** A trusted server's pinned tool surface (S18.1) recorded alongside its executable signature. */
+export interface TrustedToolSurface {
+  digest: string;
+  surface: CanonicalTool[];
+}
+
 interface TrustFile {
   version: 1;
-  entries: Record<string, string>; // server name → approved signature
+  entries: Record<string, string>; // server name → approved executable signature
+  /** server name → pinned tool surface (S18.1). Absent in pre-S18.1 trust files. */
+  tools?: Record<string, TrustedToolSurface>;
 }
+
+/** Drift status of a live tool surface vs. what was trusted. */
+export type ToolTrustStatus = 'trusted' | 'unpinned' | 'drifted';
 
 export interface TrustGate {
   status(name: string, entry: ExecutableEntry): TrustStatus;
   isTrusted(name: string, entry: ExecutableEntry): boolean;
   approve(name: string, entry: ExecutableEntry): void;
+  /** The pinned tool surface for a server, if any was recorded (S18.1). */
+  trustedTools(name: string): TrustedToolSurface | undefined;
+  /** Compare a live surface's digest to the pinned one (S18.1). */
+  toolsStatus(name: string, liveSurface: CanonicalTool[]): ToolTrustStatus;
+  /** Record (or re-approve) a server's tool surface (S18.1). */
+  approveTools(name: string, surface: CanonicalTool[]): void;
 }
 
 function makeGate(read: () => TrustFile, write: (f: TrustFile) => void): TrustGate {
@@ -60,6 +78,20 @@ function makeGate(read: () => TrustFile, write: (f: TrustFile) => void): TrustGa
     approve(name, entry) {
       const file = read();
       file.entries[name] = executableSignature(entry);
+      write(file);
+    },
+    trustedTools(name) {
+      return read().tools?.[name];
+    },
+    toolsStatus(name, liveSurface) {
+      const pinned = read().tools?.[name];
+      if (!pinned) return 'unpinned';
+      return pinned.digest === digestOfCanonical(liveSurface) ? 'trusted' : 'drifted';
+    },
+    approveTools(name, surface) {
+      const file = read();
+      file.tools ??= {};
+      file.tools[name] = { digest: digestOfCanonical(surface), surface };
       write(file);
     },
   };

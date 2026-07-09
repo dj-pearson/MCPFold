@@ -7,7 +7,14 @@ import { connectProxy, streamTransport, type JsonRpcMessage } from '@mcpfold/pro
 import { runRun, shouldUseProxy, type ProxySpawner, type Spawner } from '../src/commands/run.js';
 import type { TrustGate } from '../src/trust/tofu.js';
 
-const trustAll: TrustGate = { status: () => 'trusted', isTrusted: () => true, approve: () => {} };
+const trustAll: TrustGate = {
+  status: () => 'trusted',
+  isTrusted: () => true,
+  approve: () => {},
+  trustedTools: () => undefined,
+  toolsStatus: () => 'unpinned',
+  approveTools: () => {},
+};
 
 let cwd: string;
 
@@ -52,6 +59,37 @@ describe('runRun routing (S5.3)', () => {
     await runRun({ cwd, name: 'plain', providers: [], spawnFn, proxySpawnFn, trust: trustAll });
     expect(spawnFn).toHaveBeenCalledTimes(1);
     expect(proxySpawnFn).not.toHaveBeenCalled();
+  });
+
+  // S18.1: a pinned tool surface routes even a directive-less server through the proxy so drift
+  // can be verified live, and passes the pinned surface + the strict/warn mode down.
+  it('routes a pinned-but-directive-less server through the proxy with its pinned surface', async () => {
+    const pinnedGate: TrustGate = {
+      ...trustAll,
+      trustedTools: () => ({
+        digest: 'd',
+        surface: [{ name: 'read', description: 'r', schemaDigest: '' }],
+      }),
+    };
+    let pinnedArg: unknown;
+    const proxySpawnFn = vi.fn<ProxySpawner>(async (_c, _a, _e, _tools, pinned) => {
+      pinnedArg = pinned;
+      return 0;
+    });
+    const spawnFn = vi.fn<Spawner>(async () => 0);
+    await runRun({
+      cwd,
+      name: 'plain', // no tools directive
+      providers: [],
+      spawnFn,
+      proxySpawnFn,
+      trust: pinnedGate,
+      strictTools: true,
+    });
+    expect(proxySpawnFn).toHaveBeenCalledTimes(1);
+    expect(spawnFn).not.toHaveBeenCalled();
+    expect((pinnedArg as { mode: string }).mode).toBe('block'); // strictTools → block
+    expect((pinnedArg as { surface: unknown[] }).surface).toHaveLength(1);
   });
 });
 

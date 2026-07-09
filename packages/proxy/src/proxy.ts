@@ -1,6 +1,13 @@
 import type { ToolsDirective } from '@mcpfold/core';
 import { errorResponse, isRequest, type JsonRpcId, type JsonRpcMessage } from './jsonrpc.js';
 import { filterTools, isToolAllowed, type McpTool } from './filter.js';
+import {
+  canonicalizeTools,
+  diffToolSurface,
+  hasToolDrift,
+  type CanonicalTool,
+  type ToolSurfaceDiff,
+} from './tool-digest.js';
 import type { MessageTransport } from './transport/types.js';
 
 /**
@@ -30,11 +37,29 @@ export const DISCOVER_METHOD = 'server/discover';
 /** The session-mode tool listing method. */
 export const TOOLS_LIST_METHOD = 'tools/list';
 
+/**
+ * Tool-definition pinning (S18.1). When set, the proxy compares the live tool surface in each
+ * `tools/list` / `server/discover` response against the trusted surface and reports drift.
+ */
+export interface PinnedToolsOptions {
+  /** The canonical tool surface recorded at trust time. */
+  surface: CanonicalTool[];
+  /** 'warn' (default): report drift but forward; 'block': replace the response with an error. */
+  mode?: 'warn' | 'block';
+  /** Called once per drifted listing with the diff (never with the resolved token/secret). */
+  onDrift?: (diff: ToolSurfaceDiff) => void;
+}
+
 export interface ProxyOptions {
   tools?: ToolsDirective;
   /** Reject `tools/call` to a filtered-out tool instead of forwarding it. Default true. */
   rejectFilteredCalls?: boolean;
+  /** Pin the trusted tool surface and detect/optionally block drift (S18.1). */
+  pinnedTools?: PinnedToolsOptions;
 }
+
+// MCP error code for a security-policy refusal (invalid params / not permitted).
+const SECURITY_BLOCKED = -32000;
 
 interface ToolsResult {
   tools: McpTool[];
@@ -65,7 +90,9 @@ export function connectProxy(
 ): () => void {
   const directive = options.tools;
   const rejectFiltered = options.rejectFilteredCalls ?? true;
-  // Track in-flight request ids whose responses carry a tool list to curate — both the
+  const pinned = options.pinnedTools;
+  const pinnedMode = pinned?.mode ?? 'warn';
+  // Track in-flight request ids whose responses carry a tool list to curate or verify — both the
   // session-mode `tools/list` and the stateless-core `server/discover`.
   const pendingToolListing = new Set<JsonRpcId>();
 
@@ -90,7 +117,7 @@ export function connectProxy(
       }
     }
     if (
-      directive &&
+      (directive || pinned) &&
       message.id !== undefined &&
       (isRequest(message, TOOLS_LIST_METHOD) || isRequest(message, DISCOVER_METHOD))
     ) {
@@ -101,15 +128,37 @@ export function connectProxy(
 
   server.onMessage((message) => {
     if (
-      directive &&
+      (directive || pinned) &&
       message.id !== undefined &&
       pendingToolListing.has(message.id) &&
       isToolsResult(message.result)
     ) {
       pendingToolListing.delete(message.id);
-      const filtered = filterTools(message.result.tools, directive);
+
+      // Tool-definition pinning (S18.1): verify the live surface against the trusted one BEFORE
+      // filtering, so drift is measured against everything the server actually offers.
+      if (pinned) {
+        const diff = diffToolSurface(pinned.surface, canonicalizeTools(message.result.tools));
+        if (hasToolDrift(diff)) {
+          pinned.onDrift?.(diff);
+          if (pinnedMode === 'block') {
+            // Refuse the whole listing — a drifted server shouldn't inject anything into context.
+            client.send(
+              errorResponse(message.id, {
+                code: SECURITY_BLOCKED,
+                message:
+                  'Tool definitions changed since you trusted this server (blocked by mcpfold). ' +
+                  'Review the diff and re-run `mcpfold trust` to approve.',
+              }),
+            );
+            return;
+          }
+        }
+      }
+
+      const tools = directive ? filterTools(message.result.tools, directive) : message.result.tools;
       // Spread the original result so `_meta` and any other discover fields survive untouched.
-      client.send({ ...message, result: { ...message.result, tools: filtered } });
+      client.send({ ...message, result: { ...message.result, tools } });
       return;
     }
     // Everything else (MRTR input_required results, _meta-carrying messages, notifications,

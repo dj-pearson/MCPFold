@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '@mcpfold/core';
+import { canonicalizeTools } from '@mcpfold/proxy';
 import { executableSignature, memoryTrustGate, untrustedServers } from '../src/trust/tofu.js';
 import { signConfig, verifyConfig } from '../src/trust/signing.js';
 import { computeIntegrity, verifyPackageIntegrity } from '../src/trust/integrity.js';
@@ -144,5 +145,58 @@ describe('pin integrity (S9.2)', () => {
     const findings = checkPinIntegrity(config, 'mcp.config.jsonc');
     expect(findings).toHaveLength(1);
     expect(findings[0]!.message).toMatch(/malformed integrity/i);
+  });
+});
+
+describe('tool-definition pinning: trust store + trust --tools (S18.1)', () => {
+  const surfaceA = canonicalizeTools([
+    { name: 'read', description: 'reads a file' },
+    { name: 'write', description: 'writes a file' },
+  ]);
+
+  it('toolsStatus is unpinned until approveTools, then trusted, then drifted', () => {
+    const gate = memoryTrustGate();
+    expect(gate.toolsStatus('srv', surfaceA)).toBe('unpinned');
+    gate.approveTools('srv', surfaceA);
+    expect(gate.toolsStatus('srv', surfaceA)).toBe('trusted');
+    // Same tools reordered → still trusted (order-insensitive).
+    const reordered = canonicalizeTools([
+      { name: 'write', description: 'writes a file' },
+      { name: 'read', description: 'reads a file' },
+    ]);
+    expect(gate.toolsStatus('srv', reordered)).toBe('trusted');
+    // A mutated description → drifted.
+    const mutated = canonicalizeTools([
+      { name: 'read', description: 'reads a file AND phones home' },
+      { name: 'write', description: 'writes a file' },
+    ]);
+    expect(gate.toolsStatus('srv', mutated)).toBe('drifted');
+  });
+
+  it('`trust <name> --tools` probes and pins the live surface, and re-trust updates it', async () => {
+    const gate = memoryTrustGate();
+    let probeSurface = surfaceA;
+    const probeTools = () => Promise.resolve(probeSurface);
+
+    const first = await runTrust({ cwd, name: 'srv', gate, tools: true, probeTools });
+    expect(first.data.approved[0]!.toolsPinned).toBe(2);
+    expect(gate.toolsStatus('srv', surfaceA)).toBe('trusted');
+
+    // The server ships a new tool; re-running trust --tools re-approves the new surface.
+    probeSurface = canonicalizeTools([
+      { name: 'read', description: 'reads a file' },
+      { name: 'write', description: 'writes a file' },
+      { name: 'exec', description: 'runs a command' },
+    ]);
+    const again = await runTrust({ cwd, name: 'srv', gate, tools: true, probeTools });
+    expect(again.data.approved[0]!.toolsPinned).toBe(3);
+    expect(gate.toolsStatus('srv', probeSurface)).toBe('trusted');
+    expect(gate.toolsStatus('srv', surfaceA)).toBe('drifted'); // old surface no longer trusted
+  });
+
+  it('`trust --tools` without a server name is a usage error', async () => {
+    await expect(runTrust({ cwd, gate: memoryTrustGate(), tools: true })).rejects.toThrow(
+      /needs a server name/i,
+    );
   });
 });

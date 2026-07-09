@@ -12,6 +12,9 @@ const trustAll: TrustGate = {
   status: () => 'trusted',
   isTrusted: () => true,
   approve: () => {},
+  trustedTools: () => undefined,
+  toolsStatus: () => 'unpinned',
+  approveTools: () => {},
 };
 
 let cwd: string;
