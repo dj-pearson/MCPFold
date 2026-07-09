@@ -6,8 +6,8 @@ _mcpfold_complete() {
   local cur prev
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
-  local commands="diagnose sync diff init import export doctor scan status test completions restore migrate run secret scaffold-adapter add trust login push pull"
-  local flags="--allow-unsigned --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --mcp-json --output --package --pin --profile --tag --team --token-ref --tools --transport --url --version --watch --yes"
+  local commands="diagnose sync diff init import export doctor scan status test completions restore migrate run secret scaffold-adapter add search trust login push pull"
+  local flags="--allow-unsigned --as --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --from-registry --guided --help --json --limit --list --mcp-json --output --package --pin --profile --secret-scheme --tag --team --token-ref --tools --transport --url --version --watch --yes"
   case "$prev" in
     -p|--profile) COMPREPLY=( $(compgen -W "$(mcpfold __complete profiles 2>/dev/null)" -- "$cur") ); return;;
     test|restore) COMPREPLY=( $(compgen -W "$(mcpfold __complete servers 2>/dev/null)" -- "$cur") ); return;;
@@ -44,7 +44,8 @@ complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'migrate' -d 'upgrade an out
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'run' -d 'internal shim launcher (resolve secrets, inject, exec the server)'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'secret' -d 'wire up and verify secret providers'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'scaffold-adapter' -d 'generate a new client adapter module + test (contributor on-ramp)'
-complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'add' -d 'add a server by URL or npm package (guided or scripted)'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'add' -d 'add a server by URL, npm package, or the official registry (guided or scripted)'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'search' -d 'search the official MCP registry for servers (feed into \`add --from-registry\`)'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'trust' -d 'approve new or changed server launch commands (config-as-code TOFU)'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'login' -d 'authenticate to the mcpfold cloud (device-code OAuth)'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'push' -d 'push the canonical config to the cloud (refs only, new version)'
@@ -58,8 +59,8 @@ exports[`completion scripts (S11.2) > generates a stable pwsh script from the co
 "# PowerShell completion for mcpfold — mcpfold completions pwsh | Out-String | Invoke-Expression
 Register-ArgumentCompleter -Native -CommandName mcpfold,mcpf -ScriptBlock {
   param($wordToComplete, $commandAst, $cursorPosition)
-  $commands = @('diagnose','sync','diff','init','import','export','doctor','scan','status','test','completions','restore','migrate','run','secret','scaffold-adapter','add','trust','login','push','pull')
-  $flags = @('--allow-unsigned','--at','--audit-log','--auth-type','--check','--config','--config-version','--cwd','--debug','--dry-run','--force','--guided','--help','--json','--list','--mcp-json','--output','--package','--pin','--profile','--tag','--team','--token-ref','--tools','--transport','--url','--version','--watch','--yes')
+  $commands = @('diagnose','sync','diff','init','import','export','doctor','scan','status','test','completions','restore','migrate','run','secret','scaffold-adapter','add','search','trust','login','push','pull')
+  $flags = @('--allow-unsigned','--as','--at','--audit-log','--auth-type','--check','--config','--config-version','--cwd','--debug','--dry-run','--force','--from-registry','--guided','--help','--json','--limit','--list','--mcp-json','--output','--package','--pin','--profile','--secret-scheme','--tag','--team','--token-ref','--tools','--transport','--url','--version','--watch','--yes')
   $candidates = if ($wordToComplete -like '-*') { $flags } else { $commands }
   $candidates | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
     [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
@@ -90,7 +91,8 @@ _mcpfold() {
     'run:internal shim launcher (resolve secrets, inject, exec the server)'
     'secret:wire up and verify secret providers'
     'scaffold-adapter:generate a new client adapter module + test (contributor on-ramp)'
-    'add:add a server by URL or npm package (guided or scripted)'
+    'add:add a server by URL, npm package, or the official registry (guided or scripted)'
+    'search:search the official MCP registry for servers (feed into \`add --from-registry\`)'
     'trust:approve new or changed server launch commands (config-as-code TOFU)'
     'login:authenticate to the mcpfold cloud (device-code OAuth)'
     'push:push the canonical config to the cloud (refs only, new version)'
@@ -102,7 +104,7 @@ _mcpfold() {
     opts)
       case $words[1] in
         test|restore) compadd $(mcpfold __complete servers 2>/dev/null) ;;
-        *) compadd --allow-unsigned --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --mcp-json --output --package --pin --profile --tag --team --token-ref --tools --transport --url --version --watch --yes ;;
+        *) compadd --allow-unsigned --as --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --from-registry --guided --help --json --limit --list --mcp-json --output --package --pin --profile --secret-scheme --tag --team --token-ref --tools --transport --url --version --watch --yes ;;
       esac ;;
   esac
 }

@@ -30,6 +30,7 @@ import { spawn } from 'node:child_process';
 import { runImport } from './commands/import.js';
 import { runExport } from './commands/export.js';
 import { runAdd } from './commands/add.js';
+import { runSearch } from './commands/search.js';
 import { runRun } from './commands/run.js';
 import { runMigrate } from './commands/migrate.js';
 import { scaffoldAdapter } from './commands/scaffold-adapter.js';
@@ -442,10 +443,21 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   addGlobalFlags(
     program
       .command('add')
-      .description('add a server by URL or npm package (guided or scripted)')
-      .argument('<name>', 'server name')
+      .description(
+        'add a server by URL, npm package, or the official registry (guided or scripted)',
+      )
+      .argument('<name>', 'server name (a reverse-DNS registry name with --from-registry)')
       .option('--url <url>', 'remote server URL (creates an http server)')
       .option('--package <spec>', 'npm package spec (creates a stdio npx server)')
+      .option('--from-registry', 'resolve <name> from the official MCP registry (pinned, ref-only)')
+      .option(
+        '--secret-scheme <s>',
+        'scheme for registry secret refs: env|dotenv|infisical|keychain|op',
+      )
+      .option(
+        '--as <name>',
+        'local config key for a registry server (default: name’s last segment)',
+      )
       .option('--transport <t>', 'http | sse | stdio')
       .option('--pin <version>', 'pin a stdio package to a fixed version')
       .option('--tag <tag...>', 'tag(s) to attach')
@@ -457,6 +469,9 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       opts: GlobalFlags & {
         url?: string;
         package?: string;
+        fromRegistry?: boolean;
+        secretScheme?: 'env' | 'dotenv' | 'infisical' | 'keychain' | 'op';
+        as?: string;
         transport?: 'http' | 'sse' | 'stdio';
         pin?: string;
         tag?: string[];
@@ -475,6 +490,9 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
               name,
               url: opts.url,
               package: opts.package,
+              fromRegistry: opts.fromRegistry,
+              secretScheme: opts.secretScheme,
+              as: opts.as,
               transport: opts.transport,
               pin: opts.pin,
               tags: opts.tag,
@@ -487,6 +505,24 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       );
     },
   );
+
+  addGlobalFlags(
+    program
+      .command('search')
+      .description('search the official MCP registry for servers (feed into `add --from-registry`)')
+      .argument('<query>', 'search terms')
+      .option('--limit <n>', 'max results (default 20)'),
+  ).action(async (query: string, opts: GlobalFlags & { limit?: string }) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'search',
+        ctx.json,
+        () => runSearch({ query, limit: opts.limit ? Number(opts.limit) : undefined }),
+        writer,
+      ),
+    );
+  });
 
   // ---- Config-as-code trust (S9.2) --------------------------------------------
   addGlobalFlags(

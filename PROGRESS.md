@@ -275,3 +275,45 @@ Prettier + demo drift + an end-to-end `migrate`+`doctor` smoke on a real v1 file
 **Follow-ups (not blocking):** a frozen v1 JSON-schema snapshot if strict per-version autocomplete is
 ever wanted (today both URLs serve the current schema); adapters could emit a client-specific OAuth
 hint field for clients that want one.
+
+---
+
+## S17.7 — Official MCP registry integration: `add --from-registry` and `search`
+
+**Started** 2026-07-09 · branch `story/S17.7-registry` · priority p1, deps: none.
+
+**Done** 2026-07-09 (CLI-side; unit + integration tested, and **smoke-tested live against the real
+registry**).
+
+One command turns an official-registry listing into the **safest possible** canonical entry —
+pinned to an exact version, integrity-hashed where available, every secret a reference, never a
+value. No competitor in the sync niche does this mapping.
+
+- **`registry/client.ts`** — client for `registry.modelcontextprotocol.io` (frozen v0 API).
+  Injectable `fetch`; base URL overridable via `MCPFOLD_REGISTRY_URL` (subregistries/mirrors);
+  `search(query)` + `getByName(name)` (exact, latest). Network failure → actionable offline error
+  (S0.9), **nothing written**.
+- **`registry/map.ts`** (pure) — `server.json` (2025-12-11) → canonical: `packages[]`
+  (npm→npx / pypi→uvx / oci→docker …) with `pin` = exact version and `integrity` (SRI from an mcpb
+  `fileSha256`); `remotes[]` (streamable-http/sse) → remote server; `environmentVariables`/`headers`
+  with `isSecret` → `${scheme:NAME}` **references**. **Refuses** an unpinnable package or a raw
+  secret value (even when the listing ships a secret `default`).
+- **`mcpfold add <name> --from-registry`** — fetch → map → org-policy gate → comment-preserving
+  insert under a derived local key (`--as` to override). `--secret-scheme env|dotenv|infisical|
+keychain|op` (or an interactive prompt).
+- **`mcpfold search <query>`** — human + `--json` list of matching servers.
+- **`docs/registry.md`** — the full `server.json` → `mcp.config` mapping table, subregistry override,
+  offline behavior.
+
+Tests: `registry.test.ts` (19) — mapper (npm/pypi/oci/mcpb/remotes, isSecret→ref, refusal paths,
+no-raw-value-even-with-default), client (search/getByName, base-URL override, offline + non-ok
+errors), and `add --from-registry`/`search` integration (derived key, `--as`, no-write-on-failure).
+Completion snapshots + `--help` list updated for the new `search` command.
+
+`verify_all` green (lint+purity, typecheck ×8, `pnpm -r test` — cli 34 files/248 — build), plus
+`docs:build`, Prettier, deploy-env. **Live smoke**: `search github` and
+`add ai.smithery/smithery-ai-github --from-registry` against the real registry produced a
+`streamable-http` server with the secret header as `${env:Authorization}` — never a value.
+
+**Follow-ups (not blocking):** a `--package`/`--remote` selector when a listing has several; caching
+registry responses for offline reuse.
