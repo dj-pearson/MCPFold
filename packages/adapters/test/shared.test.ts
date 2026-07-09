@@ -78,6 +78,7 @@ describe('mcpServers shape round-trip (S2.1)', () => {
 describe('createMcpServersAdapter (S2.1)', () => {
   const adapter = createMcpServersAdapter({
     id: 'cursor',
+    remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
     resolvePath: (scope, projectPath) =>
       scope === 'user' ? '/home/dev/.cursor/mcp.json' : `${projectPath}/.cursor/mcp.json`,
   });

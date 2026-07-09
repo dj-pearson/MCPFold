@@ -19,6 +19,8 @@ export const rooCodeAdapter = createMcpServersAdapter({
   id: 'roo-code',
   secretStrategy: 'shim',
   needsRestart: false,
+  // Cline-family: native http/sse remotes with header auth (`url` + `headers`).
+  remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope === 'user') {
       return joinFor(

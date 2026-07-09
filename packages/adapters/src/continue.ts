@@ -23,6 +23,8 @@ export const continueAdapter = createMcpServersAdapter({
   id: 'continue',
   secretStrategy: 'shim',
   needsRestart: false,
+  // Continue speaks streamable-http/sse remotes natively with header auth.
+  remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope === 'user') {
       return joinFor(ctx, ctx.home, '.continue', 'mcpServers', 'mcpfold.json');

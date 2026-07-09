@@ -50,6 +50,8 @@ export const geminiCliAdapter: ClientAdapter = {
   id: 'gemini-cli',
   secretStrategy: 'shim',
   needsRestart: false,
+  // Native remotes with header auth; streamable HTTP under `httpUrl`, SSE under `url`.
+  remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'httpUrl' },
 
   resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
     if (scope !== 'user') throw new Error('Gemini CLI only supports user scope.');

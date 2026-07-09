@@ -80,6 +80,7 @@ describe('renderWithStrategy — inline (S4.6)', () => {
   const inlineAdapter = createMcpServersAdapter({
     id: 'cursor',
     secretStrategy: 'inline',
+    remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
     resolvePath: () => '/home/dev/.cursor/mcp.json',
   });
   const fakeResolve = async (servers: ResolvedServer[]): Promise<ResolvedServer[]> =>

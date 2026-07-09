@@ -6,5 +6,5 @@
   },
   "rootKeys": ["mcpServers"],
   "serverContainer": "mcpServers",
-  "entryKeys": ["args", "command", "env", "url"]
+  "entryKeys": ["args", "command", "env"]
 }

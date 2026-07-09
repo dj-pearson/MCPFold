@@ -22,6 +22,8 @@ export const jetbrainsAdapter = createMcpServersAdapter({
   id: 'jetbrains',
   secretStrategy: 'shim',
   needsRestart: false,
+  // The mcp.json surface takes a native remote `url` + `headers` (verified July 2026).
+  remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope === 'user') return joinFor(ctx, ctx.home, '.junie', 'mcp', 'mcp.json');
     if (!projectPath) throw new Error('JetBrains project scope requires a project path.');

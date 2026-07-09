@@ -15,6 +15,8 @@ export const clineAdapter = createMcpServersAdapter({
   id: 'cline',
   secretStrategy: 'shim',
   needsRestart: false,
+  // Cline calls http/sse remotes natively with header auth (`url` + `headers`).
+  remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
   resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
     if (scope !== 'user') throw new Error('Cline only supports user scope.');
     return joinFor(

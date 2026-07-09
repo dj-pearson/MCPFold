@@ -90,6 +90,8 @@ export const vscodeAdapter: ClientAdapter = {
   id: 'vscode',
   secretStrategy: 'native-input',
   needsRestart: false,
+  // Native HTTP remotes with OAuth (verified July 2026); explicit `type` in the `servers` dialect.
+  remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'type+url' },
 
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope === 'workspace' || scope === 'project') {
