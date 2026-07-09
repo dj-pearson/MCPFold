@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { generateSchema, generateSchemaText } from '../src/generate.js';
+import { generatePolicySchemaText, generateSchema, generateSchemaText } from '../src/generate.js';
 
 // ajv is CJS; verbatimModuleSyntax + NodeNext make a default import non-constructable, so
 // load it via createRequire.
@@ -10,11 +10,15 @@ const require = createRequire(import.meta.url);
 const Ajv = require('ajv') as typeof import('ajv').default;
 
 const committedPath = fileURLToPath(new URL('../mcp.config.schema.json', import.meta.url));
+const committedPolicyPath = fileURLToPath(new URL('../mcp.policy.schema.json', import.meta.url));
 
-// `pnpm --filter @mcpfold/schema generate` (WRITE_SCHEMA=1) writes the committed file;
-// CI runs without the flag and the drift test fails if the committed file is stale.
+// `pnpm --filter @mcpfold/schema generate` (WRITE_SCHEMA=1) writes the committed files;
+// CI runs without the flag and the drift test fails if a committed file is stale.
 beforeAll(() => {
-  if (process.env.WRITE_SCHEMA === '1') writeFileSync(committedPath, generateSchemaText());
+  if (process.env.WRITE_SCHEMA === '1') {
+    writeFileSync(committedPath, generateSchemaText());
+    writeFileSync(committedPolicyPath, generatePolicySchemaText());
+  }
 });
 
 const VALID = {
@@ -69,5 +73,10 @@ describe('generated JSON Schema (S1.5)', () => {
     // Normalize CRLF → LF so the check is robust to git autocrlf on Windows checkouts.
     const committed = readFileSync(committedPath, 'utf8').replace(/\r\n/g, '\n');
     expect(committed).toBe(generateSchemaText());
+  });
+
+  it('committed mcp.policy.schema.json matches the generated policy schema (S18.3 drift check)', () => {
+    const committed = readFileSync(committedPolicyPath, 'utf8').replace(/\r\n/g, '\n');
+    expect(committed).toBe(generatePolicySchemaText());
   });
 });

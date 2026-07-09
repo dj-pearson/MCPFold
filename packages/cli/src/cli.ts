@@ -131,37 +131,50 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       .command('sync')
       .description('fold the canonical config out to client files, with backups')
       .option('--check', 'exit nonzero if client files differ from canonical; write nothing', false)
-      .option('--watch', 're-fold automatically when the config changes (Ctrl-C to stop)', false),
-  ).action(async (opts: GlobalFlags & { check?: boolean; watch?: boolean }) => {
-    const ctx = resolve(opts);
-    if (opts.watch) {
-      // Long-running: fold on change until a signal, then stop cleanly. (Not a --json command.)
-      const w = writer ?? processWriter;
-      await new Promise<void>((res) => {
-        const handle = runSyncWatch(
-          { cwd: ctx.cwd, profile: ctx.profile, dryRun: ctx.dryRun },
-          { write: (line) => w.out(`${line}\n`) },
-        );
-        const shutdown = () => {
-          handle.stop();
-          w.out('\nStopped watching.\n');
-          res();
-        };
-        process.once('SIGINT', shutdown);
-        process.once('SIGTERM', shutdown);
-      });
-      return;
-    }
-    setExit(
-      await runCommand(
-        'sync',
-        ctx.json,
-        () =>
-          runSync({ cwd: ctx.cwd, profile: ctx.profile, dryRun: ctx.dryRun, check: opts.check }),
-        writer,
+      .option('--watch', 're-fold automatically when the config changes (Ctrl-C to stop)', false)
+      .option(
+        '--strip-denied',
+        'fold the org-policy-permitted servers and omit denied ones (default: refuse)',
+        false,
       ),
-    );
-  });
+  ).action(
+    async (opts: GlobalFlags & { check?: boolean; watch?: boolean; stripDenied?: boolean }) => {
+      const ctx = resolve(opts);
+      if (opts.watch) {
+        // Long-running: fold on change until a signal, then stop cleanly. (Not a --json command.)
+        const w = writer ?? processWriter;
+        await new Promise<void>((res) => {
+          const handle = runSyncWatch(
+            { cwd: ctx.cwd, profile: ctx.profile, dryRun: ctx.dryRun },
+            { write: (line) => w.out(`${line}\n`) },
+          );
+          const shutdown = () => {
+            handle.stop();
+            w.out('\nStopped watching.\n');
+            res();
+          };
+          process.once('SIGINT', shutdown);
+          process.once('SIGTERM', shutdown);
+        });
+        return;
+      }
+      setExit(
+        await runCommand(
+          'sync',
+          ctx.json,
+          () =>
+            runSync({
+              cwd: ctx.cwd,
+              profile: ctx.profile,
+              dryRun: ctx.dryRun,
+              check: opts.check,
+              stripDenied: opts.stripDenied,
+            }),
+          writer,
+        ),
+      );
+    },
+  );
 
   addGlobalFlags(
     program

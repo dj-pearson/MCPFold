@@ -76,3 +76,54 @@ The repo gate covers one repository. When you outgrow it — a config shared acr
 `mcpfold push` sends the canonical config (references only, new version), teammates `mcpfold pull`,
 and the team console adds members, roles, and the change-audit trail. Nothing about your config
 changes — you graduate the _distribution_, not the _format_.
+
+## Org policy: allow/deny lists enforced everywhere (S18.3)
+
+TOFU trust catches a _changed_ launch command, but it can't stop a developer from adding a
+perfectly-valid server your org hasn't vetted. An **org policy** does: publish one
+`mcp.policy.json` and mcpfold enforces it on every developer machine and in CI, so ungoverned
+servers can't quietly enter any client config you manage.
+
+```jsonc
+{
+  "$schema": "https://mcpfold.com/schema/policy-v1.json",
+  "version": 1,
+  // "permissive" (default) enforces only the deny list; "strict" is allow-list-only.
+  "mode": "permissive",
+  "deny": [
+    { "match": "namespace", "pattern": "@evilcorp", "reason": "unvetted vendor" },
+    { "match": "url", "pattern": "https://*.pastebin.com/*" },
+  ],
+  "allow": [{ "match": "namespace", "pattern": "@modelcontextprotocol" }],
+}
+```
+
+**Rules** match on `name` (glob), `package` (prefix/glob), `namespace` (the `@scope` or registry
+namespace of the launched package), or `url` (glob). **Deny always wins** — over an allow rule and
+over local TOFU trust. In `strict` mode a server must additionally match an `allow` rule or it is
+denied (allow-list-only).
+
+**Enforcement** is one shared evaluator, applied everywhere:
+
+- `sync` refuses to fold a denied server (or `sync --strip-denied` folds the permitted ones and
+  omits the denied ones with a loud warning);
+- `add` / `add --from-registry` refuse to add a denied server;
+- `run` refuses to launch a denied server — **before** the trust gate;
+- `scan` and `sync --check` report violations with rule provenance (which rule, from which file).
+
+**Discovery** looks for the policy in this order, first found wins: a project `mcp.policy.jsonc` /
+`mcp.policy.json`, then `$MCPFOLD_POLICY`, then the machine-managed location
+(`/etc/mcpfold/policy.json` on Linux, `/Library/Application Support/mcpfold/policy.json` on macOS,
+`%PROGRAMDATA%\mcpfold\policy.json` on Windows) that an org deploys via MDM/config management.
+
+**CI example** — fail the build if any managed config or the canonical config contains a
+policy-denied server:
+
+```yaml
+- name: Enforce MCP org policy
+  env:
+    MCPFOLD_POLICY: ${{ github.workspace }}/mcp.policy.json
+  run: |
+    npx mcpfold sync --check   # exits 1 on drift OR a policy violation
+    npx mcpfold scan --json    # exits 1 and lists violations with provenance
+```

@@ -116,6 +116,24 @@ export {
 } from './migrate/index.js';
 export { MIGRATIONS, type Migration } from './migrate/migrations.js';
 
+// Org-managed server policy (S18.3)
+export {
+  evaluatePolicy,
+  launchedNamespace,
+  launchedPackage,
+  parsePolicy,
+  PolicyRuleSchema,
+  PolicySchema,
+  POLICY_MATCH_KINDS,
+  POLICY_VERSION,
+  type McpfoldPolicy,
+  type ParsePolicyResult,
+  type PolicyDecision,
+  type PolicyMatchKind,
+  type PolicyRule,
+  type PolicyTarget,
+} from './policy.js';
+
 // Drift-diff engine (S1.6)
 export {
   diffRendered,

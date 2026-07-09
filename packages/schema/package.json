@@ -11,11 +11,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./mcp.config.schema.json": "./mcp.config.schema.json"
+    "./mcp.config.schema.json": "./mcp.config.schema.json",
+    "./mcp.policy.schema.json": "./mcp.policy.schema.json"
   },
   "files": [
     "dist",
-    "mcp.config.schema.json"
+    "mcp.config.schema.json",
+    "mcp.policy.schema.json"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

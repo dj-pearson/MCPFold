@@ -7,7 +7,7 @@ _mcpfold_complete() {
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
   local commands="diagnose sync diff init import doctor scan status test completions restore migrate run secret scaffold-adapter add trust login push pull"
-  local flags="--allow-unsigned --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --package --pin --profile --tag --team --token-ref --tools --transport --url --version --watch --yes"
+  local flags="--allow-unsigned --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --package --pin --profile --strip-denied --tag --team --token-ref --tools --transport --url --version --watch --yes"
   case "$prev" in
     -p|--profile) COMPREPLY=( $(compgen -W "$(mcpfold __complete profiles 2>/dev/null)" -- "$cur") ); return;;
     test|restore) COMPREPLY=( $(compgen -W "$(mcpfold __complete servers 2>/dev/null)" -- "$cur") ); return;;
@@ -58,7 +58,7 @@ exports[`completion scripts (S11.2) > generates a stable pwsh script from the co
 Register-ArgumentCompleter -Native -CommandName mcpfold,mcpf -ScriptBlock {
   param($wordToComplete, $commandAst, $cursorPosition)
   $commands = @('diagnose','sync','diff','init','import','doctor','scan','status','test','completions','restore','migrate','run','secret','scaffold-adapter','add','trust','login','push','pull')
-  $flags = @('--allow-unsigned','--at','--audit-log','--auth-type','--check','--config','--config-version','--cwd','--debug','--dry-run','--force','--guided','--help','--json','--list','--package','--pin','--profile','--tag','--team','--token-ref','--tools','--transport','--url','--version','--watch','--yes')
+  $flags = @('--allow-unsigned','--at','--audit-log','--auth-type','--check','--config','--config-version','--cwd','--debug','--dry-run','--force','--guided','--help','--json','--list','--package','--pin','--profile','--strip-denied','--tag','--team','--token-ref','--tools','--transport','--url','--version','--watch','--yes')
   $candidates = if ($wordToComplete -like '-*') { $flags } else { $commands }
   $candidates | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
     [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
@@ -100,7 +100,7 @@ _mcpfold() {
     opts)
       case $words[1] in
         test|restore) compadd $(mcpfold __complete servers 2>/dev/null) ;;
-        *) compadd --allow-unsigned --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --package --pin --profile --tag --team --token-ref --tools --transport --url --version --watch --yes ;;
+        *) compadd --allow-unsigned --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --package --pin --profile --strip-denied --tag --team --token-ref --tools --transport --url --version --watch --yes ;;
       esac ;;
   esac
 }

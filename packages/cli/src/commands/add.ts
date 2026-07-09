@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { applyEdits, modify } from 'jsonc-parser';
 import { isSecretRef, loadConfig, UsageError, type ServerConfig } from '@mcpfold/core';
+import type { OsContext } from '@mcpfold/adapters';
 import { findConfigPath } from '../util/config.js';
 import { atomicWrite } from '../io/atomic-write.js';
+import { enforceServerPolicy } from '../policy/discover.js';
 import type { CommandOutput } from '../output/render.js';
 
 /**
@@ -29,6 +31,8 @@ export interface AddOptions {
   dryRun?: boolean;
   /** Injectable prompt for the interactive path; default reads from the TTY. */
   prompt?: Prompt;
+  /** OS context for org-policy discovery (S18.3). Injectable for tests. */
+  osContext?: OsContext;
 }
 
 export interface AddData {
@@ -107,6 +111,9 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
     const pin = options.pin;
     if (pin) server.pin = pin;
   }
+
+  // Org policy (S18.3): refuse to add a server the org policy denies, before it ever hits disk.
+  enforceServerPolicy(options.name, server, options.cwd, options.osContext);
 
   // Structural insert that preserves surrounding comments.
   const edits = modify(text, ['servers', options.name], server, {

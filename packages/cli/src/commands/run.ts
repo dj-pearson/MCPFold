@@ -15,8 +15,10 @@ import {
   type AuditRecorder,
   type PinnedToolsOptions,
 } from '@mcpfold/proxy';
+import type { OsContext } from '@mcpfold/adapters';
 import { loadConfigFromDisk } from '../util/config.js';
 import { fileTrustGate, isExecutable, type TrustGate } from '../trust/tofu.js';
+import { enforceServerPolicy } from '../policy/discover.js';
 import { resolveCommand } from '../util/spawn.js';
 
 /**
@@ -113,6 +115,8 @@ export interface RunOptions {
   proxySpawnFn?: ProxySpawner;
   /** Trust gate (TOFU); defaults to the per-machine trust store. Injectable for tests. */
   trust?: TrustGate;
+  /** OS context for org-policy discovery (S18.3). Injectable for tests. */
+  osContext?: OsContext;
   /** Block (not just warn) when the tool surface drifts from the pinned one (S18.1). */
   strictTools?: boolean;
   /** Sink for the drift warning line(s); defaults to stderr. Injectable for tests. */
@@ -177,6 +181,10 @@ export async function runRun(options: RunOptions): Promise<number> {
       hint: 'Check the server name, or add it and run `mcpfold sync`.',
     });
   }
+
+  // Org policy (S18.3): deny wins over local trust, so this gate runs BEFORE the TOFU check —
+  // a policy-blocked server never runs, no matter what the local trust store says.
+  enforceServerPolicy(options.name, server, options.cwd, options.osContext);
 
   const trust = options.trust ?? fileTrustGate();
 

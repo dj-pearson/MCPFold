@@ -1,5 +1,5 @@
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { ConfigSchema } from '@mcpfold/core';
+import { ConfigSchema, PolicySchema } from '@mcpfold/core';
 
 /**
  * Generate the published JSON Schema for `mcp.config.jsonc` from the zod source (S1.5).
@@ -22,4 +22,19 @@ export function generateSchema(): Record<string, unknown> {
 
 export function generateSchemaText(): string {
   return `${JSON.stringify(generateSchema(), null, 2)}\n`;
+}
+
+/** The published JSON Schema for the org policy file `mcp.policy.json` (S18.3). */
+export const POLICY_SCHEMA_URL = 'https://mcpfold.com/schema/policy-v1.json';
+
+export function generatePolicySchema(): Record<string, unknown> {
+  const jsonSchema = zodToJsonSchema(PolicySchema, {
+    name: 'McpfoldPolicy',
+    target: 'jsonSchema7',
+  });
+  return { $id: POLICY_SCHEMA_URL, ...jsonSchema };
+}
+
+export function generatePolicySchemaText(): string {
+  return `${JSON.stringify(generatePolicySchema(), null, 2)}\n`;
 }

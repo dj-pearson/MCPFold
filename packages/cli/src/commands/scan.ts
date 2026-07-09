@@ -4,6 +4,7 @@ import { ALL_ADAPTERS, realOsContext, registerAll, type OsContext } from '@mcpfo
 import { findConfigPath } from '../util/config.js';
 import { maskTokens, Redactor } from '../util/redact.js';
 import { scanClientRaw, securityFindings } from '../checks/security.js';
+import { discoverPolicy, policyViolations } from '../policy/discover.js';
 import type { Finding } from '../checks/types.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
@@ -133,6 +134,29 @@ export function runScan(options: ScanOptions): CommandOutput<ScanData> {
     } else {
       registerLiteralSecrets(result.config, redactor);
       tag('canonical', securityFindings(result.config, configPath, { canonical: true }));
+
+      // Org policy (S18.3): report any canonical server the policy denies, with rule provenance.
+      const { loaded: policy, error: policyError } = discoverPolicy(options.cwd, ctx);
+      if (policyError) {
+        findings.push({
+          client: 'canonical',
+          severity: 'error',
+          file: configPath,
+          message: policyError,
+          fix: 'Fix the policy file or unset MCPFOLD_POLICY.',
+        });
+      } else if (policy) {
+        for (const v of policyViolations(result.config.servers, policy)) {
+          findings.push({
+            client: 'canonical',
+            severity: 'error',
+            file: configPath,
+            where: `servers.${v.server}`,
+            message: `Server "${v.server}" is blocked by org policy: ${v.decision.reason}.`,
+            fix: `Governed by ${v.source}. Remove it or ask your platform team to allow it.`,
+          });
+        }
+      }
     }
   }
 

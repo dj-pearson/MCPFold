@@ -4,6 +4,7 @@ import {
   diffRendered,
   resolveProfile,
   UnknownProfileError,
+  UsageError,
   checkRendered,
   hasDrift,
   type CheckableFile,
@@ -14,6 +15,7 @@ import {
 import { realOsContext, registerAll, requireAdapter, type OsContext } from '@mcpfold/adapters';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import { findConfigPath, loadConfigFromDisk } from '../util/config.js';
+import { discoverPolicy, policyViolations, type PolicyViolation } from '../policy/discover.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import { backupIfExists } from '../io/backup.js';
 import { type FsWatcher, watchWithDebounce, type WatchHandle } from '../io/watch.js';
@@ -61,6 +63,8 @@ export interface SyncOptions {
   now?: Date;
   /** Injectable secret providers (used only by the inline strategy). Defaults to env+dotenv. */
   providers?: SecretProvider[];
+  /** Fold the permitted servers and omit policy-denied ones (with a loud warning), rather than refusing (S18.3). */
+  stripDenied?: boolean;
 }
 
 export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncData>> {
@@ -84,10 +88,44 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
   const resolve = (servers: ResolvedServer[]): Promise<ResolvedServer[]> =>
     resolveSecrets(servers, { providers });
 
+  // Org policy (S18.3): find the governing policy, then collect every to-be-folded server it denies.
+  const { loaded: policy, error: policyError } = discoverPolicy(options.cwd, ctx);
+  if (policyError)
+    throw new UsageError(policyError, { hint: 'Fix the policy file or unset MCPFOLD_POLICY.' });
+  const perProfile: Record<string, ResolvedServer[]> = {};
+  const denied = new Map<string, PolicyViolation>();
+  for (const name of profileNames) {
+    const servers = resolveProfile(config, name);
+    perProfile[name] = servers;
+    if (policy) {
+      const asRecord = Object.fromEntries(servers.map((s) => [s.name, s]));
+      for (const v of policyViolations(asRecord, policy)) denied.set(v.server, v);
+    }
+  }
+  const violations = [...denied.values()];
+  if (violations.length > 0) {
+    // Apply mode refuses by default (deny wins over local trust); --strip-denied folds the rest.
+    if (!options.check && !options.stripDenied) {
+      throw new UsageError(
+        `Refusing to sync: ${violations.length} server(s) are blocked by org policy (${policy!.source}).`,
+        {
+          hint: `${violations.map((v) => `${v.server}: ${v.decision.reason}`).join('; ')}. Re-run with --strip-denied to fold the permitted servers without them.`,
+        },
+      );
+    }
+    for (const v of violations) {
+      warnings.push(`⚠ policy: server "${v.server}" ${v.decision.reason} (policy: ${v.source})`);
+    }
+    if (options.check) drift = true; // a governed CI check must fail on any violation
+  }
+
   for (const name of profileNames) {
     const profile = config.profiles[name]!;
     const adapter = requireAdapter(profile.client);
-    const servers = resolveProfile(config, name);
+    // --strip-denied omits policy-denied servers from the fold; otherwise fold as resolved.
+    const servers = options.stripDenied
+      ? perProfile[name]!.filter((s) => !denied.has(s.name))
+      : perProfile[name]!;
     const file = await renderWithStrategy(adapter, servers, {
       osContext: ctx,
       resolve,
