@@ -245,6 +245,12 @@ its own container and gets its **own** host, `functions.mcpfold.com`.
    - `PORT` — the port the edge service listens on inside the container; defaults to `8000` (leave it
      unless you also change the exposed port above). `JWT_EXPIRY` — access-token lifetime in seconds,
      defaults to `3600`; if you set it on Supabase, set the **same** value here.
+   - **Stripe billing (optional, S20.2)** — leave all four unset to run the free preview (billing
+     endpoints return `501` and every team stays on the free tier). To enable paid team tiers, set:
+     `STRIPE_SECRET_KEY` (`sk_live_…`), `STRIPE_WEBHOOK_SECRET` (`whsec_…`, from the webhook you
+     point at `…/billing/webhook`), and the price ids `STRIPE_PRICE_TEAM` / `STRIPE_PRICE_ENTERPRISE`
+     for the [documented tiers](./pricing-model.md). All are secrets — store them in Coolify/Infisical,
+     never in git.
 4. Set the **domain** to `https://functions.mcpfold.com`, expose port `8000`, let Coolify handle TLS.
 5. **Deploy.** Coolify uses the image's health check (`/health`) for zero-downtime restarts.
 

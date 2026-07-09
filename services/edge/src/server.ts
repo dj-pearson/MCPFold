@@ -19,10 +19,28 @@ import {
   createTeamRemoveHandler,
   createTeamsHandler,
 } from "../functions/teams/index.ts";
+import { type BillingConfig, createBillingHandler } from "../functions/billing/index.ts";
+import { dbEntitlementChecker } from "../lib/entitlements.ts";
 import { DEFAULT_CONFIG, type DeviceAuthConfig, type Sql } from "../lib/device.ts";
 import { json } from "../lib/http.ts";
 
-/** Route a request to health / push / pull / machines / history / auth by its final path segment. */
+/**
+ * Billing config from the environment (S20.2). All optional: with no keys set the webhook and
+ * checkout/portal return 501 "billing_not_configured" and entitlements fail-closed to `cloud-free`,
+ * so the free preview keeps working without granting paid features.
+ */
+export function loadBillingConfig(): BillingConfig {
+  return {
+    webhookSecret: Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "",
+    secretKey: Deno.env.get("STRIPE_SECRET_KEY") ?? "",
+    prices: {
+      team: Deno.env.get("STRIPE_PRICE_TEAM") ?? undefined,
+      enterprise: Deno.env.get("STRIPE_PRICE_ENTERPRISE") ?? undefined,
+    },
+  };
+}
+
+/** Route a request to health / push / pull / machines / history / billing / auth by its path. */
 export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) => Promise<Response> {
   const auth = createHandler({ sql, cfg });
   const push = createPushHandler({ sql, cfg });
@@ -30,16 +48,19 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
   const machines = createMachinesHandler({ sql, cfg });
   const history = createHistoryHandler({ sql, cfg });
   const revoke = createRevokeHandler({ sql, cfg });
+  const entitlements = dbEntitlementChecker(sql);
   const teams = createTeamsHandler({ sql, cfg });
   const teamMembers = createTeamMembersHandler({ sql, cfg });
-  const teamInvite = createTeamInviteHandler({ sql, cfg });
+  const teamInvite = createTeamInviteHandler({ sql, cfg, entitlements });
   const teamRemove = createTeamRemoveHandler({ sql, cfg });
   const teamAudit = createTeamAuditHandler({ sql, cfg });
+  const billing = createBillingHandler({ sql, cfg, billing: loadBillingConfig() });
   return (req) => {
     const path = new URL(req.url).pathname.replace(/\/+$/, "");
     if (path.endsWith("/health") || path === "") {
       return Promise.resolve(json({ ok: true, service: "mcpfold-edge" }));
     }
+    if (path.includes("/billing/")) return billing(req);
     if (path.endsWith("/push")) return push(req);
     if (path.endsWith("/pull")) return pull(req);
     if (path.endsWith("/machines")) return machines(req);

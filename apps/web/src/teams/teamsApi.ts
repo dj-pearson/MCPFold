@@ -24,6 +24,14 @@ export interface AuditEntry {
   removed: string[];
 }
 
+/** The team's commercial tier (S20.2). `cloud-free` gates paid team features. */
+export type Tier = 'cloud-free' | 'team' | 'enterprise';
+
+/** Whether a tier unlocks the paid team features (invites, shared config). */
+export function isPaidTier(tier: Tier): boolean {
+  return tier === 'team' || tier === 'enterprise';
+}
+
 export interface TeamsApi {
   listTeams(): Promise<Team[]>;
   createTeam(name: string): Promise<Team>;
@@ -31,6 +39,12 @@ export interface TeamsApi {
   invite(teamId: string, email: string, role: string): Promise<void>;
   remove(teamId: string, userId: string): Promise<void>;
   audit(teamId: string): Promise<AuditEntry[]>;
+  /** The team's current tier (S20.2). */
+  entitlement(teamId: string): Promise<Tier>;
+  /** A Stripe Checkout URL to subscribe the team; empty string when no redirect is needed. */
+  checkout(teamId: string): Promise<{ url: string }>;
+  /** A Stripe Billing Portal URL to manage an existing subscription. */
+  portal(teamId: string): Promise<{ url: string }>;
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'https://functions.mcpfold.com';
@@ -99,6 +113,35 @@ function httpTeamsApi(base: string, getToken: () => string | null): TeamsApi {
       );
       return (await res.json()) as AuditEntry[];
     },
+    async entitlement(teamId) {
+      const res = await ok(
+        await fetch(`${base}/billing/entitlement?team=${teamId}`, { headers: headers() }),
+        'Entitlement',
+      );
+      return ((await res.json()) as { tier: Tier }).tier;
+    },
+    async checkout(teamId) {
+      const res = await ok(
+        await fetch(`${base}/billing/checkout`, {
+          method: 'POST',
+          headers: headers(true),
+          body: JSON.stringify({ team: teamId }),
+        }),
+        'Checkout',
+      );
+      return (await res.json()) as { url: string };
+    },
+    async portal(teamId) {
+      const res = await ok(
+        await fetch(`${base}/billing/portal`, {
+          method: 'POST',
+          headers: headers(true),
+          body: JSON.stringify({ team: teamId }),
+        }),
+        'Portal',
+      );
+      return (await res.json()) as { url: string };
+    },
   };
 }
 
@@ -107,6 +150,7 @@ function mockTeamsApi(): TeamsApi {
   const teams: Team[] = [];
   const members: Record<string, Member[]> = {};
   const audits: Record<string, AuditEntry[]> = {};
+  const tiers: Record<string, Tier> = {}; // teams start on the free tier (S20.2)
   let counter = 0;
   return {
     listTeams: () => Promise.resolve([...teams]),
@@ -135,6 +179,13 @@ function mockTeamsApi(): TeamsApi {
       return Promise.resolve();
     },
     audit: (id) => Promise.resolve([...(audits[id] ?? [])]),
+    entitlement: (id) => Promise.resolve(tiers[id] ?? 'cloud-free'),
+    // Simulate a completed subscription: flip the mock tier to `team` and skip the redirect.
+    checkout: (id) => {
+      tiers[id] = 'team';
+      return Promise.resolve({ url: '' });
+    },
+    portal: () => Promise.resolve({ url: '' }),
   };
 }
 

@@ -30,10 +30,23 @@ mapping.
 
 ## Billing
 
-Provider: **Stripe** (a subscription priced per active team member). It is **not yet integrated** —
-[`services/edge/lib/entitlements.ts`](../services/edge/lib/entitlements.ts) defines the
-`EntitlementChecker` interface the [team billing gate (S7.6)](./team-config-as-code.md) will call
-once Stripe is wired; until then the default checker gates nothing.
+Provider: **Stripe** (a subscription per team). Billing is **wired** (S20.2):
+
+- A team starts on the **free** tier. Its owner subscribes via **Stripe Checkout**
+  (`POST …/billing/checkout`) and manages the subscription via the **Billing Portal**
+  (`POST …/billing/portal`) — both surfaced in the Team console.
+- A signature-verified, **idempotent** Stripe webhook (`POST …/billing/webhook`) maintains one
+  row per team in `public.entitlements` (RLS-protected: a team's own members can read it; only the
+  webhook writes it). The Stripe event id is recorded in `public.billing_events`, so a re-delivered
+  event never double-applies.
+- The edge [`EntitlementChecker`](../services/edge/lib/entitlements.ts) reads that state and
+  resolves the tier, **failing closed to the free tier** on any missing/inactive/unknown state — it
+  never grants a paid tier by default. Team endpoints enforce it server-side (e.g. inviting members
+  returns `402` on the free tier).
+
+The OSS CLI is **never** gated by any of this — gating applies only to the hosted cloud team
+surface (see Licensing boundaries below). A regression test asserts the CLI imports no entitlement
+code.
 
 ## Licensing boundaries
 

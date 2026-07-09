@@ -99,4 +99,36 @@ maxv=$(q "select max(version) from public.configs where team_id='$TEAM';")
 [ "$maxv" = "2" ] || fail "team config should auto-version to 2, got $maxv"
 echo "✓ team config history feeds config_audit (2 versions, auto-numbered)"
 
-echo "✓ RLS + immutability + reference-only + audit all verified"
+# --- 5. Entitlements (S20.2): team members read; non-members can't; clients never write ------
+# Seed the team's entitlement as the trusted owner — this is the webhook's (BYPASSRLS) write path.
+q "reset role;
+   insert into public.entitlements (team_id, tier, status) values ('$TEAM','team','active')
+     on conflict (team_id) do update set tier='team', status='active';" >/dev/null
+
+a_ent=$(q "set app.current_user_id='$A'; set role authenticated;
+           select count(*) from public.entitlements where team_id='$TEAM';")
+[ "$a_ent" = "1" ] || fail "team member A should read its entitlement, saw $a_ent"
+echo "✓ a team member reads its entitlement"
+
+b_ent=$(q "set app.current_user_id='$B'; set role authenticated;
+           select count(*) from public.entitlements where team_id='$TEAM';")
+[ "$b_ent" = "0" ] || fail "non-member B must not read the entitlement (saw $b_ent)"
+echo "✓ a non-member cannot read the entitlement (RLS isolation)"
+
+# The authenticated role has only SELECT on entitlements → any client write is denied outright.
+if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qc "
+     set app.current_user_id='$A'; set role authenticated;
+     update public.entitlements set tier='enterprise' where team_id='$TEAM';" >/dev/null 2>&1; then
+  fail "the authenticated role must not be able to write entitlements (webhook-only)"
+fi
+echo "✓ clients cannot write entitlements (webhook is the only writer)"
+
+# billing_events (the idempotency ledger) is entirely inaccessible to the authenticated role.
+if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qc "
+     set app.current_user_id='$A'; set role authenticated;
+     select 1 from public.billing_events;" >/dev/null 2>&1; then
+  fail "the authenticated role must not read billing_events"
+fi
+echo "✓ billing_events is not client-readable"
+
+echo "✓ RLS + immutability + reference-only + audit + entitlements all verified"
