@@ -6,7 +6,14 @@ import { faqsForPath } from './faq';
  * FAQPage JSON-LD, so the answers exist in the real HTML for answer engines to lift and cite.
  * Uses semantic <dl>/<dt>/<dd> so the question→answer relationship is machine-legible.
  */
-export function FaqSection({ path }: { path: string }) {
+export function FaqSection({
+  path,
+  moreLink,
+}: {
+  path: string;
+  /** An optional "learn more" link rendered under the FAQ (e.g. pricing → the security page). */
+  moreLink?: { href: string; text: string };
+}) {
   const faqs = faqsForPath(path);
   if (faqs.length === 0) return null;
   return (
@@ -27,6 +34,13 @@ export function FaqSection({ path }: { path: string }) {
             </div>
           ))}
         </dl>
+        {moreLink && (
+          <p style={{ marginTop: 'var(--space-4)' }}>
+            <a href={moreLink.href} data-testid="faq-more-link">
+              {moreLink.text} →
+            </a>
+          </p>
+        )}
       </section>
     </Container>
   );

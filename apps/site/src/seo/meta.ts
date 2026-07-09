@@ -79,6 +79,13 @@ export function resolveMeta(path: string): RouteMeta {
       '/pricing',
     );
   }
+  if (p === '/security') {
+    return meta(
+      'Security & trust — mcpfold',
+      'How mcpfold handles secrets (references, never values), stays local-first, redacts diagnostics, keeps telemetry off by default, and how to report a vulnerability privately.',
+      '/security',
+    );
+  }
   if (p === '/blog') {
     return meta(
       'Blog — mcpfold',
@@ -113,6 +120,7 @@ export function allRoutes(): string[] {
     '/install',
     '/directory',
     '/pricing',
+    '/security',
     '/blog',
     '/changelog',
     ...categoriesWithPages().map((c) => `/directory/category/${c.id}`),

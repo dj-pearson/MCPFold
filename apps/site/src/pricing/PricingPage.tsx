@@ -99,7 +99,10 @@ export function PricingPage() {
         </div>
       </Container>
 
-      <FaqSection path="/pricing" />
+      <FaqSection
+        path="/pricing"
+        moreLink={{ href: '/security', text: 'How we handle secrets — Security & trust' }}
+      />
     </>
   );
 }
