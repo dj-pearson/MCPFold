@@ -1,0 +1,10 @@
+{
+  "client": "opencode",
+  "source": {
+    "type": "captured",
+    "capturedAt": "2026-07-09"
+  },
+  "rootKeys": ["mcp"],
+  "serverContainer": "mcp",
+  "entryKeys": ["command", "enabled", "environment", "type", "url"]
+}

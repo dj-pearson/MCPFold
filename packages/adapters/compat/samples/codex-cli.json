@@ -7,5 +7,5 @@
   "format": "toml",
   "rootKeys": ["mcp_servers"],
   "serverContainer": "mcp_servers",
-  "entryKeys": ["args", "command", "env", "http_headers", "url"]
+  "entryKeys": ["args", "command", "env", "url"]
 }

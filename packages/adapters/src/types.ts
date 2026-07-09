@@ -74,11 +74,13 @@ export interface ClientAdapter {
   resolvePath(scope: Scope, projectPath?: string, ctx?: OsContext): string;
 
   /**
-   * Render already-resolved (secret-ref-preserving) servers to a native file. `existing` is the
-   * current on-disk contents when the file exists (S19.2): adapters that write into a SHARED config
-   * file (Goose YAML, Codex TOML — files that also hold non-MCP settings) merge the managed section
-   * into it, preserving unmanaged keys (and comments where the format allows). Adapters that own a
-   * dedicated file ignore it.
+   * Render already-resolved (secret-ref-preserving) servers to a native file.
+   *
+   * `existing` is the current on-disk contents of the target file, when present. Adapters that
+   * write a **dedicated** file (Cursor, Claude, …) ignore it and fully replace. Adapters that
+   * write into a file the client **shares with non-MCP settings** (Goose's `config.yaml`, Codex's
+   * `config.toml`, opencode's `opencode.json`) merge their managed servers into `existing`,
+   * preserving every unmanaged key (and comments, where the format allows).
    */
   render(servers: ResolvedServer[], ctx?: OsContext, existing?: string): RenderedFile;
 

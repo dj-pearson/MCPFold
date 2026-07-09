@@ -136,11 +136,14 @@ importers:
       '@mcpfold/core':
         specifier: workspace:*
         version: link:../core
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
       smol-toml:
-        specifier: ^1.7.0
+        specifier: ^1.4.2
         version: 1.7.0
       yaml:
-        specifier: ^2.9.0
+        specifier: ^2.8.1
         version: 2.9.0
 
   packages/cli:

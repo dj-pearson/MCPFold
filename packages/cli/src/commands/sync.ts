@@ -131,12 +131,17 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
     const profile = config.profiles[name]!;
     const adapter = requireAdapter(profile.client);
     const servers = keptServers.get(name)!;
+    // Read the target BEFORE rendering: shared-config adapters (Goose/Codex/opencode) merge into
+    // the existing file to preserve the user's non-MCP keys, so the render depends on it.
+    const scope = servers[0]?.scope ?? 'user';
+    const targetPath = adapter.resolvePath(scope, servers[0]?.projectPath, ctx);
+    const onDisk = existsSync(targetPath) ? readFileSync(targetPath, 'utf8') : undefined;
     const file = await renderWithStrategy(adapter, servers, {
       osContext: ctx,
       resolve,
       onWarn: (w) => warnings.push(w),
+      existing: onDisk,
     });
-    const onDisk = existsSync(file.path) ? readFileSync(file.path, 'utf8') : undefined;
 
     if (preview) {
       const diff = diffRendered(file, onDisk, adapter);

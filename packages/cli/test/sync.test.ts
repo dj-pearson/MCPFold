@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -85,5 +93,38 @@ describe('runSync (S3.5)', () => {
     await runSync({ cwd, osContext: ctx });
     const stray = readdirSync(join(home, '.cursor')).filter((f) => f.includes('.mcpfold.tmp'));
     expect(stray).toHaveLength(0);
+  });
+});
+
+describe('runSync into a shared config file (S19.2)', () => {
+  const GOOSE_CONFIG = `{
+  "version": 1,
+  "servers": {
+    "playwright": { "transport": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@latest"], "tags": ["code"] }
+  },
+  "profiles": {
+    "goose-user": { "client": "goose", "scope": "user", "include": ["code"] }
+  }
+}`;
+
+  it("merges into Goose config.yaml, preserving the user's non-MCP settings", async () => {
+    writeFileSync(join(cwd, 'mcp.config.jsonc'), GOOSE_CONFIG);
+    const target = join(home, '.config', 'goose', 'config.yaml');
+    mkdirSync(join(home, '.config', 'goose'), { recursive: true });
+    writeFileSync(
+      target,
+      '# my goose config\nGOOSE_PROVIDER: anthropic\nextensions:\n  developer:\n    type: builtin\n    enabled: true\n',
+    );
+
+    const result = await runSync({ cwd, osContext: ctx });
+    expect(result.data.wrote).toBe(true);
+    const written = readFileSync(target, 'utf8');
+    // The user's non-MCP setting, comment, and Goose's builtin extension all survive the fold.
+    expect(written).toContain('GOOSE_PROVIDER: anthropic');
+    expect(written).toContain('# my goose config');
+    expect(written).toContain('developer:');
+    // The folded server is present, in Goose's dialect (`cmd`, not `command`).
+    expect(written).toContain('playwright:');
+    expect(written).toContain('cmd: npx');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkAdapter, type CompatSample, runCompatCheck } from '../compat/check.js';
+import { checkAdapter, type CompatSample, runCompatCheck, shapeOf } from '../compat/check.js';
 
 /**
  * Compat harness self-test (S14.2): a planted upstream format change is flagged, and the
@@ -42,6 +42,36 @@ describe('compat harness (S14.2)', () => {
     });
     expect(result!.status).toBe('skipped');
     expect(result!.reason).toMatch(/unavailable/);
+  });
+
+  it('parses YAML and TOML rendered output by format (S19.2)', () => {
+    // Goose renders YAML under `extensions`; the shape check must not JSON.parse it.
+    const yamlOut = 'extensions:\n  srv:\n    type: stdio\n    cmd: npx\n    args:\n      - x\n';
+    expect(shapeOf(yamlOut, 'extensions', 'yaml')).toEqual({
+      rootKeys: ['extensions'],
+      entryKeys: ['args', 'cmd', 'type'],
+    });
+    // Codex renders TOML `[mcp_servers.*]` tables.
+    const tomlOut = '[mcp_servers.srv]\ncommand = "npx"\nargs = ["x"]\n';
+    expect(shapeOf(tomlOut, 'mcp_servers', 'toml')).toEqual({
+      rootKeys: ['mcp_servers'],
+      entryKeys: ['args', 'command'],
+    });
+  });
+
+  it('flags a Goose (YAML) upstream change — renamed extension key', () => {
+    const yamlOut = 'extensions:\n  srv:\n    type: stdio\n    cmd: npx\n';
+    const sample: CompatSample = {
+      client: 'goose',
+      source: { type: 'captured', capturedAt: '2026-07-09' },
+      format: 'yaml',
+      rootKeys: ['extensions'],
+      serverContainer: 'extensions',
+      entryKeys: ['type', 'command'], // upstream now wants `command`, adapter still emits `cmd`
+    };
+    const result = checkAdapter(yamlOut, sample);
+    expect(result.status).toBe('divergent');
+    expect(result.divergence.join(' ')).toContain('cmd');
   });
 
   it('uses the pulled shape when a url source is available', async () => {

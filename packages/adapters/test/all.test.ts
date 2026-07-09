@@ -4,7 +4,7 @@ import { clearAdapters, listAdapters, requireAdapter } from '../src/registry.js'
 
 afterEach(() => clearAdapters());
 
-describe('registerAll (S2.1–S2.7, S14.1, S19.1)', () => {
+describe('registerAll (S2.1–S2.7, S14.1, S19.1, S19.2)', () => {
   it('registers all client adapters', () => {
     registerAll();
     expect(listAdapters().map((a) => a.id)).toEqual([
@@ -13,14 +13,17 @@ describe('registerAll (S2.1–S2.7, S14.1, S19.1)', () => {
       'cline',
       'codex-cli',
       'continue',
+      'copilot-cli',
       'cursor',
       'gemini-cli',
       'goose',
       'jetbrains',
       'lm-studio',
+      'opencode',
       'roo-code',
       'visual-studio',
       'vscode',
+      'warp',
       'windsurf',
       'zed',
     ]);
@@ -36,6 +39,6 @@ describe('registerAll (S2.1–S2.7, S14.1, S19.1)', () => {
   it('is idempotent', () => {
     registerAll();
     registerAll();
-    expect(listAdapters()).toHaveLength(15);
+    expect(listAdapters()).toHaveLength(18);
   });
 });
