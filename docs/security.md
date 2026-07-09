@@ -7,6 +7,9 @@ in code and CI, and the threat model for the surfaces that execute code or touch
 To report a vulnerability privately, see `SECURITY.md` at the repo root — please do not open a
 public issue for security reports.
 
+For the claims-to-evidence ledger — every property below paired with the test or CI job that proves
+it — see the [Security posture](security-posture.md) page.
+
 ## The core promise: secret **values** never touch disk or logs
 
 mcpfold's canonical config stores secret **references** (`${scheme:path}`) only — never resolved

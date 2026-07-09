@@ -109,6 +109,10 @@ jobs:
       - name: Build docs (link-check + schema staging)
         run: pnpm docs:build
 
+      # Every security-posture claim must keep a resolvable evidence link (S18.5).
+      - name: Check security-posture evidence links
+        run: pnpm check:evidence
+
       # Deployment bootstrap (S8.5): the runbook's env matrix must stay in sync with the real
       # sources, and the secret-minting script must be shellcheck-clean.
       - name: Deployment env matrix in sync

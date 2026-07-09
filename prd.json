@@ -4255,7 +4255,7 @@
       "epic": "E18",
       "order": 5,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Public security-posture page backed by the tests that prove each claim",
       "user_story": "As an evaluating engineer or security reviewer, I want a page that states mcpfold's security properties and links each one to the test/code that proves it, so trust is verifiable rather than asserted.",
