@@ -3780,7 +3780,7 @@
       "epic": "E16",
       "order": 6,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Validate cloud device-poll response before persisting a session",
       "user_story": "As a user, I want a malformed login response to fail loudly at login rather than store a broken session that errors confusingly later.",

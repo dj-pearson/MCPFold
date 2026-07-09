@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Config } from '@mcpfold/core';
 import type { CloudApi, PollResponse, PullResponse, PushBody } from '../src/cloud/api.js';
+import { httpCloudApi } from '../src/cloud/api.js';
 import { inMemoryBackend, loadSession, saveSession } from '../src/cloud/token-store.js';
 import { runLogin } from '../src/commands/login.js';
 import { runPush } from '../src/commands/push.js';
@@ -220,5 +221,56 @@ describe('pull (S6.6)', () => {
     await expect(runPull({ cwd, api: fakeApi(), backend: inMemoryBackend() })).rejects.toThrow(
       /Not logged in/,
     );
+  });
+});
+
+describe('httpCloudApi.pollDevice response validation (S16.6)', () => {
+  // A fetch that returns one canned response for the poll POST.
+  const fetchReturning = (status: number, body: unknown): typeof fetch =>
+    (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+
+  const poll = (status: number, body: unknown) =>
+    httpCloudApi('https://api.test', fetchReturning(status, body)).pollDevice('dc');
+
+  it('returns complete only for a well-formed session', async () => {
+    const res = await poll(200, { access_token: 'at', refresh_token: 'rt', expires_in: 3600 });
+    expect(res).toEqual({
+      status: 'complete',
+      access_token: 'at',
+      refresh_token: 'rt',
+      expires_in: 3600,
+    });
+  });
+
+  it('rejects a 200 that is missing the access token', async () => {
+    await expect(poll(200, { refresh_token: 'rt', expires_in: 3600 })).rejects.toThrow(
+      /malformed session/,
+    );
+  });
+
+  it('rejects a 200 with an empty refresh token', async () => {
+    await expect(
+      poll(200, { access_token: 'at', refresh_token: '', expires_in: 3600 }),
+    ).rejects.toThrow(/malformed session/);
+  });
+
+  it('rejects a 200 whose expires_in is not a finite number', async () => {
+    await expect(
+      poll(200, { access_token: 'at', refresh_token: 'rt', expires_in: 'soon' }),
+    ).rejects.toThrow(/invalid expires_in/);
+    await expect(
+      poll(200, { access_token: 'at', refresh_token: 'rt', expires_in: null }),
+    ).rejects.toThrow(/invalid expires_in/);
+  });
+
+  it('leaves the pending and error poll paths unchanged', async () => {
+    expect(await poll(400, { error: 'authorization_pending', interval: 7 })).toEqual({
+      status: 'pending',
+      interval: 7,
+    });
+    expect(await poll(400, { error: 'expired_token' })).toEqual({
+      status: 'error',
+      error: 'expired_token',
+    });
   });
 });

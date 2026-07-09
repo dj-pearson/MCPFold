@@ -64,6 +64,10 @@ export interface CloudApi {
 
 type FetchLike = typeof fetch;
 
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === 'string' && v.length > 0;
+}
+
 export function httpCloudApi(endpoint: string, fetchImpl: FetchLike = fetch): CloudApi {
   const base = endpoint.replace(/\/+$/, '');
   const post = async (path: string, body: unknown, token?: string): Promise<Response> =>
@@ -87,12 +91,18 @@ export function httpCloudApi(endpoint: string, fetchImpl: FetchLike = fetch): Cl
       const res = await post('/auth-device/poll', { device_code: deviceCode });
       const body = (await res.json()) as Record<string, unknown>;
       if (res.ok) {
-        return {
-          status: 'complete',
-          access_token: body.access_token as string,
-          refresh_token: body.refresh_token as string,
-          expires_in: body.expires_in as number,
-        };
+        // Validate the shape at the source (S16.6): a malformed 200 must fail fast here
+        // rather than persisting undefined/empty tokens that only surface later on read.
+        const { access_token, refresh_token, expires_in } = body;
+        if (!isNonEmptyString(access_token) || !isNonEmptyString(refresh_token)) {
+          throw new Error(
+            'device-code poll returned a malformed session (missing access or refresh token)',
+          );
+        }
+        if (typeof expires_in !== 'number' || !Number.isFinite(expires_in)) {
+          throw new Error('device-code poll returned a malformed session (invalid expires_in)');
+        }
+        return { status: 'complete', access_token, refresh_token, expires_in };
       }
       if (body.error === 'authorization_pending') {
         return { status: 'pending', interval: (body.interval as number) ?? 5 };
