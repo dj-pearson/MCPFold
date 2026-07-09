@@ -354,3 +354,40 @@ generates the artifacts, and **site e2e (18) + prerender e2e (7) pass**.
 
 **Follow-ups (not blocking):** apply the answer-first pattern to the glossary (S15.6) and per-client
 guides (S15.5) as they ship; run the first live GEO check and fill in the baseline table.
+
+---
+
+## S15.3 — Homepage + core-page on-page SEO and messaging
+
+**Started** 2026-07-09 · branch `story/S15.3-seo` · priority p1, deps: S13.2, S15.1.
+
+**Done** 2026-07-09 (apps/site; site e2e + prerender e2e green).
+
+Reworked the homepage's on-page SEO around the focus keyword **"MCP config"** / "one config for
+every MCP client", without losing the context-window-tax brand line or the committed benchmark.
+
+- **Hero:** H1 is now keyword-first + brand — "mcpfold — one **MCP config** for every client". The
+  first ~100 words (a new `hero-intro`) name MCP config, MCP servers, and the supported clients
+  (Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Zed); the context-window tax + the
+  committed token-savings % moved into the benchmark line right below.
+- **`meta.ts`:** homepage `<title>` = "mcpfold — one MCP config for every MCP client"; description
+  leads with the keyword cluster ("Manage MCP servers from one config, folded out to every MCP
+  client — …") within the length budget.
+- **Below-fold H2 sections** (each a keyword cluster): manage every server from one file · works
+  with every MCP client (the 12 clients rendered as **crawlable links** to /docs/coverage) · curate
+  tools/cut the context-window tax · secrets as references. Plus an "Explore" internal-link graph out
+  to /install, /directory, /docs, /pricing.
+- **`seo/keyword-map.ts`:** the in-repo keyword→page map (target term per core page, `live` vs
+  `planned`), including the future /guides (S15.5) and /glossary (S15.6) pages — those homepage links
+  wire in when those stories ship.
+
+Tests: `home.e2e.ts` gains four checks — title/H1/meta contain the target terms + client names +
+meta-length budget; the four H2 clusters are present; the client list renders as links; the internal
+links point at /directory, /docs, /pricing. `homepage.e2e.ts` + `prerender.e2e.ts` updated for the
+new copy; the benchmark headline still matches the committed value.
+
+`verify_all` green (typecheck ×8, `pnpm -r test`, lint, Prettier). **Site e2e (22) + prerender e2e
+(7) pass.**
+
+**Follow-ups:** wire the homepage's guides/glossary links when S15.5/S15.6 ship; apply the same
+title/H1/meta pass to the remaining core pages as their content lands.

@@ -24,8 +24,8 @@ function jsonLdBlocks(html: string): Array<Record<string, unknown>> {
 test('homepage: real content + SoftwareApplication JSON-LD in no-JS HTML', async ({ request }) => {
   const html = await rawHtml(request, '/');
   // Hero/body text is present without running JS (rendered at build time).
-  expect(html).toContain('one config for every MCP client');
-  expect(html).toContain('<title>mcpfold — one config for every MCP client</title>');
+  expect(html).toContain('one MCP config for every');
+  expect(html).toContain('<title>mcpfold — one MCP config for every MCP client</title>');
   // The React root is NOT an empty shell.
   expect(html).not.toMatch(/<div id="root"><\/div>/);
 

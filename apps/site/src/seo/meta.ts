@@ -17,8 +17,10 @@ export interface RouteMeta {
   canonical: string;
 }
 
+// S15.3: lead with the focus keyword cluster (MCP config / manage MCP servers / every MCP client),
+// name the clients, and keep the token-savings proof — within ~160 chars.
 const HOME_DESC =
-  'Connect every MCP server without paying the context-window tax. One canonical config, folded out to every client, with secret references instead of hardcoded values.';
+  'Manage MCP servers from one config, folded out to every MCP client — Claude Code, Cursor, VS Code, Windsurf, Zed. Secret references, not hardcoded values.';
 
 function meta(title: string, description: string, path: string): RouteMeta {
   return { title, description, canonical: `${SITE_URL}${path}` };
@@ -30,7 +32,7 @@ export function resolveMeta(path: string): RouteMeta {
   const p = path !== '/' && path.endsWith('/') ? path.slice(0, -1) : path;
 
   if (p === '/') {
-    return meta('mcpfold — one config for every MCP client', HOME_DESC, '/');
+    return meta('mcpfold — one MCP config for every MCP client', HOME_DESC, '/');
   }
   if (p === '/install') {
     return meta(
