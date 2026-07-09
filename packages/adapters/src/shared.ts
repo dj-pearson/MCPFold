@@ -23,10 +23,12 @@ import { realOsContext } from './paths.js';
  * remote entry (`authed && !nativeOauth`, e.g. Windsurf). Everything else folds natively.
  */
 export function remoteNeedsShim(capability: RemoteCapability, server: ResolvedServer): boolean {
-  const isRemote = server.transport === 'http' || server.transport === 'sse';
+  const isRemote = server.transport === 'streamable-http' || server.transport === 'sse';
   if (!isRemote) return false;
-  const isAuthed = Boolean(server.auth && server.auth.type !== 'none');
-  return !capability.nativeHttp || (isAuthed && !capability.nativeOauth);
+  // `oauth` (S17.5) is client-native — the client runs the OAuth flow itself, so it never needs the
+  // bridge. Only static credentials (bearer/header) that a client can't attach natively force a shim.
+  const hasStaticAuth = server.auth?.type === 'bearer' || server.auth?.type === 'header';
+  return !capability.nativeHttp || (hasStaticAuth && !capability.nativeOauth);
 }
 
 /** `--header` args carrying each of a server's auth values (refs pass through; resolved at S4.6). */
@@ -67,7 +69,7 @@ export function parseRemoteShim(entry: Record<string, unknown>): ServerConfig | 
       if (sep !== -1) headers[raw.slice(0, sep).trim()] = raw.slice(sep + 1).trim();
     }
   }
-  const server: ServerConfig = { transport: 'http', url, tags: [] };
+  const server: ServerConfig = { transport: 'streamable-http', url, tags: [] };
   if (Object.keys(headers).length > 0) server.auth = { type: 'header', headers };
   return server;
 }
@@ -157,8 +159,8 @@ export function fromMcpServersShape(raw: unknown): Partial<Config> {
         }
         servers[name] = server;
       } else if (typeof entry.url === 'string') {
-        // `streamable-http` is Claude Code's alias for `http` (S17.3); anything non-`sse` is http.
-        const explicitType = entry.type === 'sse' ? 'sse' : 'http';
+        // Canonical remote transport is `streamable-http` (S17.5); only an explicit `sse` is sse.
+        const explicitType = entry.type === 'sse' ? 'sse' : 'streamable-http';
         const server: ServerConfig = { transport: explicitType, url: entry.url, tags: [] };
         if (entry.headers && typeof entry.headers === 'object') {
           server.auth = { type: 'header', headers: entry.headers as Record<string, string> };

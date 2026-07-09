@@ -10,7 +10,7 @@ const SECRET_REF = '${infisical:dev/mcp/GITHUB_PAT}';
 
 const githubSecret: ResolvedServer = {
   name: 'github',
-  transport: 'http',
+  transport: 'streamable-http',
   url: 'https://api.githubcopilot.com/mcp/',
   auth: { type: 'bearer', token: SECRET_REF },
   tags: ['work'],

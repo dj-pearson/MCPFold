@@ -9,6 +9,27 @@ import type { Finding } from './types.js';
 
 const SUSPICIOUS_KEY = /(token|secret|key|auth|pat|password|bearer)/i;
 
+/**
+ * Flag servers on the deprecated `sse` transport (S17.5). The MCP spec deprecated the HTTP+SSE
+ * transport on 2025-11-25 in favor of Streamable HTTP; `sse` still loads and folds, but authors
+ * should migrate to `streamable-http`.
+ */
+export function checkDeprecatedTransports(config: Config, file: string): Finding[] {
+  const findings: Finding[] = [];
+  for (const [name, server] of Object.entries(config.servers)) {
+    if (server.transport === 'sse') {
+      findings.push({
+        severity: 'warning',
+        file,
+        where: `servers.${name}`,
+        message: `Server "${name}" uses the deprecated "sse" transport (MCP deprecated HTTP+SSE on 2025-11-25).`,
+        fix: 'Switch to "transport": "streamable-http" once the server supports it.',
+      });
+    }
+  }
+  return findings;
+}
+
 /** Flag stdio servers launching `@latest` with no `pin` (April-2026 RCE lesson). */
 export function checkUnpinnedLatest(config: Config, file: string): Finding[] {
   const findings: Finding[] = [];

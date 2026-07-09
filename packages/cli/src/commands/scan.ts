@@ -104,7 +104,7 @@ export function runScan(options: ScanOptions): CommandOutput<ScanData> {
     }
     try {
       const servers = (adapter.parse(text).servers ?? {}) as Config['servers'];
-      const config: Config = { version: 1, servers, profiles: {} };
+      const config: Config = { version: 2, servers, profiles: {} };
       registerLiteralSecrets(config, redactor);
       tag(adapter.id, securityFindings(config, path));
     } catch {

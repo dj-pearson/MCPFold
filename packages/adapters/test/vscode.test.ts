@@ -48,6 +48,6 @@ describe('vscodeAdapter (S2.5)', () => {
       env: { HEADLESS: 'true' },
       tags: [],
     });
-    expect(parsed.servers?.github?.transport).toBe('http');
+    expect(parsed.servers?.github?.transport).toBe('streamable-http');
   });
 });

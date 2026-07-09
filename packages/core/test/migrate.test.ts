@@ -29,15 +29,33 @@ describe('migrateConfig (S0.7)', () => {
     expect(result.config).toEqual(v1);
   });
 
-  it('applies the worked 1→2 example end-to-end (tags → labels)', () => {
+  it('applies the real 1→2 migration: http → streamable-http (S17.5)', () => {
     const result = migrateConfig(v1, 2);
     expect(result.fromVersion).toBe(1);
     expect(result.toVersion).toBe(2);
     expect(result.applied).toHaveLength(1);
     const server = (result.config.servers as Record<string, Record<string, unknown>>).gh;
-    expect(server?.labels).toEqual(['work']);
-    expect(server?.tags).toBeUndefined();
+    expect(server?.transport).toBe('streamable-http');
+    expect(server?.url).toBe('https://x/mcp'); // no semantic loss
+    expect(server?.tags).toEqual(['work']); // tags untouched
     expect(result.config.version).toBe(2);
+  });
+
+  it('leaves stdio and sse transports untouched (S17.5)', () => {
+    const mixed = {
+      version: 1,
+      servers: {
+        s: { transport: 'stdio', command: 'x', tags: [] },
+        e: { transport: 'sse', url: 'https://x/sse', tags: [] },
+      },
+      profiles: {},
+    };
+    const servers = migrateConfig(mixed, 2).config.servers as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(servers.s?.transport).toBe('stdio');
+    expect(servers.e?.transport).toBe('sse');
   });
 
   it('round-trips: migrated v2 carries the same server names', () => {

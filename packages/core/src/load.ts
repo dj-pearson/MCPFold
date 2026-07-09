@@ -6,7 +6,7 @@ import {
   type Node as JsoncNode,
 } from 'jsonc-parser';
 import { ConfigSchema } from './schema.js';
-import { detectVersion, SCHEMA_VERSION } from './migrate/index.js';
+import { detectVersion, migrateConfig, SCHEMA_VERSION } from './migrate/index.js';
 import type { Config } from './types.js';
 
 /**
@@ -62,7 +62,7 @@ function hintForSchemaIssue(path: string, message: string): string | undefined {
     return 'Add a `path` to this profile (project/workspace scopes need one).';
   }
   if (path === 'version') {
-    return 'The canonical format is version 1: set "version": 1.';
+    return 'The canonical format is version 2: set "version": 2 (run `mcpfold migrate` to upgrade a v1 file).';
   }
   if (message.toLowerCase().includes('unrecognized key')) {
     return 'Remove the unknown key — the canonical schema is strict about field names.';
@@ -127,7 +127,14 @@ export function loadConfig(text: string): LoadResult {
     };
   }
 
-  const result = ConfigSchema.safeParse(value);
+  // An older config auto-migrates in-memory so it keeps loading (S17.5); `mcpfold migrate` is what
+  // persists the upgrade to disk. Validation then always runs against the current (v2) schema.
+  const toValidate =
+    version < SCHEMA_VERSION && value && typeof value === 'object'
+      ? migrateConfig(value as Record<string, unknown>, SCHEMA_VERSION).config
+      : value;
+
+  const result = ConfigSchema.safeParse(toValidate);
   if (result.success) {
     return { ok: true, config: result.data };
   }

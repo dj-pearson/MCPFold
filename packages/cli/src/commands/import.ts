@@ -226,7 +226,7 @@ export function runImport(options: ImportOptions): CommandOutput<ImportData> {
     mergedServers[name] = { ...mergedServers[name]!, tags: [...tags].sort() };
   }
 
-  const config: Config = { version: 1, servers: mergedServers, profiles };
+  const config: Config = { version: 2, servers: mergedServers, profiles };
   const contents = `${serialize(config)}`;
 
   const data: ImportData = {

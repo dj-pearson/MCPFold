@@ -62,7 +62,7 @@ describe('TOFU trust gate (S9.2)', () => {
   it('untrustedServers reports new vs changed correctly', () => {
     const gate = memoryTrustGate();
     const config: Config = {
-      version: 1,
+      version: 2,
       servers: { a: { transport: 'stdio', command: 'x', args: [], tags: [] } },
       profiles: {},
     };
@@ -78,7 +78,7 @@ describe('TOFU trust gate (S9.2)', () => {
 
 describe('version-integrity signing (S9.2)', () => {
   const config: Config = {
-    version: 1,
+    version: 2,
     servers: { s: { transport: 'stdio', command: 'srv', tags: [] } },
     profiles: {},
   };
@@ -138,7 +138,7 @@ describe('pin integrity (S9.2)', () => {
 
   it('doctor flags a malformed integrity hash', () => {
     const config: Config = {
-      version: 1,
+      version: 2,
       servers: { s: { transport: 'stdio', command: 'npx', integrity: 'garbage', tags: [] } },
       profiles: {},
     };

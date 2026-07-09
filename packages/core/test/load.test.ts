@@ -75,8 +75,8 @@ describe('loadConfig (S1.2)', () => {
   });
 
   describe('loadConfigOrThrow', () => {
-    it('returns the config on success', () => {
-      expect(loadConfigOrThrow(SPEC_EXAMPLE_JSONC).version).toBe(1);
+    it('returns the config on success, auto-migrating the v1 fixture to v2 (S17.5)', () => {
+      expect(loadConfigOrThrow(SPEC_EXAMPLE_JSONC).version).toBe(2);
     });
     it('throws an aggregate error listing issues on failure', () => {
       expect(() => loadConfigOrThrow('{ "version": 3 }')).toThrow(/Invalid mcp\.config\.jsonc/);

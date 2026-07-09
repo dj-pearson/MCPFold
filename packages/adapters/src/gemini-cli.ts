@@ -82,7 +82,7 @@ export const geminiCliAdapter: ClientAdapter = {
         }
         servers[name] = server;
       } else if (typeof entry.httpUrl === 'string') {
-        const server: ServerConfig = { transport: 'http', url: entry.httpUrl, tags: [] };
+        const server: ServerConfig = { transport: 'streamable-http', url: entry.httpUrl, tags: [] };
         if (entry.headers && typeof entry.headers === 'object') {
           server.auth = { type: 'header', headers: entry.headers as Record<string, string> };
         }

@@ -34,8 +34,28 @@ describe('runDoctor (S3.7)', () => {
     expect(result.exit).toBe(EXIT.SUCCESS);
   });
 
+  it('warns about the deprecated sse transport, but not about an oauth server (S17.5)', () => {
+    write(`{
+      "version": 2,
+      "servers": {
+        "old": { "transport": "sse", "url": "https://x/sse", "tags": [] },
+        "modern": { "transport": "streamable-http", "url": "https://y/mcp", "auth": { "type": "oauth" }, "tags": [] }
+      },
+      "profiles": {}
+    }`);
+    const result = runDoctor({ cwd, osContext: ctx });
+    const sse = result.data.findings.find((f) => f.where === 'servers.old');
+    expect(sse?.severity).toBe('warning');
+    expect(sse?.message).toContain('deprecated');
+    // The oauth server carries no token/headers and must NOT trip any secret/token finding.
+    expect(result.data.findings.some((f) => f.where === 'servers.modern')).toBe(false);
+  });
+
   it('reports pathed errors for an invalid config (exit 2)', () => {
-    write(`{ "version": 2, "servers": {}, "profiles": {} }`);
+    // An invalid transport → a real schema error (v2 accepts stdio/streamable-http/sse only).
+    write(
+      `{ "version": 2, "servers": { "x": { "transport": "ftp", "url": "https://x" } }, "profiles": {} }`,
+    );
     const result = runDoctor({ cwd, osContext: ctx });
     expect(result.exit).toBe(EXIT.ERROR);
     expect(result.data.errorCount).toBeGreaterThan(0);

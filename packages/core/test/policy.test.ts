@@ -14,7 +14,11 @@ const stdio = (name: string, command: string, args: string[] = []) => ({
   command,
   args,
 });
-const remote = (name: string, url: string) => ({ name, transport: 'http' as const, url });
+const remote = (name: string, url: string) => ({
+  name,
+  transport: 'streamable-http' as const,
+  url,
+});
 
 describe('policy matchers (S18.3)', () => {
   it('extracts the package spec from a runner invocation, skipping flags', () => {

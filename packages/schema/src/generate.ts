@@ -10,7 +10,7 @@ import { ConfigSchema, PolicySchema } from '@mcpfold/core';
  * in JSON Schema and are enforced only by the zod loader — the JSON Schema covers structure,
  * enums, the secret-reference pattern, and strict unknown-key rejection.
  */
-export const SCHEMA_URL = 'https://mcpfold.com/schema/v1.json';
+export const SCHEMA_URL = 'https://mcpfold.com/schema/v2.json';
 
 export function generateSchema(): Record<string, unknown> {
   const jsonSchema = zodToJsonSchema(ConfigSchema, {

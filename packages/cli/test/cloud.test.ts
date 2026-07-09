@@ -14,10 +14,10 @@ import { runPull } from '../src/commands/pull.js';
 import { EXIT } from '../src/output/exit-codes.js';
 
 const CONFIG: Config = {
-  version: 1,
+  version: 2,
   servers: {
     gh: {
-      transport: 'http',
+      transport: 'streamable-http',
       url: 'https://api.github.com/mcp',
       auth: { type: 'bearer', token: '${env:GH_PAT}' },
       tags: ['work'],

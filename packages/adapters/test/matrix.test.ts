@@ -78,7 +78,8 @@ describe('cross-adapter matrix (S2.8)', () => {
       });
       // The remote server recovers at least its transport + a URL for every adapter.
       expect(
-        parsed.servers?.github?.transport === 'http' || parsed.servers?.github?.transport === 'sse',
+        parsed.servers?.github?.transport === 'streamable-http' ||
+          parsed.servers?.github?.transport === 'sse',
       ).toBe(true);
       expect(typeof parsed.servers?.github?.url).toBe('string');
     });

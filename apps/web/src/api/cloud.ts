@@ -78,7 +78,7 @@ function httpCloudApi(base: string, getToken: () => string | null): CloudApi {
 // A module-level in-memory mock so version state survives client-side navigation during e2e.
 let mockSingleton: CloudApi | null = null;
 function mockCloudApi(): CloudApi {
-  let config: Config = { version: 1, servers: {}, profiles: {} };
+  let config: Config = { version: 2, servers: {}, profiles: {} };
   let version = 0;
   let machines: MachineStatus[] = [
     { name: 'laptop', lastSeen: '2026-07-08T10:00:00Z', lastVersion: 3 },

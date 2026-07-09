@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 
 // Reuses the canonical types straight from @mcpfold/core — the web app never redefines the
 // config shape. The visual editor (S7.2) builds on exactly this `Config`.
-const EMPTY_CONFIG: Config = { version: 1, servers: {}, profiles: {} };
+const EMPTY_CONFIG: Config = { version: 2, servers: {}, profiles: {} };
 
 export function Dashboard() {
   const { session } = useAuth();

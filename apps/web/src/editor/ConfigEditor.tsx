@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { createCloudApi } from '../api/cloud';
 import { emptyDraft, type ServerDraft, validateDraft } from './validation';
 
-const EMPTY: Config = { version: 1, servers: {}, profiles: {} };
+const EMPTY: Config = { version: 2, servers: {}, profiles: {} };
 
 interface HistoryEntry {
   version: number;

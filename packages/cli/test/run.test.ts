@@ -82,7 +82,7 @@ describe('runRun (S4.7)', () => {
   it('planRemoteRun falls back to the pinned bridge (no native transport yet, S17.2)', () => {
     const plan = planRemoteRun({
       name: 'remote',
-      transport: 'http',
+      transport: 'streamable-http',
       url: 'https://api.example/mcp/',
       tags: [],
       client: 'claude-code',

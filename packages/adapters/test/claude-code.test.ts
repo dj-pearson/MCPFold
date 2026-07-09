@@ -22,7 +22,7 @@ describe('claudeCodeAdapter (S2.4)', () => {
     const explicit = claudeCodeAdapter.parse(
       '{"mcpServers":{"a":{"type":"http","url":"https://x.test/mcp"},"b":{"command":"npx"}}}',
     );
-    expect(explicit.servers?.a?.transport).toBe('http');
+    expect(explicit.servers?.a?.transport).toBe('streamable-http');
     expect(explicit.servers?.b?.transport).toBe('stdio');
   });
 
@@ -42,7 +42,7 @@ describe('claudeCodeAdapter (S2.4)', () => {
     const parsed = claudeCodeAdapter.parse(
       '{"mcpServers":{"s":{"type":"streamable-http","url":"https://x.test/mcp"}}}',
     );
-    expect(parsed.servers?.s?.transport).toBe('http');
+    expect(parsed.servers?.s?.transport).toBe('streamable-http');
     expect(parsed.servers?.s?.url).toBe('https://x.test/mcp');
   });
 });
