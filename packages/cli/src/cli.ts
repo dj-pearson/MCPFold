@@ -17,9 +17,11 @@ import {
 } from './commands/completions.js';
 import {
   defaultCachePath,
+  detectChannel,
   getUpdateNotice,
   isNotifierEnabled,
   isRefreshDue,
+  refreshSpawnTarget,
   refreshUpdateCache,
 } from './update-notifier.js';
 import { spawn } from 'node:child_process';
@@ -588,9 +590,13 @@ function maybeNotifyUpdate(command: string | undefined, w: Writer): void {
 
     if (!isNotifierEnabled(process.env, Boolean(process.stdout.isTTY))) return;
     if (!isRefreshDue(defaultCachePath(), new Date())) return;
-    const bin = process.argv[1];
-    if (!bin) return;
-    const child = spawn(process.execPath, [bin, '__refresh-update'], {
+    // Channel-aware background refresh (S16.8): a standalone binary re-invokes its own
+    // `__refresh-update` subcommand (process.argv[1] is unreliable under pkg/yao-pkg), while
+    // node-based installs re-run the JS entry script as before.
+    const channel = detectChannel(process.execPath);
+    const target = refreshSpawnTarget(channel, process.execPath, process.argv[1]);
+    if (!target) return;
+    const child = spawn(target.command, target.args, {
       detached: true,
       stdio: 'ignore',
     });
