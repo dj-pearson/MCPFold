@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { searchDirectory } from '@mcpfold/core';
+import { FaqSection } from '../seo/FaqSection';
 import { Container } from '../design/components';
 
 /**
@@ -77,6 +78,8 @@ export function DirectoryList() {
           {results.length === 0 && <p className="muted">No servers match “{query}”.</p>}
         </div>
       </Container>
+
+      <FaqSection path="/directory" />
     </>
   );
 }

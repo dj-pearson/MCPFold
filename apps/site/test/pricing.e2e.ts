@@ -20,7 +20,7 @@ test('renders the tiers from source and funnels signup into the app', async ({ p
   // The Team CTA routes into the app auth.
   await expect(page.getByTestId('cta-team')).toHaveAttribute('href', 'https://app.mcpfold.com');
 
-  // FAQ covers self-hosting + licensing.
-  await expect(page.getByText('Can I self-host the cloud?')).toBeVisible();
-  await expect(page.getByText('What is the license?')).toBeVisible();
+  // FAQ (S15.2 shared, extraction-friendly) covers self-hosting + licensing.
+  await expect(page.getByText('Can I self-host the mcpfold cloud?')).toBeVisible();
+  await expect(page.getByText('What is the mcpfold license?')).toBeVisible();
 });

@@ -1,6 +1,7 @@
 import { Container } from '../design/components';
 import { Hero } from '../home/Hero';
 import { Calculator } from '../benchmark/Calculator';
+import { FaqSection } from '../seo/FaqSection';
 
 /** Homepage (S13.2): hero + recorded demo, an interactive benchmark calculator, and the feature
  * grid. Numbers come from the committed benchmark so the site and docs never disagree. */
@@ -37,6 +38,8 @@ export function Home() {
           ))}
         </div>
       </Container>
+
+      <FaqSection path="/" />
     </>
   );
 }
