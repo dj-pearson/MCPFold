@@ -1,0 +1,30 @@
+{
+  "inputs": [
+    {
+      "description": "Token for github",
+      "id": "github-token",
+      "password": true,
+      "type": "promptString"
+    }
+  ],
+  "servers": {
+    "github": {
+      "headers": {
+        "Authorization": "Bearer ${input:github-token}"
+      },
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "playwright": {
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "command": "npx",
+      "env": {
+        "HEADLESS": "true"
+      },
+      "type": "stdio"
+    }
+  }
+}

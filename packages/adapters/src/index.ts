@@ -28,7 +28,7 @@ export {
   requireAdapter,
 } from './registry.js';
 
-// Concrete client adapters (S2.2–S2.7)
+// Concrete client adapters (S2.2–S2.7, S14.1, S19.1)
 export { cursorAdapter } from './cursor.js';
 export { claudeDesktopAdapter } from './claude-desktop.js';
 export { claudeCodeAdapter } from './claude-code.js';
@@ -37,4 +37,8 @@ export { windsurfAdapter } from './windsurf.js';
 export { zedAdapter } from './zed.js';
 export { clineAdapter } from './cline.js';
 export { geminiCliAdapter } from './gemini-cli.js';
+export { jetbrainsAdapter } from './jetbrains.js';
+export { visualStudioAdapter } from './visual-studio.js';
+export { continueAdapter } from './continue.js';
+export { rooCodeAdapter } from './roo-code.js';
 export { ALL_ADAPTERS, registerAll } from './all.js';

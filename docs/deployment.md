@@ -18,13 +18,13 @@ their fixes are listed there.
 
 You're going to deploy **five pieces** across **four web addresses**:
 
-| # | Piece | Lives at | What it is |
-| - | ----- | -------- | ---------- |
-| 1 | Marketing site | `mcpfold.com` | The public website + docs (Cloudflare Pages) |
-| 2 | Web console | `app.mcpfold.com` | The logged-in dashboard (Cloudflare Pages) |
-| 3 | Supabase | `api.mcpfold.com` | Auth + database gateway (Docker, on your server via Coolify) |
-| 4 | Edge service | `functions.mcpfold.com` | mcpfold's sync/login API (Docker, on your server via Coolify) |
-| 5 | Postgres | *(internal, not public)* | The database, inside Supabase |
+| #   | Piece          | Lives at                 | What it is                                                    |
+| --- | -------------- | ------------------------ | ------------------------------------------------------------- |
+| 1   | Marketing site | `mcpfold.com`            | The public website + docs (Cloudflare Pages)                  |
+| 2   | Web console    | `app.mcpfold.com`        | The logged-in dashboard (Cloudflare Pages)                    |
+| 3   | Supabase       | `api.mcpfold.com`        | Auth + database gateway (Docker, on your server via Coolify)  |
+| 4   | Edge service   | `functions.mcpfold.com`  | mcpfold's sync/login API (Docker, on your server via Coolify) |
+| 5   | Postgres       | _(internal, not public)_ | The database, inside Supabase                                 |
 
 ```
    Browser / CLI
@@ -46,7 +46,7 @@ You're going to deploy **five pieces** across **four web addresses**:
 ```
 
 **The one rule that matters most:** a secret called `JWT_SECRET` must be the **exact same value** in
-Supabase *and* in the edge service. It's the shared key that lets logins work across both. Get it
+Supabase _and_ in the edge service. It's the shared key that lets logins work across both. Get it
 identical and everything authenticates; get it wrong and logins fail with confusing errors. We'll
 generate it once and paste the same value in both places.
 
@@ -66,7 +66,7 @@ Deeper reference docs (optional): [self-hosting](self-hosting.md) ·
   Supabase + edge Docker containers.
 - **Admin access to the GitHub repo** — for CI secrets and releases.
 - An **npm account** with publish rights to the `mcpfold` name — for the CLI.
-- *(Optional)* a **GitHub OAuth app** — only if you want "Sign in with GitHub."
+- _(Optional)_ a **GitHub OAuth app** — only if you want "Sign in with GitHub."
 
 **Tools on your local machine.** Commands in this guide are written for **PowerShell** on Windows.
 Run these checks; install anything that's missing:
@@ -130,13 +130,13 @@ blocks.
 In Cloudflare's DNS settings for `mcpfold.com`, create these records. (You can add `api.` and
 `functions.` now even though the server isn't ready yet.)
 
-| Record | Type | Points at | TLS handled by |
-| ------ | ---- | --------- | -------------- |
-| `mcpfold.com` (apex) | Pages | Cloudflare Pages project `mcpfold-site` | Cloudflare |
-| `www.mcpfold.com` | Redirect | → `mcpfold.com` (a Cloudflare redirect rule) | Cloudflare |
-| `app.mcpfold.com` | Pages | Cloudflare Pages project `mcpfold-web` | Cloudflare |
-| `api.mcpfold.com` | A / AAAA | your VPS IP address | Coolify (Let's Encrypt) |
-| `functions.mcpfold.com` | A / AAAA | your VPS IP address | Coolify (Let's Encrypt) |
+| Record                  | Type     | Points at                                    | TLS handled by          |
+| ----------------------- | -------- | -------------------------------------------- | ----------------------- |
+| `mcpfold.com` (apex)    | Pages    | Cloudflare Pages project `mcpfold-site`      | Cloudflare              |
+| `www.mcpfold.com`       | Redirect | → `mcpfold.com` (a Cloudflare redirect rule) | Cloudflare              |
+| `app.mcpfold.com`       | Pages    | Cloudflare Pages project `mcpfold-web`       | Cloudflare              |
+| `api.mcpfold.com`       | A / AAAA | your VPS IP address                          | Coolify (Let's Encrypt) |
+| `functions.mcpfold.com` | A / AAAA | your VPS IP address                          | Coolify (Let's Encrypt) |
 
 Note: `api.` and `functions.` both point at the **same server IP** — Coolify tells them apart by
 hostname and gives each its own HTTPS certificate.
@@ -161,6 +161,21 @@ The easiest path is Coolify's built-in one-click Supabase.
    `SITE_URL`, the two `REALTIME_*` keys, etc.).
 3. Set the service's **domain** to `https://api.mcpfold.com` and let Coolify handle TLS.
 4. **Deploy.**
+
+The full set of Supabase-stack variables the one-click service reads (all live in
+`supabase/.env.example`; copy them from the Supabase block of your `cloud.env`):
+
+| Variable                        | Default      | What it is                                                                                  |
+| ------------------------------- | ------------ | ------------------------------------------------------------------------------------------- |
+| `POSTGRES_DB`                   | `postgres`   | Postgres database name the stack creates and connects to.                                   |
+| `POSTGRES_PASSWORD`             | _(generate)_ | Postgres superuser password (`openssl rand -hex 24`).                                       |
+| `JWT_SECRET`                    | _(generate)_ | ≥32-char signing secret shared by GoTrue, PostgREST, Realtime.                              |
+| `JWT_EXPIRY`                    | `3600`       | Access-token lifetime in seconds.                                                           |
+| `ANON_KEY` / `SERVICE_ROLE_KEY` | _(mint)_     | JWTs signed with `JWT_SECRET` (see [self-hosting](./self-hosting.md)).                      |
+| `REALTIME_ENC_KEY`              | _(generate)_ | Realtime encryption key, exactly 32 hex chars (`openssl rand -hex 16`).                     |
+| `REALTIME_SECRET_KEY_BASE`      | _(generate)_ | Realtime secret key base, 64 hex chars (`openssl rand -hex 32`).                            |
+| `GITHUB_OAUTH_ENABLED`          | `false`      | Toggle GitHub device-code login (see [Sign in with GitHub](#optional-sign-in-with-github)). |
+| `DISABLE_SIGNUP`                | `false`      | Set `true` to refuse new public sign-ups on the GoTrue auth server.                         |
 
 > ⚠️ **The #1 thing that goes wrong here:** Supabase's `analytics` (Logflare) container fails and
 > takes the whole stack down with it. If the deploy hangs or errors on `supabase-analytics`, see
@@ -214,7 +229,7 @@ its own container and gets its **own** host, `functions.mcpfold.com`.
 1. In Coolify: **+ New → Application → Public Repository**, URL `https://github.com/dj-pearson/MCPFold`.
 2. Build settings:
    - **Build Pack:** Dockerfile
-   - **Base Directory:** `/services/edge`  ← important; the Dockerfile's file paths are relative to
+   - **Base Directory:** `/services/edge` ← important; the Dockerfile's file paths are relative to
      this folder, so the build context must be it (not the repo root).
    - **Dockerfile Location:** `/Dockerfile`
    - **Port:** `8000`
@@ -227,20 +242,26 @@ its own container and gets its **own** host, `functions.mcpfold.com`.
      `docker ps | grep supabase-db` (e.g. `supabase-db-xxxxxxxx`). The edge container must be on the
      same Docker network as that container — both are usually on Coolify's shared `coolify` network.
    - `SITE_URL` — `https://mcpfold.com`.
+   - `PORT` — the port the edge service listens on inside the container; defaults to `8000` (leave it
+     unless you also change the exposed port above). `JWT_EXPIRY` — access-token lifetime in seconds,
+     defaults to `3600`; if you set it on Supabase, set the **same** value here.
 4. Set the **domain** to `https://functions.mcpfold.com`, expose port `8000`, let Coolify handle TLS.
 5. **Deploy.** Coolify uses the image's health check (`/health`) for zero-downtime restarts.
 
 ✅ **Check 1 (service is up):**
+
 ```powershell
 curl.exe https://functions.mcpfold.com/health
 # → {"ok":true,"service":"mcpfold-edge"}
 ```
 
 ✅ **Check 2 (it can actually reach the database — this is the important one):**
+
 ```powershell
 curl.exe -X POST https://functions.mcpfold.com/auth-device/start -H "content-type: application/json" -d '{\"machine_name\":\"test\"}'
 # → a JSON device code
 ```
+
 > Use `curl.exe` (not `curl`) — in PowerShell plain `curl` is an alias for `Invoke-WebRequest` with
 > different syntax. Keep it on **one line**; PowerShell doesn't use `\` for line continuation.
 
@@ -259,7 +280,7 @@ correct. A `500` here means the DB connection is wrong — see
    - **Build output directory:** `apps/site/dist`
    - **Root directory:** leave as the repo root
 3. **Project name must be exactly `mcpfold-site`** (the GitHub Actions workflow deploys by that name).
-4. *(Optional)* set `VITE_ANALYTICS_SRC` + `VITE_ANALYTICS_DOMAIN` if you use privacy-friendly
+4. _(Optional)_ set `VITE_ANALYTICS_SRC` + `VITE_ANALYTICS_DOMAIN` if you use privacy-friendly
    analytics. The site needs **no secrets** otherwise.
 5. Deploy, then set the custom domain to `mcpfold.com`.
 
@@ -295,7 +316,7 @@ Publishing is automated with [Changesets](https://github.com/changesets/changese
 
 **One-time setup:**
 
-1. Create an **automation** access token at npmjs.com (Account → Access Tokens → Generate → *Automation*).
+1. Create an **automation** access token at npmjs.com (Account → Access Tokens → Generate → _Automation_).
    An automation token works in CI without 2FA prompts.
 2. In the GitHub repo: **Settings → Secrets and variables → Actions → New repository secret**, name it
    `NPM_TOKEN`, paste the token.
@@ -421,6 +442,7 @@ DB volume was first created with a **different** password than what's now in the
 changing `POSTGRES_PASSWORD` or a half-finished first boot).
 
 Fix:
+
 1. Read the real error: `docker logs supabase-analytics-<id> --tail 80`.
 2. If it says `password authentication failed`, set `POSTGRES_PASSWORD` back to what the volume was
    created with — **or**, if there's no important data yet, reset the DB volume and redeploy so it
@@ -434,6 +456,7 @@ Symptom: `curl.exe https://functions.mcpfold.com/health` is fine, but `POST /aut
 `500`.
 
 Fix — read the edge logs: `docker logs <edge-container> --tail 40`:
+
 - `ECONNREFUSED` / `getaddrinfo` → wrong host or the edge isn't on the same Docker network as
   Postgres. Use the DB **container name** (`docker ps | grep supabase-db`) as the host and make sure
   both containers share the `coolify` network.
@@ -450,6 +473,7 @@ this two-host setup — call them there. `api.mcpfold.com` is only for Supabase'
 ### Web login fails
 
 Almost always a key mismatch:
+
 - `VITE_SUPABASE_ANON_KEY` must be an `ANON_KEY` minted from the **current** Supabase `JWT_SECRET`. If
   you rebuilt Supabase, the old key is invalid — copy the new one and redeploy the web project.
 - The edge service's `JWT_SECRET` must match Supabase's, or tokens minted by one are rejected by the
@@ -459,6 +483,7 @@ Almost always a key mismatch:
 
 The CLI defaults to `https://functions.mcpfold.com`. To test against a different endpoint (or before a
 release ships the new default), override it:
+
 ```powershell
 $env:MCPFOLD_API_URL = "https://functions.mcpfold.com"
 ```
@@ -467,12 +492,12 @@ $env:MCPFOLD_API_URL = "https://functions.mcpfold.com"
 
 ## Verification cheat-sheet
 
-| Surface | Quick check |
-| ------- | ----------- |
-| Supabase | `curl.exe https://api.mcpfold.com/rest/v1/` → PostgREST JSON |
-| Database | `psql $env:DATABASE_URL -c '\dt public.*'` shows tables + `schema_migrations` |
-| Edge (up) | `curl.exe https://functions.mcpfold.com/health` → `{"ok":true,...}` |
-| Edge (DB) | `POST /auth-device/start` → a device code (proves Postgres write) |
-| Marketing site | `mcpfold.com` loads; `/docs` + `/schema/v1.json` resolve |
-| Web console | `app.mcpfold.com` signs in; a cross-tenant read is denied |
-| npm | `npx mcpfold@latest --version` matches the release |
+| Surface        | Quick check                                                                   |
+| -------------- | ----------------------------------------------------------------------------- |
+| Supabase       | `curl.exe https://api.mcpfold.com/rest/v1/` → PostgREST JSON                  |
+| Database       | `psql $env:DATABASE_URL -c '\dt public.*'` shows tables + `schema_migrations` |
+| Edge (up)      | `curl.exe https://functions.mcpfold.com/health` → `{"ok":true,...}`           |
+| Edge (DB)      | `POST /auth-device/start` → a device code (proves Postgres write)             |
+| Marketing site | `mcpfold.com` loads; `/docs` + `/schema/v1.json` resolve                      |
+| Web console    | `app.mcpfold.com` signs in; a cross-tenant read is denied                     |
+| npm            | `npx mcpfold@latest --version` matches the release                            |

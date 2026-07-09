@@ -44,8 +44,8 @@ Connect every MCP server without paying the context-window tax.
 > 9 actually needed cut tool-schema tokens by ~80%. Secrets stay references, never values.
 > Run `npx mcpfold init`, import your existing configs, and sync.
 
-Rationale: the opening names the focus keyword (*MCP config manager*), *MCP servers*, every
-*MCP client* by name (the client-keyword net), the token-savings proof, the secrets promise,
+Rationale: the opening names the focus keyword (_MCP config manager_), _MCP servers_, every
+_MCP client_ by name (the client-keyword net), the token-savings proof, the secrets promise,
 and the entry command — all in the first paragraph, which crawlers and LLMs weight heavily.
 
 ---
@@ -53,12 +53,14 @@ and the entry command — all in the first paragraph, which crawlers and LLMs we
 ## Below-fold H2 sections (each targets a keyword cluster)
 
 ### H2: Manage every MCP server from one file
+
 One canonical config is the source of truth. Add a server once; `mcpfold sync` writes it to
 every client in the right format. `mcpfold diff` shows drift; `mcpfold import` reverse-folds
 the configs you already have.
 _Targets: manage MCP servers, MCP config, MCP server setup, add MCP server, mcpServers json._
 
 ### H2: Works with every MCP client
+
 mcpfold speaks each client's native format — including the traps: VS Code uses the root key
 `servers`, Zed uses `context_servers`, everyone else uses `mcpServers`. Render this list as
 real links to the per-client guides (S15.5): Claude Code, Claude Desktop, Cursor, VS Code,
@@ -67,17 +69,20 @@ _Targets: cursor mcp, claude code mcp, claude mcp, vs code mcp, windsurf mcp, ze
 claude desktop mcp config._
 
 ### H2: Curate tools, cut context
+
 Every server you connect dumps its full tool schema into context on every turn — used or
 not. mcpfold's local proxy trims `tools/list` to the allow/deny set per client. Link to the
 benchmark writeup.
 _Targets: mcp tools, mcp proxy, reduce token usage, too many mcp tools, context window._
 
 ### H2: Secrets stay references, never values
+
 Tokens are stored as `${provider:path}` references and resolved at launch from env, dotenv,
 Infisical, keychain, or 1Password — plaintext tokens never touch a git-tracked file.
 _Targets: mcp secrets management._
 
 ### H2 (discovery hook): Browse the MCP server directory
+
 A curated, indexable directory of MCP servers with an add-to-config snippet for each. Link
 to /directory.
 _Targets: best mcp servers, mcp server directory, mcp server list._

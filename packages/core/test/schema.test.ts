@@ -7,11 +7,17 @@ import {
   SECRET_REF_RE,
 } from '../src/schema.js';
 
-// S17.3: the doc comment on CLIENT_IDS claims a count ("eight clients"); keep it honest.
-describe('CLIENT_IDS (S17.3)', () => {
-  it('has exactly eight clients (matches the "eight clients" comment)', () => {
-    expect(CLIENT_IDS).toHaveLength(8);
+// S17.3/S19.1: the doc comment on CLIENT_IDS claims a count ("twelve clients"); keep it honest.
+describe('CLIENT_IDS (S17.3, S19.1)', () => {
+  it('has exactly twelve clients (matches the "twelve clients" comment)', () => {
+    expect(CLIENT_IDS).toHaveLength(12);
     expect(new Set(CLIENT_IDS).size).toBe(CLIENT_IDS.length); // no duplicates
+  });
+
+  it('includes the wave-1 adapters (S19.1)', () => {
+    for (const id of ['jetbrains', 'visual-studio', 'continue', 'roo-code'] as const) {
+      expect(CLIENT_IDS).toContain(id);
+    }
   });
 });
 

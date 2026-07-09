@@ -7,7 +7,7 @@ import { z } from 'zod';
  * these zod schemas. Never hand-duplicate an interface; infer it (see types.ts).
  */
 
-/** The eight clients mcpfold folds config out to (keep in sync with CLIENT_IDS.length; tested). */
+/** The twelve clients mcpfold folds config out to (keep in sync with CLIENT_IDS.length; tested). */
 export const CLIENT_IDS = [
   'claude-desktop',
   'claude-code',
@@ -17,6 +17,10 @@ export const CLIENT_IDS = [
   'zed',
   'cline',
   'gemini-cli',
+  'jetbrains',
+  'visual-studio',
+  'continue',
+  'roo-code',
 ] as const;
 
 /** Secret-provider schemes understood by the resolver (E4). Parsing lives in secret-ref.ts. */

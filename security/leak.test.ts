@@ -15,7 +15,15 @@ import {
 } from '@mcpfold/adapters';
 import { runSync, runRun, renderWithStrategy, type Spawner, type TrustGate } from 'mcpfold';
 
-const trustAll: TrustGate = { status: () => 'trusted', isTrusted: () => true, approve: () => {} };
+const trustAll: TrustGate = {
+  status: () => 'trusted',
+  isTrusted: () => true,
+  approve: () => {},
+  // Tool-surface trust (S18.1): a trust-all gate treats every live surface as trusted.
+  trustedTools: () => undefined,
+  toolsStatus: () => 'trusted',
+  approveTools: () => {},
+};
 import {
   assertRefOnlyForPush,
   findRawSecretsForPush,

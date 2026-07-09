@@ -27,7 +27,9 @@ mkdirSync(join(root, outDir), { recursive: true });
 // asset name → sha256, read from the .sha256 sidecars the binaries build produced.
 const shas = {};
 for (const f of readdirSync(join(root, checksumsDir)).filter((n) => n.endsWith('.sha256'))) {
-  const [hash] = readFileSync(join(root, checksumsDir, f), 'utf8').trim().split(/\s+/);
+  const [hash] = readFileSync(join(root, checksumsDir, f), 'utf8')
+    .trim()
+    .split(/\s+/);
   shas[basename(f, '.sha256')] = hash;
 }
 const shaFor = (asset) => {
@@ -61,7 +63,8 @@ writeFileSync(join(root, outDir, 'mcpfold.rb'), brewOut);
 // --- Scoop manifest: version, concrete 64-bit URL + hash for the Windows binary ---
 const scoop = JSON.parse(readFileSync(join(root, 'packaging/scoop/mcpfold.json'), 'utf8'));
 scoop.version = version;
-scoop.architecture['64bit'].url = `https://github.com/dj-pearson/MCPFold/releases/download/${tag}/mcpfold-windows-x64.exe#/mcpfold.exe`;
+scoop.architecture['64bit'].url =
+  `https://github.com/dj-pearson/MCPFold/releases/download/${tag}/mcpfold-windows-x64.exe#/mcpfold.exe`;
 scoop.architecture['64bit'].hash = shaFor('mcpfold-windows-x64.exe');
 writeFileSync(join(root, outDir, 'mcpfold.json'), JSON.stringify(scoop, null, 2) + '\n');
 

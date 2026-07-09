@@ -134,7 +134,11 @@
                   "windsurf",
                   "zed",
                   "cline",
-                  "gemini-cli"
+                  "gemini-cli",
+                  "jetbrains",
+                  "visual-studio",
+                  "continue",
+                  "roo-code"
                 ]
               },
               "scope": {
