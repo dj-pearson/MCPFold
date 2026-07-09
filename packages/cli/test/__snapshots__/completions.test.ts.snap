@@ -6,8 +6,8 @@ _mcpfold_complete() {
   local cur prev
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
-  local commands="diagnose sync diff init import doctor scan status test completions restore migrate run secret scaffold-adapter add trust login push pull"
-  local flags="--allow-unsigned --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --package --pin --profile --tag --team --token-ref --tools --transport --url --version --watch --yes"
+  local commands="diagnose sync diff init import export doctor scan status test completions restore migrate run secret scaffold-adapter add trust login push pull"
+  local flags="--allow-unsigned --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --mcp-json --output --package --pin --profile --tag --team --token-ref --tools --transport --url --version --watch --yes"
   case "$prev" in
     -p|--profile) COMPREPLY=( $(compgen -W "$(mcpfold __complete profiles 2>/dev/null)" -- "$cur") ); return;;
     test|restore) COMPREPLY=( $(compgen -W "$(mcpfold __complete servers 2>/dev/null)" -- "$cur") ); return;;
@@ -33,6 +33,7 @@ complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'sync' -d 'fold the canonica
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'diff' -d 'show drift between the canonical config and on-disk client files'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'init' -d 'scaffold mcp.config.jsonc and detect installed clients'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'import' -d 'adopt existing client configs into the canonical file'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'export' -d 'emit the flat ecosystem-standard .mcp.json from the canonical config'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'doctor' -d 'validate config and catch silent failures'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'scan' -d 'security preflight: audit every client config for known incident root causes'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'status' -d 'at-a-glance health: detected clients, drift, config health, cloud state'
@@ -57,8 +58,8 @@ exports[`completion scripts (S11.2) > generates a stable pwsh script from the co
 "# PowerShell completion for mcpfold — mcpfold completions pwsh | Out-String | Invoke-Expression
 Register-ArgumentCompleter -Native -CommandName mcpfold,mcpf -ScriptBlock {
   param($wordToComplete, $commandAst, $cursorPosition)
-  $commands = @('diagnose','sync','diff','init','import','doctor','scan','status','test','completions','restore','migrate','run','secret','scaffold-adapter','add','trust','login','push','pull')
-  $flags = @('--allow-unsigned','--at','--audit-log','--auth-type','--check','--config','--config-version','--cwd','--debug','--dry-run','--force','--guided','--help','--json','--list','--package','--pin','--profile','--tag','--team','--token-ref','--tools','--transport','--url','--version','--watch','--yes')
+  $commands = @('diagnose','sync','diff','init','import','export','doctor','scan','status','test','completions','restore','migrate','run','secret','scaffold-adapter','add','trust','login','push','pull')
+  $flags = @('--allow-unsigned','--at','--audit-log','--auth-type','--check','--config','--config-version','--cwd','--debug','--dry-run','--force','--guided','--help','--json','--list','--mcp-json','--output','--package','--pin','--profile','--tag','--team','--token-ref','--tools','--transport','--url','--version','--watch','--yes')
   $candidates = if ($wordToComplete -like '-*') { $flags } else { $commands }
   $candidates | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
     [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
@@ -78,6 +79,7 @@ _mcpfold() {
     'diff:show drift between the canonical config and on-disk client files'
     'init:scaffold mcp.config.jsonc and detect installed clients'
     'import:adopt existing client configs into the canonical file'
+    'export:emit the flat ecosystem-standard .mcp.json from the canonical config'
     'doctor:validate config and catch silent failures'
     'scan:security preflight: audit every client config for known incident root causes'
     'status:at-a-glance health: detected clients, drift, config health, cloud state'
@@ -100,7 +102,7 @@ _mcpfold() {
     opts)
       case $words[1] in
         test|restore) compadd $(mcpfold __complete servers 2>/dev/null) ;;
-        *) compadd --allow-unsigned --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --package --pin --profile --tag --team --token-ref --tools --transport --url --version --watch --yes ;;
+        *) compadd --allow-unsigned --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --guided --help --json --list --mcp-json --output --package --pin --profile --tag --team --token-ref --tools --transport --url --version --watch --yes ;;
       esac ;;
   esac
 }

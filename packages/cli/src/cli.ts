@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { UsageError } from '@mcpfold/core';
 import { diagnose } from './commands/diagnose.js';
 import { runSync, runSyncWatch } from './commands/sync.js';
 import { runDiff } from './commands/diff.js';
@@ -27,6 +28,7 @@ import {
 } from './update-notifier.js';
 import { spawn } from 'node:child_process';
 import { runImport } from './commands/import.js';
+import { runExport } from './commands/export.js';
 import { runAdd } from './commands/add.js';
 import { runRun } from './commands/run.js';
 import { runMigrate } from './commands/migrate.js';
@@ -223,6 +225,38 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
         'import',
         ctx.json,
         () => runImport({ cwd: ctx.cwd, force: opts.force, dryRun: ctx.dryRun }),
+        writer,
+      ),
+    );
+  });
+
+  addGlobalFlags(
+    program
+      .command('export')
+      .description('emit the flat ecosystem-standard .mcp.json from the canonical config')
+      .option('--mcp-json', 'emit the flat .mcp.json format (the only format today)', false)
+      .option('-o, --output <path>', 'output path (default: .mcp.json in the current directory)')
+      .option('-f, --force', 'overwrite an existing output file', false),
+  ).action(async (opts: GlobalFlags & { mcpJson?: boolean; output?: string; force?: boolean }) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'export',
+        ctx.json,
+        () => {
+          if (!opts.mcpJson) {
+            throw new UsageError('`mcpfold export` needs a format flag.', {
+              hint: 'Pass --mcp-json to emit a flat .mcp.json.',
+            });
+          }
+          return runExport({
+            cwd: ctx.cwd,
+            profile: ctx.profile,
+            output: opts.output,
+            force: opts.force,
+            dryRun: ctx.dryRun,
+          });
+        },
         writer,
       ),
     );

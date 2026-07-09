@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="515" viewBox="0 0 900 515" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">
-  <rect width="900" height="515" rx="10" fill="#282a36"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="557" viewBox="0 0 900 557" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">
+  <rect width="900" height="557" rx="10" fill="#282a36"/>
   <circle cx="20" cy="18" r="6" fill="#ff5f56"/><circle cx="40" cy="18" r="6" fill="#ffbd2e"/><circle cx="60" cy="18" r="6" fill="#27c93f"/>
   <text x="450" y="22" fill="#6272a4" text-anchor="middle" font-size="12">mcpfold — write once, fold out everywhere</text>
   <text x="20" y="54" fill="#8be9fd" xml:space="preserve">MCP tool-schemas cost context. mcpfold cuts them ~80% (7476 → 1497 tokens).</text>
@@ -10,17 +10,19 @@
   <text x="20" y="159" fill="#f8f8f2" xml:space="preserve">Detected clients: cursor.</text>
   <text x="20" y="180" fill="#f8f8f2" xml:space="preserve"></text>
   <text x="20" y="201" fill="#f8f8f2" xml:space="preserve">Next: edit the config, then run `mcpfold sync` to fold it out.</text>
-  <text x="20" y="222" fill="#50fa7b" xml:space="preserve">$ mcpfold import</text>
-  <text x="20" y="243" fill="#f8f8f2" xml:space="preserve">Imported from: cursor.</text>
-  <text x="20" y="264" fill="#f8f8f2" xml:space="preserve">Servers: filesystem, github, playwright.</text>
-  <text x="20" y="285" fill="#f8f8f2" xml:space="preserve">Profiles: cursor.</text>
-  <text x="20" y="306" fill="#f8f8f2" xml:space="preserve"></text>
-  <text x="20" y="327" fill="#f8f8f2" xml:space="preserve">Wrote ~/project/mcp.config.jsonc</text>
-  <text x="20" y="348" fill="#50fa7b" xml:space="preserve">$ mcpfold sync</text>
-  <text x="20" y="369" fill="#f8f8f2" xml:space="preserve">Synced:</text>
-  <text x="20" y="390" fill="#f8f8f2" xml:space="preserve">  cursor (cursor) → ~/.cursor/mcp.json: wrote (backup: ~/.cursor/mcp.json.mcpfold.bak.&lt;timestamp&gt;)</text>
-  <text x="20" y="411" fill="#50fa7b" xml:space="preserve">$ mcpfold diff</text>
-  <text x="20" y="432" fill="#f8f8f2" xml:space="preserve">cursor (cursor) → ~/.cursor/mcp.json</text>
-  <text x="20" y="453" fill="#f8f8f2" xml:space="preserve">  ✓ up to date</text>
-  <text x="20" y="474" fill="#f8f8f2" xml:space="preserve">No drift.</text>
+  <text x="20" y="222" fill="#f8f8f2" xml:space="preserve">Already have a .mcp.json? Run `mcpfold import` to adopt it. Need one for another tool?</text>
+  <text x="20" y="243" fill="#f8f8f2" xml:space="preserve">`mcpfold export --mcp-json` writes one.</text>
+  <text x="20" y="264" fill="#50fa7b" xml:space="preserve">$ mcpfold import</text>
+  <text x="20" y="285" fill="#f8f8f2" xml:space="preserve">Imported from: cursor.</text>
+  <text x="20" y="306" fill="#f8f8f2" xml:space="preserve">Servers: filesystem, github, playwright.</text>
+  <text x="20" y="327" fill="#f8f8f2" xml:space="preserve">Profiles: cursor.</text>
+  <text x="20" y="348" fill="#f8f8f2" xml:space="preserve"></text>
+  <text x="20" y="369" fill="#f8f8f2" xml:space="preserve">Wrote ~/project/mcp.config.jsonc</text>
+  <text x="20" y="390" fill="#50fa7b" xml:space="preserve">$ mcpfold sync</text>
+  <text x="20" y="411" fill="#f8f8f2" xml:space="preserve">Synced:</text>
+  <text x="20" y="432" fill="#f8f8f2" xml:space="preserve">  cursor (cursor) → ~/.cursor/mcp.json: wrote (backup: ~/.cursor/mcp.json.mcpfold.bak.&lt;timestamp&gt;)</text>
+  <text x="20" y="453" fill="#50fa7b" xml:space="preserve">$ mcpfold diff</text>
+  <text x="20" y="474" fill="#f8f8f2" xml:space="preserve">cursor (cursor) → ~/.cursor/mcp.json</text>
+  <text x="20" y="495" fill="#f8f8f2" xml:space="preserve">  ✓ up to date</text>
+  <text x="20" y="516" fill="#f8f8f2" xml:space="preserve">No drift.</text>
 </svg>

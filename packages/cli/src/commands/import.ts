@@ -8,8 +8,14 @@ import {
   type ProfileConfig,
   type ServerConfig,
 } from '@mcpfold/core';
-import { ALL_ADAPTERS, realOsContext, registerAll, type OsContext } from '@mcpfold/adapters';
-import { CONFIG_FILENAMES } from '../util/config.js';
+import {
+  ALL_ADAPTERS,
+  fromMcpServersShape,
+  realOsContext,
+  registerAll,
+  type OsContext,
+} from '@mcpfold/adapters';
+import { CONFIG_FILENAMES, MCP_JSON_FILENAME } from '../util/config.js';
 import type { CommandOutput } from '../output/render.js';
 
 /**
@@ -59,6 +65,8 @@ function signature(server: ServerConfig): string {
 }
 
 const SUSPICIOUS_KEY = /(token|secret|key|auth|pat|password|bearer)/i;
+/** A canonical ref (`${scheme:path}`) embedded anywhere in a value (not just the whole value). */
+const REF_ANYWHERE = /\$\{[a-z][a-z0-9]*:[^}]+\}/i;
 
 /** Rewrite hardcoded secret values (non-refs) in env/headers to ${env:...} placeholders. */
 function redactSecrets(name: string, server: ServerConfig, flagged: FlaggedSecret[]): ServerConfig {
@@ -66,7 +74,9 @@ function redactSecrets(name: string, server: ServerConfig, flagged: FlaggedSecre
   const rewrite = (record: Record<string, string>, kind: string): Record<string, string> => {
     const out: Record<string, string> = {};
     for (const [key, value] of Object.entries(record)) {
-      if (!isSecretRef(value) && SUSPICIOUS_KEY.test(key)) {
+      // Skip values that already reference a secret — whole-value (${env:X}) or embedded
+      // (Authorization: Bearer ${env:X}) — so import never destroys an existing ref.
+      if (!isSecretRef(value) && !REF_ANYWHERE.test(value) && SUSPICIOUS_KEY.test(key)) {
         const placeholder = `\${env:${`${name}_${key}`.toUpperCase().replace(/[^A-Z0-9]/g, '_')}}`;
         out[key] = placeholder;
         flagged.push({ server: name, location: `${kind}.${key}`, placeholder });
@@ -82,6 +92,65 @@ function redactSecrets(name: string, server: ServerConfig, flagged: FlaggedSecre
   return clone;
 }
 
+/** Tag + profile id used for servers adopted from a bare `.mcp.json` (S20.1). */
+const MCP_JSON_SOURCE = 'mcp-json';
+
+/** Bare `${NAME}` (no scheme) in a `.mcp.json` value → a canonical `${env:NAME}` ref. */
+function normalizeEnvInterpolation(server: ServerConfig): ServerConfig {
+  const rewrite = (record: Record<string, string>): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(record)) {
+      out[key] = value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, '${env:$1}');
+    }
+    return out;
+  };
+  const clone: ServerConfig = { ...server };
+  if (server.env) clone.env = rewrite(server.env);
+  if (server.auth?.headers) clone.auth = { ...server.auth, headers: rewrite(server.auth.headers) };
+  return clone;
+}
+
+/** Accumulator threaded through every import source (adapters + `.mcp.json`). */
+interface MergeAcc {
+  mergedServers: Record<string, ServerConfig>;
+  serverTags: Record<string, Set<string>>;
+  serverSig: Record<string, string>;
+  conflicts: ImportConflict[];
+  flagged: FlaggedSecret[];
+  sources: string[];
+  profiles: Record<string, ProfileConfig>;
+}
+
+/**
+ * Fold one source's servers into the accumulator: register a per-source profile, then merge each
+ * server (dedupe identical definitions by signature, union their tags, flag genuine conflicts).
+ */
+function ingestSource(
+  sourceId: string,
+  profile: { client: ProfileConfig['client']; scope: ProfileConfig['scope'] },
+  parsedServers: Record<string, ServerConfig>,
+  acc: MergeAcc,
+): void {
+  acc.sources.push(sourceId);
+  acc.profiles[sourceId] = { client: profile.client, scope: profile.scope, include: [sourceId] };
+
+  for (const [name, rawServer] of Object.entries(parsedServers)) {
+    const server = redactSecrets(name, rawServer, acc.flagged);
+    const sig = signature(server);
+    if (!acc.mergedServers[name]) {
+      acc.mergedServers[name] = server;
+      acc.serverSig[name] = sig;
+      acc.serverTags[name] = new Set([sourceId]);
+    } else if (acc.serverSig[name] === sig) {
+      acc.serverTags[name]!.add(sourceId); // same server across sources → dedupe, union tags
+    } else {
+      const conflict = acc.conflicts.find((c) => c.name === name);
+      if (conflict) conflict.clients.push(sourceId);
+      else acc.conflicts.push({ name, clients: [...acc.serverTags[name]!, sourceId] });
+    }
+  }
+}
+
 export function runImport(options: ImportOptions): CommandOutput<ImportData> {
   registerAll();
   const ctx = options.osContext ?? realOsContext();
@@ -93,13 +162,15 @@ export function runImport(options: ImportOptions): CommandOutput<ImportData> {
     });
   }
 
-  const mergedServers: Record<string, ServerConfig> = {};
-  const serverTags: Record<string, Set<string>> = {};
-  const serverSig: Record<string, string> = {};
-  const conflicts: ImportConflict[] = [];
-  const flagged: FlaggedSecret[] = [];
-  const sources: string[] = [];
-  const profiles: Record<string, ProfileConfig> = {};
+  const acc: MergeAcc = {
+    mergedServers: {},
+    serverTags: {},
+    serverSig: {},
+    conflicts: [],
+    flagged: [],
+    sources: [],
+    profiles: {},
+  };
 
   for (const adapter of ALL_ADAPTERS) {
     let path: string;
@@ -120,26 +191,35 @@ export function runImport(options: ImportOptions): CommandOutput<ImportData> {
       continue;
     }
     if (Object.keys(parsedServers).length === 0) continue;
-    sources.push(adapter.id);
-    profiles[adapter.id] = { client: adapter.id, scope: 'user', include: [adapter.id] };
+    ingestSource(adapter.id, { client: adapter.id, scope: 'user' }, parsedServers, acc);
+  }
 
-    for (const [name, rawServer] of Object.entries(parsedServers)) {
-      const server = redactSecrets(name, rawServer, flagged);
-      const sig = signature(server);
-      const existing = mergedServers[name];
-      if (!existing) {
-        mergedServers[name] = server;
-        serverSig[name] = sig;
-        serverTags[name] = new Set([adapter.id]);
-      } else if (serverSig[name] === sig) {
-        serverTags[name]!.add(adapter.id); // same server across clients → dedupe, union tags
-      } else {
-        const conflict = conflicts.find((c) => c.name === name);
-        if (conflict) conflict.clients.push(adapter.id);
-        else conflicts.push({ name, clients: [...serverTags[name]!, adapter.id] });
+  // The flat ecosystem-standard `.mcp.json` (S20.1) is a first-class import source: a bare
+  // `<cwd>/.mcp.json` (Claude Code's project file, one of VS's read paths) is folded in like any
+  // client. `${VAR}` env interpolation in it becomes a canonical `${env:VAR}` ref.
+  const mcpJsonPath = join(options.cwd, MCP_JSON_FILENAME);
+  if (existsSync(mcpJsonPath)) {
+    try {
+      const raw = JSON.parse(readFileSync(mcpJsonPath, 'utf8')) as { mcpServers?: unknown };
+      const parsed = (fromMcpServersShape(raw.mcpServers).servers ?? {}) as Record<
+        string,
+        ServerConfig
+      >;
+      const normalized: Record<string, ServerConfig> = {};
+      for (const [name, server] of Object.entries(parsed)) {
+        normalized[name] = normalizeEnvInterpolation(server);
       }
+      if (Object.keys(normalized).length > 0) {
+        // Scope 'user' (like every adapter-derived profile) keeps the generated canonical config
+        // portable + valid — a project scope would require a hardcoded `path`. The user edits this.
+        ingestSource(MCP_JSON_SOURCE, { client: 'claude-code', scope: 'user' }, normalized, acc);
+      }
+    } catch {
+      // Unreadable/invalid .mcp.json — skip it rather than fail the whole import.
     }
   }
+
+  const { mergedServers, serverTags, conflicts, flagged, sources, profiles } = acc;
 
   // Attach inferred tags.
   for (const [name, tags] of Object.entries(serverTags)) {

@@ -27,7 +27,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @mcpfold/site build
+      - run: pnpm --filter "@mcpfold/site..." build
       - name: Build docs (unified shell + search) so the docs e2e can run
         run: pnpm docs:build
       - name: Playwright e2e (homepage, theme, SEO, docs)
@@ -56,7 +56,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @mcpfold/site build
+      - run: pnpm --filter "@mcpfold/site..." build
       - name: Mount docs under /docs (unified site, S13.4)
         run: |
           pnpm docs:build

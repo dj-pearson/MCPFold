@@ -88,6 +88,12 @@ export {
   type ImportData,
   type ImportOptions,
 } from './commands/import.js';
+export {
+  runExport,
+  type ExportData,
+  type ExportOptions,
+  type UnresolvedRef,
+} from './commands/export.js';
 export { runAdd, type AddData, type AddOptions, type Prompt } from './commands/add.js';
 export { detectClients, type DetectedClient } from './util/detect-clients.js';
 export type { Finding, Severity } from './checks/types.js';
@@ -154,4 +160,9 @@ export {
   type RestoreOptions,
   type RestoreTarget,
 } from './commands/restore.js';
-export { CONFIG_FILENAMES, findConfigPath, loadConfigFromDisk } from './util/config.js';
+export {
+  CONFIG_FILENAMES,
+  MCP_JSON_FILENAME,
+  findConfigPath,
+  loadConfigFromDisk,
+} from './util/config.js';
