@@ -1,4 +1,4 @@
-import { DIRECTORY } from '@mcpfold/core';
+import { DIRECTORY, categoryMeta, entriesForCategory } from '@mcpfold/core';
 import { POSTS } from '../blog/posts';
 import { SITE_URL } from './meta';
 import { faqPageJsonLd, faqsForPath } from './faq';
@@ -48,6 +48,25 @@ function directoryItemList(): JsonLd {
   };
 }
 
+/** ItemList for a category/collection page (S15.4) — its servers, in directory order. */
+function categoryItemList(cat: string): JsonLd {
+  const m = categoryMeta(cat);
+  const entries = entriesForCategory(cat);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: `${m.label} MCP servers`,
+    description: m.description,
+    numberOfItems: entries.length,
+    itemListElement: entries.map((entry, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: entry.name,
+      url: `${SITE_URL}/directory/${entry.id}`,
+    })),
+  };
+}
+
 function breadcrumb(trail: Array<{ name: string; path: string }>): JsonLd {
   return {
     '@context': 'https://schema.org',
@@ -70,6 +89,18 @@ export function jsonLdForPath(path: string): JsonLd[] {
 
   if (p === '/') return [softwareApplication(), ...faqNode];
   if (p === '/directory') return [directoryItemList(), ...faqNode];
+
+  if (p.startsWith('/directory/category/')) {
+    const cat = p.slice('/directory/category/'.length);
+    if (entriesForCategory(cat).length === 0) return [];
+    return [
+      categoryItemList(cat),
+      breadcrumb([
+        { name: 'Directory', path: '/directory' },
+        { name: categoryMeta(cat).label, path: `/directory/category/${cat}` },
+      ]),
+    ];
+  }
 
   if (p.startsWith('/directory/')) {
     const entry = DIRECTORY.find((e) => e.id === p.slice('/directory/'.length));

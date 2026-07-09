@@ -49,6 +49,32 @@ test('/directory: heading + ItemList JSON-LD in no-JS HTML', async ({ request })
   expect(items[0]!.position).toBe(1);
 });
 
+test('/directory/category/:cat: prerendered collection with ItemList + in the sitemap (no-JS)', async ({
+  request,
+}) => {
+  const html = await rawHtml(request, '/directory/category/database');
+  // The collection is real, server-rendered content, not an empty shell.
+  expect(html).toContain('Best Database MCP servers');
+  expect(html).toContain('<title>Best Database MCP servers · mcpfold</title>');
+  expect(html).not.toMatch(/<div id="root"><\/div>/);
+
+  const blocks = jsonLdBlocks(html);
+  const list = blocks.find((b) => b['@type'] === 'ItemList');
+  expect(list, 'ItemList JSON-LD on the category page').toBeTruthy();
+  const items = list!.itemListElement as Array<Record<string, unknown>>;
+  expect(items.length).toBeGreaterThan(2); // >= MIN_CATEGORY_ENTRIES
+  expect(items.some((i) => String(i.url).endsWith('/directory/postgres'))).toBe(true);
+  expect(
+    blocks.find((b) => b['@type'] === 'BreadcrumbList'),
+    'breadcrumb',
+  ).toBeTruthy();
+
+  // The sitemap lists populated categories but not thin ones (index-bloat guard).
+  const sitemap = await rawHtml(request, '/sitemap.xml');
+  expect(sitemap).toContain('/directory/category/database');
+  expect(sitemap).not.toContain('/directory/category/finance');
+});
+
 test('/directory/:id: entry content + BreadcrumbList JSON-LD in no-JS HTML', async ({
   request,
 }) => {
