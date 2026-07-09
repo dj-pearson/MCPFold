@@ -57,6 +57,12 @@ jobs:
     name: deploy
     needs: build
     runs-on: ubuntu-latest
+    # Gated until GitHub Pages is set up (like the Cloudflare deploys). To publish the docs site:
+    #   1. Settings → Pages → Source = "GitHub Actions"
+    #   2. Settings → Secrets and variables → Actions → Variables → add PAGES_ENABLED = true
+    # Until then the deploy is SKIPPED (not failed), so `main` stays green. The `build` job above
+    # still runs on every push, so a broken docs build is caught regardless.
+    if: vars.PAGES_ENABLED == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
