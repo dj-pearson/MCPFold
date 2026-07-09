@@ -3692,7 +3692,7 @@
       "epic": "E16",
       "order": 3,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Windows credential storage without a third-party PowerShell module",
       "user_story": "As a Windows user on a stock machine, I want `mcpfold login`/`push`/`pull` to store my session securely without installing extra modules so cloud sync works out of the box.",
