@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import {
   resolveProfile,
   UnknownProfileError,
@@ -7,9 +6,19 @@ import {
   type ResolvedServer,
   type Transport,
 } from '@mcpfold/core';
-import { handshake, type MessageTransport, streamTransport } from '@mcpfold/proxy';
+import {
+  canonicalizeTools,
+  diffToolSurface,
+  handshake,
+  hasToolDrift,
+  renderToolSurfaceDiff,
+  type MessageTransport,
+  type ToolSurfaceDiff,
+} from '@mcpfold/proxy';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import { loadConfigFromDisk } from '../util/config.js';
+import { realTransport } from '../util/mcp-transport.js';
+import { fileTrustGate, type TrustGate } from '../trust/tofu.js';
 import { Redactor } from '../util/redact.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
@@ -27,6 +36,8 @@ export interface TestServerResult {
   reachable: boolean;
   protocolVersion?: string;
   toolCount?: number;
+  /** Tool-definition drift vs the trusted surface (S18.1), when the server is pinned. */
+  toolDrift?: { drifted: boolean; diff?: ToolSurfaceDiff; summary?: string };
   error?: string;
 }
 
@@ -47,6 +58,12 @@ export interface TestOptions {
   providers?: SecretProvider[];
   /** Injectable for tests; defaults to real stdio/http transports. */
   transportFactory?: TransportFactory;
+  /**
+   * Check the live tool surface against the trusted digest (S18.1) — the test-time enforcement
+   * point for NON-proxied servers. Pass `false` to disable, a gate to override; defaults to the
+   * on-disk trust gate.
+   */
+  trust?: TrustGate | false;
 }
 
 /** Build the list of servers to test — a named one, an active profile's set, or the whole config. */
@@ -73,78 +90,6 @@ function serversToTest(
   });
 }
 
-/** Default transport for a resolved server: spawn stdio, or POST JSON-RPC over HTTP/SSE. */
-function realTransport(server: ResolvedServer): MessageTransport {
-  if (server.transport === 'stdio') {
-    if (!server.command) throw new UsageError(`Server "${server.name}" has no launch command.`);
-    const child = spawn(server.command, server.args ?? [], {
-      stdio: ['pipe', 'pipe', 'ignore'],
-      env: { ...process.env, ...server.env },
-    });
-    let spawnError: string | undefined;
-    child.on('error', (e) => {
-      spawnError = e.message;
-    });
-    const transport = streamTransport(child.stdout!, child.stdin!);
-    return {
-      onMessage: (h) => transport.onMessage(h),
-      send: (m) => {
-        if (spawnError) throw new Error(spawnError);
-        transport.send(m);
-      },
-      close: () => {
-        transport.close();
-        child.kill();
-      },
-    };
-  }
-  // http / sse: streamable-HTTP JSON-RPC over POST.
-  const headers: Record<string, string> = {
-    'content-type': 'application/json',
-    accept: 'application/json, text/event-stream',
-    ...(server.auth?.headers ?? {}),
-  };
-  if (server.auth?.token) headers.authorization = `Bearer ${server.auth.token}`;
-  let onMsg: Parameters<MessageTransport['onMessage']>[0] | undefined;
-  return {
-    onMessage: (h) => {
-      onMsg = h;
-    },
-    send: (msg) => {
-      if (msg.id == null) return; // notification: fire-and-forget
-      fetch(server.url!, { method: 'POST', headers, body: JSON.stringify(msg) })
-        .then(async (res) => {
-          if (!res.ok) {
-            onMsg?.({
-              jsonrpc: '2.0',
-              id: msg.id,
-              error: { code: res.status, message: `HTTP ${res.status}` },
-            });
-            return;
-          }
-          const text = await res.text();
-          const jsonLine = text.startsWith('data:')
-            ? text
-                .split('\n')
-                .find((l) => l.startsWith('data:'))
-                ?.slice(5)
-                .trim()
-            : text;
-          const parsed = jsonLine ? JSON.parse(jsonLine) : null;
-          if (parsed) onMsg?.(parsed);
-        })
-        .catch((e) =>
-          onMsg?.({
-            jsonrpc: '2.0',
-            id: msg.id,
-            error: { code: -1, message: String(e?.message ?? e) },
-          }),
-        );
-    },
-    close: () => {},
-  };
-}
-
 export async function runTest(options: TestOptions): Promise<CommandOutput<TestData>> {
   const { config } = loadConfigFromDisk(options.cwd);
   if (options.profile && !config.profiles[options.profile]) {
@@ -152,6 +97,7 @@ export async function runTest(options: TestOptions): Promise<CommandOutput<TestD
   }
   const timeoutMs = options.timeoutMs ?? 10_000;
   const factory = options.transportFactory ?? realTransport;
+  const trustGate = options.trust === false ? undefined : (options.trust ?? fileTrustGate());
 
   const targets = serversToTest(config, { server: options.server, profile: options.profile });
   const resolved = await resolveSecrets(targets, {
@@ -179,6 +125,14 @@ export async function runTest(options: TestOptions): Promise<CommandOutput<TestD
         toolCount: res.toolCount,
         error: res.error ? redactor.string(res.error) : undefined,
       };
+      // Tool-definition pinning (S18.1): the test-time drift check for non-proxied servers.
+      const pinned = trustGate?.trustedTools(server.name);
+      if (pinned && res.reachable && res.tools) {
+        const diff = diffToolSurface(pinned.surface, canonicalizeTools(res.tools));
+        result.toolDrift = hasToolDrift(diff)
+          ? { drifted: true, diff, summary: renderToolSurfaceDiff(diff) }
+          : { drifted: false };
+      }
     } catch (err) {
       result = {
         server: server.name,
@@ -190,7 +144,9 @@ export async function runTest(options: TestOptions): Promise<CommandOutput<TestD
     results.push(result);
   }
 
-  const anyFail = results.some((r) => !r.reachable);
+  // A reachable-but-drifted server is a failure signal too — silent tool-definition drift is the
+  // exact rug-pull we're defending against.
+  const anyFail = results.some((r) => !r.reachable || r.toolDrift?.drifted);
   return {
     data: { results },
     human: renderHuman(results),
@@ -200,14 +156,24 @@ export async function runTest(options: TestOptions): Promise<CommandOutput<TestD
 
 function renderHuman(results: TestServerResult[]): string {
   if (results.length === 0) return 'No servers to test.';
-  const lines = results.map((r) => {
+  const lines: string[] = [];
+  for (const r of results) {
     if (r.reachable) {
       const proto = r.protocolVersion ? ` · MCP ${r.protocolVersion}` : '';
-      return `  ✓ ${r.server} (${r.transport}): reachable — ${r.toolCount} tool(s)${proto}`;
+      lines.push(`  ✓ ${r.server} (${r.transport}): reachable — ${r.toolCount} tool(s)${proto}`);
+      if (r.toolDrift?.drifted) {
+        lines.push(`  ⚠ ${r.server}: tool definitions CHANGED since you trusted this server:`);
+        if (r.toolDrift.summary) lines.push(r.toolDrift.summary);
+        lines.push(`      Review, then re-run \`mcpfold trust ${r.server} --tools\` to approve.`);
+      }
+    } else {
+      lines.push(`  ✗ ${r.server} (${r.transport}): ${r.error ?? 'unreachable'}`);
     }
-    return `  ✗ ${r.server} (${r.transport}): ${r.error ?? 'unreachable'}`;
-  });
+  }
   const failed = results.filter((r) => !r.reachable).length;
-  const footer = failed === 0 ? 'All servers reachable.' : `${failed} server(s) failed.`;
-  return ['Server health:', ...lines, '', footer].join('\n');
+  const drifted = results.filter((r) => r.toolDrift?.drifted).length;
+  const parts: string[] = [];
+  parts.push(failed === 0 ? 'All servers reachable.' : `${failed} server(s) failed.`);
+  if (drifted > 0) parts.push(`${drifted} server(s) with drifted tool definitions.`);
+  return ['Server health:', ...lines, '', parts.join(' ')].join('\n');
 }

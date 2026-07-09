@@ -11,4 +11,10 @@ export interface MessageTransport {
   send(message: JsonRpcMessage): void;
   /** Close the transport and release resources. */
   close(): void;
+  /**
+   * Optional (S17.4): called once with the negotiated MCP protocol version after `initialize`
+   * completes. HTTP transports must echo it as the `MCP-Protocol-Version` header on every
+   * subsequent request (required since protocol 2025-06-18). No-op for stdio/in-memory.
+   */
+  setProtocolVersion?(version: string): void;
 }

@@ -18,9 +18,33 @@ code-execution and secret-handling surface.
 
 ## Curation proxy
 
-The optional proxy trims `tools/list` to an allow/deny set. It is a faithful JSON-RPC passthrough
-(ids/notifications/errors preserved), **off by default**, and only sits in the launch path when a
-server declares a `tools` directive. It transforms only the tool list — never secret material.
+The optional proxy trims `tools/list` (and the stateless-core `server/discover`) to an allow/deny
+set. It is a faithful JSON-RPC passthrough (ids/notifications/errors/`_meta` preserved), **off by
+default**, and only sits in the launch path when a server declares a `tools` directive. It
+transforms only the tool list — never secret material.
+
+## Tool-definition pinning (rug-pull defense)
+
+Tool poisoning / rug pulls are OWASP **MCP03:2025**: malicious instructions ride in tools/list
+**descriptions** and enter the model's context before any tool is called, and a server that shipped
+many clean versions can mutate its definitions after you trust it (e.g. `postmark-mcp` shipped a
+backdoor in v1.0.16). Our config-as-code TOFU (S9.2) pins only the launch _command_; this extends
+it to the _tool surface_.
+
+- **What is pinned.** `mcpfold trust <server> --tools` probes the live server once and records an
+  order-insensitive, whitespace-stable digest of every tool's `name` + `description` + input-schema
+  alongside the launch-command signature, in the per-machine trust store (never synced).
+- **Where it's enforced.** For **proxied** stdio servers, the proxy compares the live tool surface
+  against the pinned one on every `tools/list` / `server/discover` and **warns by default** or
+  **blocks** (`--strict-tools`), replacing the drifted listing with an error so nothing new reaches
+  the model. For **non-proxied** servers, `mcpfold test` performs the same comparison and exits
+  nonzero on drift. Either way the user sees a reviewable diff (added / removed / description- or
+  schema-changed tools) and re-approves with `mcpfold trust <server> --tools`.
+- **Boundaries.** This detects _silent_ drift from a trusted baseline; it does not judge whether the
+  first-seen definitions are themselves benign (that is the user's trust decision, as with SSH host
+  keys). Drift measured on the full surface even when curation would hide a tool from the client.
+  The digest is content-based, so a server that changes behavior without changing its advertised
+  definitions is out of scope. This is the ETDI / SEP-1766 direction, shipped ahead of the spec.
 
 ## Sync channel (`login` / `push` / `pull` + edge)
 

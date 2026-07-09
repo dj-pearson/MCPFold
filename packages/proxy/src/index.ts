@@ -12,9 +12,36 @@ export {
   type JsonRpcId,
   type JsonRpcMessage,
 } from './jsonrpc.js';
-export { connectProxy, type ProxyOptions } from './proxy.js';
+export {
+  connectProxy,
+  DISCOVER_METHOD,
+  TOOLS_LIST_METHOD,
+  type PinnedToolsOptions,
+  type ProxyOptions,
+} from './proxy.js';
 export { filterTools, isToolAllowed, type McpTool } from './filter.js';
+export {
+  canonicalizeTools,
+  diffToolSurface,
+  digestOfCanonical,
+  hasToolDrift,
+  renderToolSurfaceDiff,
+  toolDefinitionsDigest,
+  type CanonicalTool,
+  type ChangedTool,
+  type ToolSurfaceDiff,
+} from './tool-digest.js';
 export { streamTransport } from './transport/stdio.js';
 export { MemoryTransport } from './transport/memory.js';
 export type { MessageTransport } from './transport/types.js';
-export { handshake, MCP_PROTOCOL_VERSION, type HandshakeResult } from './handshake.js';
+export {
+  handshake,
+  isSupportedProtocolVersion,
+  MCP_PROTOCOL_VERSION,
+  META_PROTOCOL_VERSION_KEY,
+  PREFERRED_PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+  type HandshakeMode,
+  type HandshakeResult,
+  type ProtocolVersion,
+} from './handshake.js';

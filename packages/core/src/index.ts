@@ -83,6 +83,17 @@ export {
 
 // Deterministic serialization (S0.8)
 export { isByteIdentical, serialize, sortKeysDeep, type SerializeOptions } from './serialize.js';
+
+// mcp-remote bridge spec + CVE guards (S17.1)
+export {
+  compareVersions,
+  findMcpRemoteArg,
+  isVulnerableMcpRemoteVersion,
+  MCP_REMOTE_MIN_VERSION,
+  MCP_REMOTE_PACKAGE,
+  MCP_REMOTE_PINNED_VERSION,
+  MCP_REMOTE_SPEC,
+} from './bridge.js';
 export { DIRECTORY, DIRECTORY_VERSION, searchDirectory, type DirectoryEntry } from './directory.js';
 
 // Drift-check engine (S0.8)

@@ -443,10 +443,18 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     program
       .command('trust')
       .description('approve new or changed server launch commands (config-as-code TOFU)')
-      .argument('[name]', 'a single server to trust; omit to trust all untrusted'),
-  ).action(async (name: string | undefined, opts: GlobalFlags) => {
+      .argument('[name]', 'a single server to trust; omit to trust all untrusted')
+      .option('--tools', 'also probe and pin the server’s tool definitions (rug-pull defense)'),
+  ).action(async (name: string | undefined, opts: GlobalFlags & { tools?: boolean }) => {
     const ctx = resolve(opts);
-    setExit(await runCommand('trust', ctx.json, () => runTrust({ cwd: ctx.cwd, name }), writer));
+    setExit(
+      await runCommand(
+        'trust',
+        ctx.json,
+        () => runTrust({ cwd: ctx.cwd, name, tools: opts.tools }),
+        writer,
+      ),
+    );
   });
 
   // ---- Cloud sync: login / push / pull (S6.6) ---------------------------------

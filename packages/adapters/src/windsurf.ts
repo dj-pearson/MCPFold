@@ -1,4 +1,11 @@
-import { serialize, type Config, type ResolvedServer, type ServerConfig } from '@mcpfold/core';
+import {
+  findMcpRemoteArg,
+  MCP_REMOTE_SPEC,
+  serialize,
+  type Config,
+  type ResolvedServer,
+  type ServerConfig,
+} from '@mcpfold/core';
 import { joinFor, realOsContext } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
@@ -47,7 +54,7 @@ function toWindsurfEntry(server: ResolvedServer): WindsurfEntry {
   if (needsRemoteWrapper(server)) {
     return {
       command: 'npx',
-      args: ['-y', 'mcp-remote', server.url ?? '', ...headerArgs(server)],
+      args: ['-y', MCP_REMOTE_SPEC, server.url ?? '', ...headerArgs(server)],
     };
   }
   if (server.transport === 'stdio') {
@@ -88,7 +95,8 @@ export const windsurfAdapter: ClientAdapter = {
       if (!value || typeof value !== 'object') continue;
       const entry = value as Record<string, unknown>;
       const args = Array.isArray(entry.args) ? (entry.args as string[]) : [];
-      const remoteIdx = args.indexOf('mcp-remote');
+      // Recognize both the pinned spec (`mcp-remote@x.y.z`) and legacy unpinned (`mcp-remote`).
+      const remoteIdx = findMcpRemoteArg(args)?.index ?? -1;
 
       if (entry.command === 'npx' && remoteIdx !== -1) {
         // Reverse the mcp-remote wrapper back to a canonical http server.

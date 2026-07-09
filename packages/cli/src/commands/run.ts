@@ -1,9 +1,20 @@
 import { spawn } from 'node:child_process';
-import { UsageError, type ResolvedServer, type ToolsDirective } from '@mcpfold/core';
+import {
+  MCP_REMOTE_SPEC,
+  UsageError,
+  type ResolvedServer,
+  type ToolsDirective,
+} from '@mcpfold/core';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
-import { connectProxy, streamTransport } from '@mcpfold/proxy';
+import {
+  connectProxy,
+  renderToolSurfaceDiff,
+  streamTransport,
+  type PinnedToolsOptions,
+} from '@mcpfold/proxy';
 import { loadConfigFromDisk } from '../util/config.js';
 import { fileTrustGate, isExecutable, type TrustGate } from '../trust/tofu.js';
+import { resolveCommand } from '../util/spawn.js';
 
 /**
  * `mcpfold run <name>` (S4.7) — the shim launcher the `shim` strategy points clients at.
@@ -20,7 +31,12 @@ export type Spawner = (command: string, args: string[], env: NodeJS.ProcessEnv) 
 
 const defaultSpawner: Spawner = (command, args, env) =>
   new Promise<number>((resolve) => {
-    const child = spawn(command, args, { stdio: 'inherit', env });
+    const r = resolveCommand(command, args);
+    const child = spawn(r.command, r.args, {
+      stdio: 'inherit',
+      env,
+      windowsVerbatimArguments: r.windowsVerbatimArguments,
+    });
     const forward = (signal: NodeJS.Signals): void => {
       if (!child.killed) child.kill(signal);
     };
@@ -39,17 +55,23 @@ export type ProxySpawner = (
   command: string,
   args: string[],
   env: NodeJS.ProcessEnv,
-  tools: ToolsDirective,
+  tools: ToolsDirective | undefined,
+  pinned?: PinnedToolsOptions,
 ) => Promise<number>;
 
-const defaultProxySpawner: ProxySpawner = (command, args, env, tools) =>
+const defaultProxySpawner: ProxySpawner = (command, args, env, tools, pinned) =>
   new Promise<number>((resolve) => {
     // stderr is inherited so the server's logs still reach the terminal; stdin/stdout are
     // piped so the proxy can sit between the MCP client (our process) and the real server.
-    const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'inherit'], env });
+    const r = resolveCommand(command, args);
+    const child = spawn(r.command, r.args, {
+      stdio: ['pipe', 'pipe', 'inherit'],
+      env,
+      windowsVerbatimArguments: r.windowsVerbatimArguments,
+    });
     const clientTransport = streamTransport(process.stdin, process.stdout);
     const serverTransport = streamTransport(child.stdout!, child.stdin!);
-    const dispose = connectProxy(clientTransport, serverTransport, { tools });
+    const dispose = connectProxy(clientTransport, serverTransport, { tools, pinnedTools: pinned });
 
     const forward = (signal: NodeJS.Signals): void => {
       if (!child.killed) child.kill(signal);
@@ -83,6 +105,10 @@ export interface RunOptions {
   proxySpawnFn?: ProxySpawner;
   /** Trust gate (TOFU); defaults to the per-machine trust store. Injectable for tests. */
   trust?: TrustGate;
+  /** Block (not just warn) when the tool surface drifts from the pinned one (S18.1). */
+  strictTools?: boolean;
+  /** Sink for the drift warning line(s); defaults to stderr. Injectable for tests. */
+  warn?: (line: string) => void;
 }
 
 /** Rewrite an `@latest` package spec to the pinned version (supply-chain hygiene). */
@@ -91,9 +117,10 @@ function applyPin(args: string[] | undefined, pin: string | undefined): string[]
   return args.map((a) => a.replace(/@latest$/, `@${pin}`));
 }
 
-/** Build `mcp-remote` args for a remote server, injecting resolved auth headers. */
+/** Build `mcp-remote` args for a remote server, injecting resolved auth headers. The bridge is
+ * pinned to a CVE-safe version via MCP_REMOTE_SPEC (see @mcpfold/core bridge.ts). */
 function remoteArgs(server: ResolvedServer): string[] {
-  const args = ['-y', 'mcp-remote', server.url ?? ''];
+  const args = ['-y', MCP_REMOTE_SPEC, server.url ?? ''];
   if (server.auth?.type === 'bearer' && server.auth.token) {
     args.push('--header', `Authorization: Bearer ${server.auth.token}`);
   }
@@ -115,9 +142,10 @@ export async function runRun(options: RunOptions): Promise<number> {
     });
   }
 
+  const trust = options.trust ?? fileTrustGate();
+
   // Config-as-code TOFU gate (S9.2): never exec a launch command that hasn't been trusted.
   if (isExecutable(server)) {
-    const trust = options.trust ?? fileTrustGate();
     const entry = { command: server.command, args: server.args, pin: server.pin };
     if (!trust.isTrusted(options.name, entry)) {
       const st = trust.status(options.name, entry);
@@ -140,12 +168,27 @@ export async function runRun(options: RunOptions): Promise<number> {
   if (s.transport === 'stdio') {
     const args = applyPin(s.args, s.pin) ?? [];
     const env: NodeJS.ProcessEnv = { ...process.env, ...(s.env ?? {}) };
-    // S5.3: when the server declares a `tools` directive, route stdio through the proxy so
-    // the client sees only the allowed tools. With no directive, plain passthrough — no
-    // proxy overhead.
-    if (s.tools) {
+
+    // Tool-definition pinning (S18.1): if this server's tool surface was pinned, verify it live at
+    // the proxy — warn by default, block with strictTools. This is the enforcement point for
+    // PROXIED stdio servers (non-proxied get the test-time check in `mcpfold test`).
+    const trustedSurface = trust.trustedTools(options.name);
+    const warn = options.warn ?? ((line: string) => process.stderr.write(`${line}\n`));
+    const pinned: PinnedToolsOptions | undefined = trustedSurface && {
+      surface: trustedSurface.surface,
+      mode: options.strictTools ? 'block' : 'warn',
+      onDrift: (diff) => {
+        warn(`⚠ mcpfold: tool definitions for "${options.name}" changed since you trusted it:`);
+        warn(renderToolSurfaceDiff(diff));
+        warn(`  Review, then re-run \`mcpfold trust ${options.name} --tools\` to approve.`);
+      },
+    };
+
+    // S5.3: when the server declares a `tools` directive OR has a pinned surface, route stdio
+    // through the proxy. With neither, plain passthrough — no proxy overhead.
+    if (s.tools || pinned) {
       const proxySpawner = options.proxySpawnFn ?? defaultProxySpawner;
-      return proxySpawner(s.command ?? '', args, env, s.tools);
+      return proxySpawner(s.command ?? '', args, env, s.tools, pinned);
     }
     return spawner(s.command ?? '', args, env);
   }

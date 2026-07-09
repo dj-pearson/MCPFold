@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "github": {
-      "url": "https://api.githubcopilot.com/mcp/"
+      "httpUrl": "https://api.githubcopilot.com/mcp/"
     },
     "playwright": {
       "args": [
