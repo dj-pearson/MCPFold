@@ -12,21 +12,22 @@ export interface Migration {
 }
 
 /**
- * The registry, keyed implicitly by `from`. Today the canonical format is v1, so no
- * migration is applied to real configs. The hypothetical 1→2 entry below is a *worked
- * example* that exercises the runner end-to-end (it becomes real the day v2 ships).
+ * The registry, keyed implicitly by `from`. v2 (S17.5) is the first REAL migration: it renames the
+ * remote transport `http` → the spec-canonical `streamable-http` (the wire semantics are identical,
+ * so it is lossless), leaving `stdio` and the now-deprecated `sse` untouched. `mcpfold migrate`
+ * persists it; `loadConfig` also applies it in-memory so a v1 file keeps loading.
  */
 export const MIGRATIONS: Migration[] = [
   {
     from: 1,
     to: 2,
-    description: "v1→v2 (example): rename each server's `tags` to `labels`",
+    description: 'v1→v2: canonicalize the `http` transport to `streamable-http`',
     migrate: (config) => {
       const servers = config.servers as Record<string, Record<string, unknown>> | undefined;
       const migratedServers: Record<string, unknown> = {};
       for (const [name, server] of Object.entries(servers ?? {})) {
-        const { tags, ...rest } = server;
-        migratedServers[name] = { ...rest, labels: tags ?? [] };
+        migratedServers[name] =
+          server.transport === 'http' ? { ...server, transport: 'streamable-http' } : server;
       }
       return { ...config, version: 2, servers: migratedServers };
     },

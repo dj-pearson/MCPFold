@@ -8,7 +8,7 @@ const linux: OsContext = { platform: 'linux', home: '/home/dev', env: {} };
 const servers: ResolvedServer[] = [
   {
     name: 'http-server',
-    transport: 'http',
+    transport: 'streamable-http',
     url: 'https://api.example.test/mcp',
     auth: { type: 'header', headers: { 'X-Api-Key': '${env:KEY}' } },
     tags: [],
@@ -61,7 +61,7 @@ describe('geminiCliAdapter (S14.1, S17.3)', () => {
   it('parse reverses httpUrl → http and url → sse', () => {
     const file = geminiCliAdapter.render(servers, linux);
     const parsed = geminiCliAdapter.parse(file.contents);
-    expect(parsed.servers?.['http-server']?.transport).toBe('http');
+    expect(parsed.servers?.['http-server']?.transport).toBe('streamable-http');
     expect(parsed.servers?.['http-server']?.url).toBe('https://api.example.test/mcp');
     expect(parsed.servers?.['sse-server']?.transport).toBe('sse');
     expect(parsed.servers?.['sse-server']?.url).toBe('https://sse.example.test/mcp');

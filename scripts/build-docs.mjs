@@ -272,6 +272,9 @@ writeFileSync(
 const schema = readFileSync(SCHEMA_SRC, 'utf8');
 JSON.parse(schema); // fail if the committed schema isn't valid JSON
 mkdirSync(join(OUT, 'schema'), { recursive: true });
+// The current schema is v2 (S17.5). Serve it at /schema/v2.json; keep /schema/v1.json resolving so
+// existing `$schema` pointers still work ($schema is advisory and v1 configs auto-migrate on load).
+writeFileSync(join(OUT, 'schema', 'v2.json'), schema);
 writeFileSync(join(OUT, 'schema', 'v1.json'), schema);
 
 // The org-policy schema (S18.3), served at /schema/policy/v1.json.

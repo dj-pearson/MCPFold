@@ -6,7 +6,7 @@ import type { SecretProvider } from '../src/types.js';
 function server(partial: Partial<ResolvedServer>): ResolvedServer {
   return {
     name: 's',
-    transport: 'http',
+    transport: 'streamable-http',
     url: 'https://x/mcp',
     tags: [],
     client: 'cursor',

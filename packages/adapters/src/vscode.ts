@@ -138,7 +138,7 @@ export const vscodeAdapter: ClientAdapter = {
           server.env = entry.env as Record<string, string>;
         servers[name] = server;
       } else if (typeof entry.url === 'string') {
-        const t = entry.type === 'sse' ? 'sse' : 'http';
+        const t = entry.type === 'sse' ? 'sse' : 'streamable-http'; // canonical remote (S17.5)
         const server: ServerConfig = { transport: t, url: entry.url, tags: [] };
         if (entry.headers && typeof entry.headers === 'object') {
           server.auth = { type: 'header', headers: entry.headers as Record<string, string> };

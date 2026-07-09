@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { createCloudApi } from '../api/cloud';
 import { emptyProfileDraft, type ProfileDraft, validateProfileDraft } from './validation';
 
-const EMPTY: Config = { version: 1, servers: {}, profiles: {} };
+const EMPTY: Config = { version: 2, servers: {}, profiles: {} };
 
 export function ProfileManager() {
   const { session } = useAuth();

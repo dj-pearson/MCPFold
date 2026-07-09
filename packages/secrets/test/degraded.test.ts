@@ -10,7 +10,7 @@ import type { SecretProvider } from '../src/types.js';
 
 const refServer: ResolvedServer = {
   name: 'gh',
-  transport: 'http',
+  transport: 'streamable-http',
   url: 'https://x/mcp',
   auth: { type: 'bearer', token: '${slow:tok}' },
   tags: [],

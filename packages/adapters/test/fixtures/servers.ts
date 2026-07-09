@@ -9,7 +9,7 @@ export function sampleServers(client: ClientId, scope: Scope = 'user', projectPa
   return [
     {
       name: 'github',
-      transport: 'http',
+      transport: 'streamable-http',
       url: 'https://api.githubcopilot.com/mcp/',
       auth: { type: 'bearer', token: '${infisical:dev/mcp/GITHUB_PAT}' },
       tags: ['work'],

@@ -3992,7 +3992,7 @@
       "epic": "E17",
       "order": 5,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Schema v2: streamable-http naming, OAuth marker, sse deprecation — the first real migration",
       "user_story": "As a config author, I want the canonical schema to model today's transport and auth reality (streamable HTTP, client-native OAuth, deprecated SSE) so folds and doctor advice match the ecosystem, with `mcpfold migrate` upgrading my v1 file losslessly.",

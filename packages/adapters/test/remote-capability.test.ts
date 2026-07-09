@@ -14,7 +14,7 @@ const linux: OsContext = { platform: 'linux', home: '/home/dev', env: {} };
 function authedRemote(client: ResolvedServer['client']): ResolvedServer {
   return {
     name: 'github',
-    transport: 'http',
+    transport: 'streamable-http',
     url: 'https://api.githubcopilot.com/mcp/',
     auth: { type: 'bearer', token: '${infisical:dev/mcp/GITHUB_PAT}' },
     tags: [],
@@ -26,7 +26,7 @@ function authedRemote(client: ResolvedServer['client']): ResolvedServer {
 function unauthedRemote(client: ResolvedServer['client']): ResolvedServer {
   return {
     name: 'open',
-    transport: 'http',
+    transport: 'streamable-http',
     url: 'https://open.example/mcp/',
     tags: [],
     client,
@@ -114,7 +114,7 @@ describe('capability drives native vs shim folding (S17.2)', () => {
   it('a shimmed remote round-trips back to a canonical http server on parse', () => {
     const cd = claudeDesktopAdapter.render([authedRemote('claude-desktop')], linux);
     const parsed = claudeDesktopAdapter.parse(cd.contents);
-    expect(parsed.servers?.github?.transport).toBe('http');
+    expect(parsed.servers?.github?.transport).toBe('streamable-http');
     expect(parsed.servers?.github?.url).toBe('https://api.githubcopilot.com/mcp/');
     expect(parsed.servers?.github?.auth?.headers?.Authorization).toContain('Bearer');
   });

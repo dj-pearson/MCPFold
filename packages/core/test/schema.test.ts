@@ -23,10 +23,10 @@ describe('CLIENT_IDS (S17.3, S19.1)', () => {
 
 /** A minimal valid config used as a base for negative variants. */
 const validConfig = {
-  version: 1,
+  version: 2,
   servers: {
     github: {
-      transport: 'http',
+      transport: 'streamable-http',
       url: 'https://api.githubcopilot.com/mcp/',
       auth: { type: 'bearer', token: '${infisical:dev/mcp/GITHUB_PAT}' },
       tools: { mode: 'allow', list: ['create_issue'] },
@@ -55,8 +55,23 @@ const validConfig = {
 describe('ConfigSchema (S1.1)', () => {
   it('accepts a valid spec-shaped config', () => {
     const parsed = ConfigSchema.parse(validConfig);
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
     expect(Object.keys(parsed.servers)).toEqual(['github', 'playwright']);
+  });
+
+  it('accepts `http` as an alias, canonicalizing it to `streamable-http` (S17.5)', () => {
+    const parsed = ServerSchema.parse({ transport: 'http', url: 'https://x.test/mcp' });
+    expect(parsed.transport).toBe('streamable-http');
+  });
+
+  it('accepts the declarative `oauth` auth marker with no token (S17.5)', () => {
+    const parsed = ServerSchema.parse({
+      transport: 'streamable-http',
+      url: 'https://x.test/mcp',
+      auth: { type: 'oauth' },
+    });
+    expect(parsed.auth?.type).toBe('oauth');
+    expect(parsed.auth?.token).toBeUndefined();
   });
 
   it('defaults tags to [] when omitted', () => {
@@ -69,8 +84,8 @@ describe('ConfigSchema (S1.1)', () => {
     expect(parsed.auth?.type).toBe('none');
   });
 
-  it('rejects a bad version (not literal 1)', () => {
-    const res = ConfigSchema.safeParse({ ...validConfig, version: 2 });
+  it('rejects a bad version (not literal 2)', () => {
+    const res = ConfigSchema.safeParse({ ...validConfig, version: 3 });
     expect(res.success).toBe(false);
     if (!res.success) {
       expect(res.error.issues.some((i) => i.path.join('.') === 'version')).toBe(true);

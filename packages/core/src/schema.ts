@@ -26,7 +26,20 @@ export const CLIENT_IDS = [
 /** Secret-provider schemes understood by the resolver (E4). Parsing lives in secret-ref.ts. */
 export const SECRET_SCHEMES = ['env', 'dotenv', 'infisical', 'keychain', 'op'] as const;
 
-export const TRANSPORTS = ['stdio', 'http', 'sse'] as const;
+/**
+ * Canonical transports (schema v2, S17.5). The MCP spec's remote transport is **Streamable HTTP**
+ * (the older HTTP+SSE was deprecated 2025-11-25). `streamable-http` is the canonical value; a plain
+ * `http` is accepted as an alias and canonicalized to it on load. `sse` still loads but `doctor`
+ * warns (deprecated). Adapters render each client's own dialect (`type: http` / bare `url` /
+ * `httpUrl`) from the canonical value.
+ */
+export const TRANSPORTS = ['stdio', 'streamable-http', 'sse'] as const;
+
+/** The transport field: accepts `http` as an alias for the canonical `streamable-http`. */
+export const TransportSchema = z.preprocess(
+  (v) => (v === 'http' ? 'streamable-http' : v),
+  z.enum(TRANSPORTS),
+);
 export const SCOPES = ['user', 'project', 'workspace'] as const;
 
 /**
@@ -44,9 +57,15 @@ export const SecretRef = z.string().regex(SECRET_REF_RE, {
 /** Header/env values may be a literal string or a secret reference. */
 const StringOrSecretRef = z.union([z.string(), SecretRef]);
 
+/**
+ * Auth kinds (v2, S17.5). `bearer`/`header` carry a secret reference mcpfold folds. `oauth` is a
+ * **declarative marker** — the remote server uses client-native OAuth 2.1 (the CLIENT discovers the
+ * RS/AS and holds no long-lived token here), so no `token`/`headers` are required and `doctor` stops
+ * pushing a token ref at it. `none` is unauthenticated.
+ */
 export const AuthSchema = z
   .object({
-    type: z.enum(['bearer', 'header', 'none']).default('none'),
+    type: z.enum(['bearer', 'header', 'oauth', 'none']).default('none'),
     token: SecretRef.optional(),
     headers: z.record(StringOrSecretRef).optional(),
   })
@@ -61,7 +80,7 @@ export const ToolsSchema = z
 
 export const ServerSchema = z
   .object({
-    transport: z.enum(TRANSPORTS),
+    transport: TransportSchema,
     command: z.string().optional(),
     args: z.array(z.string()).optional(),
     url: z.string().url().optional(),
@@ -97,7 +116,9 @@ export const ConfigSchema = z
   .object({
     /** Optional JSON Schema pointer for editor autocomplete; ignored semantically. */
     $schema: z.string().optional(),
-    version: z.literal(1),
+    /** Canonical schema version. v1 files auto-migrate to v2 on load (S17.5); `mcpfold migrate`
+     * persists the upgrade. */
+    version: z.literal(2),
     servers: z.record(ServerSchema),
     profiles: z.record(ProfileSchema),
   })

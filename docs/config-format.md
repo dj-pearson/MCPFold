@@ -10,19 +10,19 @@ what the tool actually validates.
 
 ```jsonc
 {
-  "$schema": "https://mcpfold.com/schema/v1.json",
-  "version": 1,
+  "$schema": "https://mcpfold.com/schema/v2.json",
+  "version": 2,
   "servers": {/* name -> server */},
   "profiles": {/* name -> profile */},
 }
 ```
 
-| Field      | Type            | Required | Notes                                            |
-| ---------- | --------------- | -------- | ------------------------------------------------ |
-| `$schema`  | string          | no       | Editor autocomplete only; ignored semantically.  |
-| `version`  | `1`             | **yes**  | Schema version. `mcpfold migrate` upgrades it.   |
-| `servers`  | map of servers  | **yes**  | Keyed by a name you choose.                      |
-| `profiles` | map of profiles | **yes**  | Keyed by a name you choose. May be empty (`{}`). |
+| Field      | Type            | Required | Notes                                                                           |
+| ---------- | --------------- | -------- | ------------------------------------------------------------------------------- |
+| `$schema`  | string          | no       | Editor autocomplete only; ignored semantically.                                 |
+| `version`  | `2`             | **yes**  | Schema version. A v1 file auto-migrates on load; `mcpfold migrate` persists it. |
+| `servers`  | map of servers  | **yes**  | Keyed by a name you choose.                                                     |
+| `profiles` | map of profiles | **yes**  | Keyed by a name you choose. May be empty (`{}`).                                |
 
 Unknown top-level keys are rejected (the schema is strict), so typos surface immediately.
 
@@ -32,7 +32,7 @@ A server is keyed by a name and describes how a client launches or connects to i
 
 ```jsonc
 "github": {
-  "transport": "http",
+  "transport": "streamable-http",
   "url": "https://api.githubcopilot.com/mcp/",
   "auth": { "type": "bearer", "token": "${env:GITHUB_PAT}" },
   "tags": ["work"]
@@ -46,27 +46,33 @@ A server is keyed by a name and describes how a client launches or connects to i
 }
 ```
 
-| Field       | Type                             | Notes                                                             |
-| ----------- | -------------------------------- | ----------------------------------------------------------------- |
-| `transport` | `"stdio"` \| `"http"` \| `"sse"` | Required.                                                         |
-| `command`   | string                           | Required for `stdio`. The executable (e.g. `npx`).                |
-| `args`      | string[]                         | Arguments for a `stdio` command.                                  |
-| `url`       | string (URL)                     | Required for `http`/`sse`.                                        |
-| `auth`      | [auth object](#auth)             | Credentials for a remote server.                                  |
-| `env`       | map of string \| secret ref      | Environment variables for a `stdio` command.                      |
-| `pin`       | string                           | Pins an `@latest` stdio package to a fixed version at fold time.  |
-| `tools`     | [tools filter](#tool-curation)   | Curates which tools this server exposes (the context saver).      |
-| `tags`      | string[]                         | Labels used by profiles to decide what loads where. Default `[]`. |
+| Field       | Type                                        | Notes                                                             |
+| ----------- | ------------------------------------------- | ----------------------------------------------------------------- |
+| `transport` | `"stdio"` \| `"streamable-http"` \| `"sse"` | Required. `"http"` is accepted as an alias for `streamable-http`. |
+| `command`   | string                                      | Required for `stdio`. The executable (e.g. `npx`).                |
+| `args`      | string[]                                    | Arguments for a `stdio` command.                                  |
+| `url`       | string (URL)                                | Required for `streamable-http`/`sse`.                             |
+| `auth`      | [auth object](#auth)                        | Credentials (or the `oauth` marker) for a remote server.          |
+| `env`       | map of string \| secret ref                 | Environment variables for a `stdio` command.                      |
+| `pin`       | string                                      | Pins an `@latest` stdio package to a fixed version at fold time.  |
+| `tools`     | [tools filter](#tool-curation)              | Curates which tools this server exposes (the context saver).      |
+| `tags`      | string[]                                    | Labels used by profiles to decide what loads where. Default `[]`. |
 
-`stdio` servers need a `command`; `http`/`sse` servers need a `url` — the schema enforces
-this. Values in `env` and `auth.headers` may be a literal string **or** a
+`stdio` servers need a `command`; remote servers need a `url` — the schema enforces this.
+Values in `env` and `auth.headers` may be a literal string **or** a
 [secret reference](#secret-references).
+
+**Transports (v2).** The MCP spec's remote transport is **Streamable HTTP**; the older HTTP+SSE was
+**deprecated on 2025-11-25**. So the canonical remote transport is `streamable-http` — a plain
+`http` is accepted and canonicalized to it on load, and adapters render each client's own dialect
+(Claude Code/VS Code emit `type: http`, Cursor a bare `url`, Gemini CLI `httpUrl`). `sse` still loads
+and folds, but `mcpfold doctor` warns that it's deprecated.
 
 ### Auth
 
 ```jsonc
 "auth": {
-  "type": "bearer",              // "bearer" | "header" | "none" (default "none")
+  "type": "bearer",              // "bearer" | "header" | "oauth" | "none" (default "none")
   "token": "${env:GITHUB_PAT}",  // a secret reference (never a raw token)
   "headers": {                    // optional extra headers; values may be refs
     "X-Org": "${env:ORG_ID}"
@@ -74,8 +80,13 @@ this. Values in `env` and `auth.headers` may be a literal string **or** a
 }
 ```
 
-`auth.token` must be a `${scheme:path}` reference — the schema rejects a raw literal there,
-so a token can never be committed by accident.
+`auth.token` must be a `${scheme:path}` reference — the schema rejects a raw literal there, so a
+token can never be committed by accident.
+
+**`oauth` (v2).** For a remote server that uses **client-native OAuth 2.1** — the client discovers
+the resource/authorization server and holds the token itself — set `"auth": { "type": "oauth" }` with
+**no** `token`/`headers`. It's a declarative marker (no secret material): adapters fold it to the
+client's native OAuth shape where supported, and `doctor` won't push a token reference at it.
 
 ## Secret references
 
@@ -145,17 +156,19 @@ pnpm --filter @mcpfold/schema generate
 ```
 
 The committed schema lives at
-[`packages/schema/mcp.config.schema.json`](../packages/schema/mcp.config.schema.json) and
-is served from this docs site at the stable URL
-`https://mcpfold.com/schema/v1.json`. A CI check fails if the committed copy drifts from
-what the source generates, so the schema, this reference, and the validator can never
-disagree.
+[`packages/schema/mcp.config.schema.json`](../packages/schema/mcp.config.schema.json) and is served
+from this docs site at the stable URL `https://mcpfold.com/schema/v2.json` (the previous
+`/schema/v1.json` still resolves, so older `$schema` pointers keep working). A CI check fails if the
+committed copy drifts from what the source generates, so the schema, this reference, and the
+validator can never disagree.
 
 ## Versioning & migration
 
-`version` is `1` today. When the format changes, `mcpfold migrate` upgrades an older file
-in place (with a backup), and `loadConfig` refuses a file newer than the running CLI
-understands — with an upgrade hint rather than a confusing parse error.
+The canonical format is **version 2** (S17.5). A v1 file **auto-migrates in-memory on load**, so it
+keeps working unchanged; running `mcpfold migrate` **persists** the upgrade to disk (with a backup).
+The v1→v2 migration is lossless — it canonicalizes the remote transport `http` → `streamable-http`
+(identical wire semantics) and leaves everything else untouched. `loadConfig` refuses a file _newer_
+than the running CLI understands, with an upgrade hint rather than a confusing parse error.
 
 ## Relationship to `.mcp.json`
 

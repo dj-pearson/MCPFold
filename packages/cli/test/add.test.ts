@@ -32,7 +32,7 @@ describe('runAdd (S3.4)', () => {
       tokenRef: '${env:GITHUB_PAT}',
       tags: ['work'],
     });
-    expect(result.data.server.transport).toBe('http');
+    expect(result.data.server.transport).toBe('streamable-http');
     expect(result.data.server.auth?.token).toBe('${env:GITHUB_PAT}');
     const text = read();
     expect(loadConfig(text).ok).toBe(true);
@@ -75,7 +75,7 @@ describe('runAdd (S3.4)', () => {
     let i = 0;
     const prompt: Prompt = async () => answers[i++]!;
     const result = await runAdd({ cwd, name: 'iface', prompt });
-    expect(result.data.server.transport).toBe('http');
+    expect(result.data.server.transport).toBe('streamable-http');
     expect(result.data.server.auth?.token).toBe('${env:TOKEN}');
   });
 

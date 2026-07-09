@@ -63,7 +63,7 @@ describe('findSecretRefsInString (S1.3)', () => {
 describe('findSecretRefs(server) (S1.3)', () => {
   it('enumerates refs across auth.token, nested headers, and env', () => {
     const server: ServerConfig = {
-      transport: 'http',
+      transport: 'streamable-http',
       url: 'https://x.test/mcp',
       auth: {
         type: 'header',

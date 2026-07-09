@@ -91,7 +91,8 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
   let server: ServerConfig;
 
   if (url) {
-    const transport = options.transport === 'sse' ? 'sse' : 'http';
+    // S17.5: the canonical remote transport is `streamable-http` (the spec's HTTP transport).
+    const transport = options.transport === 'sse' ? 'sse' : 'streamable-http';
     server = { transport, url, tags };
     let tokenRef = options.tokenRef;
     if (!tokenRef && prompt) {

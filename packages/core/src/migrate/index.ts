@@ -7,7 +7,7 @@ import { MIGRATIONS, type Migration } from './migrations.js';
  */
 
 /** The config schema version this build of mcpfold supports. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export class MigrationError extends Error {
   override readonly name = 'MigrationError';

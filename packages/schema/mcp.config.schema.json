@@ -1,5 +1,5 @@
 {
-  "$id": "https://mcpfold.com/schema/v1.json",
+  "$id": "https://mcpfold.com/schema/v2.json",
   "$ref": "#/definitions/McpfoldConfig",
   "definitions": {
     "McpfoldConfig": {
@@ -10,7 +10,7 @@
         },
         "version": {
           "type": "number",
-          "const": 1
+          "const": 2
         },
         "servers": {
           "type": "object",
@@ -21,7 +21,7 @@
                 "type": "string",
                 "enum": [
                   "stdio",
-                  "http",
+                  "streamable-http",
                   "sse"
                 ]
               },
@@ -46,6 +46,7 @@
                     "enum": [
                       "bearer",
                       "header",
+                      "oauth",
                       "none"
                     ],
                     "default": "none"

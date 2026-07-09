@@ -40,6 +40,6 @@ describe('continueAdapter (S19.1)', () => {
       env: { HEADLESS: 'true' },
       tags: [],
     });
-    expect(parsed.servers?.github?.transport).toBe('http');
+    expect(parsed.servers?.github?.transport).toBe('streamable-http');
   });
 });

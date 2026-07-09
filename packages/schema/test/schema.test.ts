@@ -27,10 +27,10 @@ beforeAll(() => {
 });
 
 const VALID = {
-  version: 1,
+  version: 2,
   servers: {
     github: {
-      transport: 'http',
+      transport: 'streamable-http',
       url: 'https://api.githubcopilot.com/mcp/',
       auth: { type: 'bearer', token: '${infisical:dev/mcp/GITHUB_PAT}' },
       tags: ['work'],
@@ -56,8 +56,9 @@ describe('generated JSON Schema (S1.5)', () => {
     expect(validate(VALID)).toBe(true);
   });
 
-  it('rejects a bad version (const 1)', () => {
-    expect(validate({ ...VALID, version: 2 })).toBe(false);
+  it('rejects a bad version (const 2)', () => {
+    expect(validate({ ...VALID, version: 1 })).toBe(false);
+    expect(validate({ ...VALID, version: 3 })).toBe(false);
   });
 
   it('rejects an unknown top-level key (strict)', () => {

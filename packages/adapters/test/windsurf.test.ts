@@ -38,7 +38,7 @@ describe('windsurfAdapter (S2.6)', () => {
     const file = windsurfAdapter.render(sampleServers('windsurf'), linux);
     const parsed = windsurfAdapter.parse(file.contents);
     expect(parsed.servers?.github).toEqual({
-      transport: 'http',
+      transport: 'streamable-http',
       url: 'https://api.githubcopilot.com/mcp/',
       auth: {
         type: 'header',

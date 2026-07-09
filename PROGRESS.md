@@ -236,3 +236,42 @@ plus `docs:build`, Prettier, deploy-env.
 **Follow-ups (not blocking):** S17.7 (registry) will let `add --from-registry` reuse the same
 evaluator; a managed-machine "policy cannot be overridden by a project file" hard-lock mode if orgs
 want it stricter than first-found-wins.
+
+---
+
+## S17.5 — Schema v2: streamable-http, oauth marker, sse deprecation (first real migration)
+
+**Started** 2026-07-09 · branch `story/S17.5-schema-v2` · priority p1, deps: none.
+
+**Done** 2026-07-09 (core/schema, fully local-verified incl. an end-to-end `mcpfold migrate` smoke).
+
+`SCHEMA_VERSION` is now **2**, modeling today's transport/auth reality — and it's the **first real
+migration**, proving the v1 migration infra end to end.
+
+- **Transports:** canonical remote transport is `streamable-http` (the spec's Streamable HTTP;
+  HTTP+SSE deprecated 2025-11-25). `http` is accepted as an alias and canonicalized on load (zod
+  `preprocess`). `sse` still loads/folds but `doctor` warns (new `checkDeprecatedTransports`).
+- **`auth.type: 'oauth'`** — a declarative marker (no token/headers): the client runs OAuth 2.1
+  itself. Adapters fold it to a bare native remote (no auth material), it's never shimmed
+  (`remoteNeedsShim` now treats only static bearer/header auth as shim-forcing), and `doctor` pushes
+  no token at it.
+- **Real 1→2 migration** (replacing the worked example): bumps version + rewrites `http` →
+  `streamable-http`, lossless. `loadConfig` auto-migrates a v1 file **in-memory** so it keeps
+  loading; `mcpfold migrate` persists the upgrade with a backup.
+- **Adapters:** parse-returns now yield the canonical `streamable-http`; render still emits each
+  client's dialect (`type: http` / bare `url` / `httpUrl`), so **matrix goldens are unchanged**.
+- **Published schema:** committed schema regenerated (v2, `$id .../schema/v2.json`); the docs build
+  serves it at `/schema/v2.json` and keeps `/schema/v1.json` resolving so old `$schema` pointers work.
+- **Docs:** `config-format.md` updated (transports, `oauth`, sse deprecation, v2 versioning/migration).
+
+Tests: core migration (http→streamable-http, stdio/sse untouched, round-trip), schema (`http` alias
+canonicalizes, `oauth` validates, version const 2, JSON-schema drift), adapters (all 100 green, incl.
+oauth-not-shimmed), CLI (`migrate` v1→v2 persists + backs up, `doctor` sse-warns/oauth-clean, `add`
+creates streamable-http). Swept ~40 typed `version:1`/`transport:'http'` literals across core/cli/
+web/secrets/security to v2/streamable-http (runtime tests passed via esbuild; `tsc`/build caught the
+typed ones). `verify_all` green (lint+purity, typecheck ×8, `pnpm -r test`, build) + docs:build +
+Prettier + demo drift + an end-to-end `migrate`+`doctor` smoke on a real v1 file.
+
+**Follow-ups (not blocking):** a frozen v1 JSON-schema snapshot if strict per-version autocomplete is
+ever wanted (today both URLs serve the current schema); adapters could emit a client-specific OAuth
+hint field for clients that want one.

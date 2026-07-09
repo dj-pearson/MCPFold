@@ -20,7 +20,7 @@ const stdioServer: ResolvedServer = {
 
 const httpServer: ResolvedServer = {
   name: 'github',
-  transport: 'http',
+  transport: 'streamable-http',
   url: 'https://api.githubcopilot.com/mcp/',
   auth: { type: 'header', headers: { 'X-Extra': 'v' } },
   tags: ['work'],
@@ -60,7 +60,7 @@ describe('mcpServers shape round-trip (S2.1)', () => {
       tags: [],
     });
     expect(back.servers?.github).toEqual({
-      transport: 'http',
+      transport: 'streamable-http',
       url: 'https://api.githubcopilot.com/mcp/',
       auth: { type: 'header', headers: { 'X-Extra': 'v' } },
       tags: [],

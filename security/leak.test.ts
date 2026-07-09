@@ -39,7 +39,7 @@ let ctx: OsContext;
 const CONFIG = `{
   "version": 1,
   "servers": {
-    "github": { "transport": "http", "url": "https://api.githubcopilot.com/mcp/", "auth": { "type": "bearer", "token": "\${env:SENTINEL}" }, "tags": ["all"] },
+    "github": { "transport": "streamable-http", "url": "https://api.githubcopilot.com/mcp/", "auth": { "type": "bearer", "token": "\${env:SENTINEL}" }, "tags": ["all"] },
     "local": { "transport": "stdio", "command": "srv", "env": { "API_TOKEN": "\${env:SENTINEL}" }, "tags": ["all"] }
   },
   "profiles": {
@@ -79,7 +79,7 @@ describe('S9.1 — the sentinel appears in ZERO artifacts for shim + native-inpu
   it('every adapter renders the secret server without the value', async () => {
     const server: ResolvedServer = {
       name: 'github',
-      transport: 'http',
+      transport: 'streamable-http',
       url: 'https://api.githubcopilot.com/mcp/',
       auth: { type: 'bearer', token: '${env:SENTINEL}' },
       tags: ['all'],
@@ -113,7 +113,7 @@ describe('S9.1 — inline may hold the value ONLY in a gitignored target', () =>
   });
   const server: ResolvedServer = {
     name: 'github',
-    transport: 'http',
+    transport: 'streamable-http',
     url: 'https://x/mcp',
     auth: { type: 'bearer', token: '${env:SENTINEL}' },
     tags: [],

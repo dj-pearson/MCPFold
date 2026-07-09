@@ -1,9 +1,9 @@
 {
   // The single canonical fixture folded through every adapter (S2.8).
-  "version": 1,
+  "version": 2,
   "servers": {
     "github": {
-      "transport": "http",
+      "transport": "streamable-http",
       "url": "https://api.githubcopilot.com/mcp/",
       "auth": { "type": "bearer", "token": "${infisical:dev/mcp/GITHUB_PAT}" },
       "tags": ["all"]
