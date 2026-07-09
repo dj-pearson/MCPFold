@@ -1,4 +1,4 @@
-import { DIRECTORY } from '@mcpfold/core';
+import { DIRECTORY, categoriesWithPages, categoryMeta, entriesForCategory } from '@mcpfold/core';
 import { POSTS } from '../blog/posts';
 
 /**
@@ -43,10 +43,22 @@ export function resolveMeta(path: string): RouteMeta {
   }
   if (p === '/directory') {
     return meta(
-      'MCP server directory — browse and add servers',
-      'Browse a curated directory of MCP servers and add any of them to your config in one command. A neutral, community-maintained list.',
+      'Best MCP servers — the curated directory · mcpfold',
+      `Browse ${DIRECTORY.length}+ MCP servers by category — files, databases, browsers, search, and more — and add any to your config in one command. A neutral, community-maintained list.`,
       '/directory',
     );
+  }
+  if (p.startsWith('/directory/category/')) {
+    const cat = p.slice('/directory/category/'.length);
+    if (entriesForCategory(cat).length > 0) {
+      const m = categoryMeta(cat);
+      return meta(
+        `Best ${m.label} MCP servers · mcpfold`,
+        `${m.description} Browse ${entriesForCategory(cat).length} and add any to your config in one command.`,
+        `/directory/category/${cat}`,
+      );
+    }
+    return meta('Category not found — mcpfold directory', 'No such category.', p);
   }
   if (p.startsWith('/directory/')) {
     const id = p.slice('/directory/'.length);
@@ -103,6 +115,7 @@ export function allRoutes(): string[] {
     '/pricing',
     '/blog',
     '/changelog',
+    ...categoriesWithPages().map((c) => `/directory/category/${c.id}`),
     ...DIRECTORY.map((e) => `/directory/${e.id}`),
     ...POSTS.map((p) => `/blog/${p.slug}`),
   ];

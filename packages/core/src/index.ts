@@ -94,7 +94,22 @@ export {
   MCP_REMOTE_PINNED_VERSION,
   MCP_REMOTE_SPEC,
 } from './bridge.js';
-export { DIRECTORY, DIRECTORY_VERSION, searchDirectory, type DirectoryEntry } from './directory.js';
+export {
+  DIRECTORY,
+  DIRECTORY_VERSION,
+  searchDirectory,
+  type DirectoryEntry,
+  type DirectoryCategory,
+  MIN_CATEGORY_ENTRIES,
+  CATEGORY_META,
+  entriesForCategory,
+  categoryMeta,
+  allCategoryIds,
+  categoriesWithPages,
+  categoryHasPage,
+  pagedCategoriesForEntry,
+  directorySeedSql,
+} from './directory.js';
 
 // Org-managed server allow/deny policy (S18.3)
 export {

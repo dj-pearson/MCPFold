@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { searchDirectory } from '@mcpfold/core';
+import { DIRECTORY, categoriesWithPages, searchDirectory } from '@mcpfold/core';
 import { FaqSection } from '../seo/FaqSection';
 import { Container } from '../design/components';
 
@@ -12,15 +12,41 @@ import { Container } from '../design/components';
 export function DirectoryList() {
   const [query, setQuery] = useState('');
   const results = useMemo(() => searchDirectory(query), [query]);
+  const categories = useMemo(() => categoriesWithPages(), []);
 
   return (
     <>
       <Container style={{ padding: 'var(--space-16) var(--space-6)' }}>
-        <h1>MCP server directory</h1>
-        <p style={{ color: 'var(--fg-muted)' }}>
-          A neutral, community-maintained list — mcpfold is not affiliated with or endorsed by these
-          projects. Add any to your config in one command.
+        <h1>Best MCP servers — the directory</h1>
+        <p style={{ color: 'var(--fg-muted)', maxWidth: 640 }}>
+          Browse {DIRECTORY.length}+ MCP servers, curated and grouped by category. A neutral,
+          community-maintained list — mcpfold is not affiliated with or endorsed by these projects.
+          Add any to your config in one command.
         </p>
+
+        <h2 style={{ marginTop: 'var(--space-8)' }}>Browse by category</h2>
+        <nav
+          data-testid="category-nav"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}
+        >
+          {categories.map((c) => (
+            <Link
+              key={c.id}
+              to={`/directory/category/${c.id}`}
+              data-testid={`category-${c.id}`}
+              style={{
+                fontSize: '0.9rem',
+                padding: '4px 12px',
+                borderRadius: 999,
+                border: '1px solid var(--border)',
+                color: 'var(--fg-muted)',
+                textDecoration: 'none',
+              }}
+            >
+              {c.label}
+            </Link>
+          ))}
+        </nav>
 
         <input
           type="search"

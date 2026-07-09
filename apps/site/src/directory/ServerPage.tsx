@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { DIRECTORY } from '@mcpfold/core';
+import { DIRECTORY, categoryHasPage, categoryMeta } from '@mcpfold/core';
 import { Container } from '../design/components';
 import { cliSnippet, editorUrl } from './addToConfig';
 
@@ -19,13 +19,18 @@ export function ServerPage() {
     );
   }
 
+  const launch =
+    entry.transport === 'stdio'
+      ? `${entry.command ?? ''} ${(entry.args ?? []).join(' ')}`.trim()
+      : (entry.url ?? '');
+
   return (
     <>
       <Container style={{ padding: 'var(--space-16) var(--space-6)', maxWidth: 720 }}>
         <p style={{ marginBottom: 'var(--space-4)' }}>
           <Link to="/directory">← Directory</Link>
         </p>
-        <h1 style={{ marginBottom: 'var(--space-2)' }}>{entry.name}</h1>
+        <h1 style={{ marginBottom: 'var(--space-2)' }}>{entry.name} MCP server</h1>
         <p style={{ color: 'var(--fg-muted)', fontSize: '1.1rem' }}>{entry.description}</p>
         <div
           style={{
@@ -35,21 +40,56 @@ export function ServerPage() {
             margin: 'var(--space-4) 0',
           }}
         >
-          {entry.suggestedTags.map((t) => (
-            <span
-              key={t}
-              style={{
-                fontSize: '0.8rem',
-                padding: '2px 10px',
-                borderRadius: 999,
-                border: '1px solid var(--border)',
-                color: 'var(--fg-muted)',
-              }}
-            >
-              {t}
-            </span>
-          ))}
+          {entry.suggestedTags.map((t) =>
+            categoryHasPage(t) ? (
+              <Link
+                key={t}
+                to={`/directory/category/${t}`}
+                data-testid={`tag-${t}`}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '2px 10px',
+                  borderRadius: 999,
+                  border: '1px solid var(--border)',
+                  color: 'var(--fg-muted)',
+                  textDecoration: 'none',
+                }}
+              >
+                {categoryMeta(t).label}
+              </Link>
+            ) : (
+              <span
+                key={t}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '2px 10px',
+                  borderRadius: 999,
+                  border: '1px solid var(--border)',
+                  color: 'var(--fg-muted)',
+                }}
+              >
+                {t}
+              </span>
+            ),
+          )}
         </div>
+
+        <h2>How it runs</h2>
+        <p style={{ color: 'var(--fg-muted)' }}>
+          {entry.name} is a <strong>{entry.transport}</strong> MCP server. mcpfold launches it with:
+        </p>
+        <pre
+          data-testid="launch"
+          style={{
+            background: 'var(--code-bg)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            padding: 'var(--space-4)',
+            overflowX: 'auto',
+          }}
+        >
+          <code>{launch}</code>
+        </pre>
 
         <h2>Add to your config</h2>
         <pre

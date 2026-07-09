@@ -391,3 +391,48 @@ new copy; the benchmark headline still matches the committed value.
 
 **Follow-ups:** wire the homepage's guides/glossary links when S15.5/S15.6 ship; apply the same
 title/H1/meta pass to the remaining core pages as their content lands.
+
+---
+
+## S15.4 — Directory expansion + category/collection pages (pSEO)
+
+Started/done: 2026-07-09. Grew the curated directory from **5 → 70 real, verified MCP servers**
+and turned it into a categorized, indexable discovery surface targeting the "best/awesome MCP
+servers" + "MCP server list/directory" cluster.
+
+**Curation (quality over count).** Every entry's package was verified to exist on **npm or PyPI**
+before listing (a scripted npm/PyPI check) — junk was dropped, including a `mcp-server-fetch`
+typosquat literally self-described as a "security research canary". Descriptions are neutral
+one-liners; tokens stay `${env:…}` references, never values; stdio launch via `npx`/`uvx`. Per the
+product call on this story, this ships as a **curated, growing** set (70) rather than padding to 150
+with unverifiable entries — reaching 150+ is a documented follow-up.
+
+**Single source + mirror.** `packages/core/src/directory.ts` is the one source. The DB seed
+`supabase/seed/directory.sql` is now **generated** from it by `directorySeedSql()`
+(`pnpm --filter @mcpfold/core gen:directory-seed`); `apps/web` already re-exports core, so the app,
+the marketing directory, and the DB all read the same 70 entries. A core test fails if the committed
+SQL ever drifts from `DIRECTORY`.
+
+**Collection / category pages.** New `/directory/category/<tag>` pages ("Best <category> MCP
+servers"), each prerendered with **ItemList + BreadcrumbList JSON-LD**, a targeted title/H1, and
+cross-links; the directory index now leads with "Best MCP servers", a browse-by-category nav, and a
+`{count}+` count. Per-server pages are richer — an "How it runs" section (transport + exact launch
+command) and category tags that link to their collection page.
+
+**Thin-page / index-bloat guard.** A tag earns a page only once **`MIN_CATEGORY_ENTRIES` (3)**
+distinct servers carry it. 13 categories qualify and are prerendered + in the sitemap; 6 thin tags
+(finance, crm, memory, automation, monitoring, data) get no page (the route renders a not-found stub,
+and they're absent from the sitemap). Documented in `directory.ts`, guarded by tests on both sides.
+
+Tests: `packages/core/test/directory.test.ts` (5) — 60+ valid deduped entries, ref-only tokens,
+every tag has a label, the thin-page guard, and the SQL-mirror no-drift check. `directory.e2e.ts`
+gains category-browse + cross-link + thin-guard cases; `prerender.e2e.ts` gains a category-page
+ItemList + sitemap (populated-only) check.
+
+`verify_all` green (lint, typecheck ×8, `pnpm -r test` = 91 core + 11 e2e, `pnpm -r build`,
+Prettier, docs:build). **Site e2e (24) + prerender e2e (8) pass**; 91 routes prerender (70 servers +
+13 categories).
+
+**Follow-ups:** grow the curated set toward 150+ (more verified servers per category); add
+remote/`streamable-http` servers once a hosted set is curated; surface category nav in the global
+site IA when S13.9 lands.
