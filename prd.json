@@ -3807,7 +3807,7 @@
       "epic": "E16",
       "order": 7,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Collision-safe temp filenames in atomicWrite",
       "user_story": "As a user running sync --watch alongside a manual command, I don't want two writes to the same target to corrupt each other via a shared temp file.",
