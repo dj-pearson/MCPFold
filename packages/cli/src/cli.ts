@@ -512,27 +512,42 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       .command('pull')
       .description('pull the canonical config from the cloud and diff/apply it')
       .option('--yes', 'apply the pulled config without confirmation', false)
+      .option(
+        '--allow-unsigned',
+        'apply even when the config integrity cannot be verified (signed-but-keyless or unsigned)',
+        false,
+      )
       .option('--team <id>', 'pull a team config instead of your personal one')
       .option('--config-version <n>', 'pull a specific version instead of the latest'),
-  ).action(async (opts: GlobalFlags & { yes?: boolean; team?: string; configVersion?: string }) => {
-    const ctx = resolve(opts);
-    setExit(
-      await runCommand(
-        'pull',
-        ctx.json,
-        () =>
-          runPull({
-            cwd: ctx.cwd,
-            api: httpCloudApi(resolveEndpoint()),
-            backend: osKeychainBackend(),
-            yes: opts.yes,
-            teamId: opts.team,
-            version: opts.configVersion !== undefined ? Number(opts.configVersion) : undefined,
-          }),
-        writer,
-      ),
-    );
-  });
+  ).action(
+    async (
+      opts: GlobalFlags & {
+        yes?: boolean;
+        allowUnsigned?: boolean;
+        team?: string;
+        configVersion?: string;
+      },
+    ) => {
+      const ctx = resolve(opts);
+      setExit(
+        await runCommand(
+          'pull',
+          ctx.json,
+          () =>
+            runPull({
+              cwd: ctx.cwd,
+              api: httpCloudApi(resolveEndpoint()),
+              backend: osKeychainBackend(),
+              yes: opts.yes,
+              allowUnsigned: opts.allowUnsigned,
+              teamId: opts.team,
+              version: opts.configVersion !== undefined ? Number(opts.configVersion) : undefined,
+            }),
+          writer,
+        ),
+      );
+    },
+  );
 
   return { program, getExitCode: () => exitCode };
 }

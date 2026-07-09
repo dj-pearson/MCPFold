@@ -19,10 +19,17 @@ import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
 
 /**
- * `mcpfold pull` (S6.6 + S9.2) — fetch the latest canonical config from the cloud, VERIFY its
- * integrity signature (S9.2), diff it against local (reusing the S1.6 engine), and apply it on
- * confirmation (`--yes`). Applying `--yes` also pre-approves the pulled servers' launch commands
- * in the local trust store (documented as reducing the TOFU protection).
+ * `mcpfold pull` (S6.6 + S9.2 + S16.5) — fetch the latest canonical config from the cloud, VERIFY
+ * its integrity signature (S9.2), diff it against local (reusing the S1.6 engine), and apply it on
+ * confirmation (`--yes`).
+ *
+ * Integrity gating (S16.5): `--yes` confirms the diff, but it is NOT an integrity bypass. A config
+ * is only applied under `--yes` alone when its signature positively verifies. If the config cannot
+ * be verified — signed but no local key present, or unsigned entirely — applying it additionally
+ * requires an explicit `--allow-unsigned`. A present-but-INVALID signature is always a hard reject,
+ * regardless of flags. Applying `--yes` also pre-approves the pulled servers' launch commands in
+ * the local trust store, so that auto-approval only happens for a verified (or explicitly
+ * allow-unsigned) config — it never rides in on an unverifiable one.
  */
 
 export interface PullOptions {
@@ -30,6 +37,8 @@ export interface PullOptions {
   api: CloudApi;
   backend: KeychainBackend;
   yes?: boolean;
+  /** Opt in to applying a config whose integrity could not be verified (S16.5). */
+  allowUnsigned?: boolean;
   teamId?: string;
   version?: number;
   now?: () => number;
@@ -81,8 +90,11 @@ export async function runPull(opts: PullOptions): Promise<CommandOutput<PullData
     };
   }
 
-  // --- Version-integrity verification (S9.2) --------------------------------------------
+  // --- Version-integrity verification (S9.2 + S16.5) ------------------------------------
   const warnings: string[] = [];
+  let verified = false;
+  // Why the config is unverifiable (undefined once verified), used for the S16.5 gate copy.
+  let unverifiableReason: string | undefined;
   const key = await loadSigningKey(opts.backend);
   if (key && remote.signature) {
     // A present-but-invalid signature means the stored config was tampered with → hard reject.
@@ -92,12 +104,13 @@ export async function runPull(opts: PullOptions): Promise<CommandOutput<PullData
         { hint: 'The stored config does not match its signature — do not apply it.' },
       );
     }
+    verified = true;
   } else if (remote.signature) {
-    warnings.push(
-      'This config is signed but no local signing key is present — integrity not verified.',
-    );
+    unverifiableReason = 'signed but no local signing key is present';
+    warnings.push(`This config is ${unverifiableReason} — integrity not verified.`);
   } else {
     // No signature stored yet (older push / server without signing) — cannot verify integrity.
+    unverifiableReason = 'unsigned';
     warnings.push('This config version is unsigned — integrity could not be verified.');
   }
 
@@ -134,9 +147,25 @@ export async function runPull(opts: PullOptions): Promise<CommandOutput<PullData
     };
   }
 
+  // Integrity gate (S16.5): `--yes` confirms the diff but does not bypass verification. An
+  // unverifiable config (signed-but-keyless or unsigned) needs an explicit `--allow-unsigned`;
+  // otherwise refuse before writing anything or touching the trust store.
+  if (!verified && !opts.allowUnsigned) {
+    return {
+      data: { applied: false, drift: true, version: remote.version, diff },
+      human:
+        `${summary}\n\nRefusing to apply: this config's integrity could not be verified ` +
+        `(${unverifiableReason}). Re-run with --allow-unsigned to apply it anyway.`,
+      warnings,
+      exit: EXIT.DIFF,
+    };
+  }
+
   const target = findConfigPath(opts.cwd) ?? join(opts.cwd, CONFIG_FILENAMES[0]);
   atomicWrite(target, `${serialize(remote.config)}\n`);
-  // --yes is explicit confirmation → pre-approve the pulled launch commands (S9.2).
+  // Confirmed (`--yes`) AND integrity-cleared (verified or --allow-unsigned) → pre-approve the
+  // pulled launch commands in the trust store (S9.2). Auto-approval never rides in on an
+  // unverifiable config (S16.5).
   for (const u of untrusted) gate.approve(u.name, u.entry);
 
   return {

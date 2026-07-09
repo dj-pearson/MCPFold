@@ -3749,7 +3749,7 @@
       "epic": "E16",
       "order": 5,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Separate unsigned-config acceptance from --yes on pull",
       "user_story": "As a user pulling a config on a new machine, I don't want `--yes` to silently apply an unverifiable config AND auto-trust its launch commands, so a tampered cloud config can't gain code execution behind one flag.",
