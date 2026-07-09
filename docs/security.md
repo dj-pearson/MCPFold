@@ -7,6 +7,9 @@ in code and CI, and the threat model for the surfaces that execute code or touch
 To report a vulnerability privately, see `SECURITY.md` at the repo root — please do not open a
 public issue for security reports.
 
+For the claims-to-evidence ledger — every property below paired with the test or CI job that proves
+it — see the [Security posture](security-posture.md) page.
+
 ## The core promise: secret **values** never touch disk or logs
 
 mcpfold's canonical config stores secret **references** (`${scheme:path}`) only — never resolved
@@ -63,6 +66,29 @@ The [Security workflow](../.github/workflows/security.yml) runs on every push an
 The main [CI](ci.md) pipeline additionally runs the leak harness and the full test suite on the
 Windows/macOS/Linux matrix.
 
+## Preflight audit: `mcpfold scan`
+
+Where `doctor` checks config **validity**, `scan` is the **security preflight**: it audits every
+detected client's on-disk config (and the canonical config) for the verified 2025–26 MCP incident
+root causes, so mcpfold finds pre-existing problems — not just avoids creating new ones.
+
+Each finding names the client, file, location, severity, and a concrete fix. Checks include:
+cleartext secret-shaped values in env/auth/headers; unpinned `@latest` or bare (unversioned) stdio
+packages; `mcp-remote` bridges below the CVE-2025-6514 floor (the vulnerable-version table lives in
+one updatable module, `packages/cli/src/checks/security.ts`); and informational nudges for
+uncurated canonical servers. It reads the **raw** on-disk config, not the adapter-normalized model,
+so an adapter that rewrites a field on parse can't hide a finding.
+
+Secret **values** never appear in scan output: findings carry only locations, and every literal
+secret discovered is registered with the redactor so any accidental echo is scrubbed (test-proven).
+The exit code is CI-gateable — `0` clean, `1` when actionable findings exist (info-only stays
+clean), `2` on error — and `--json` emits the machine-readable envelope.
+
+```bash
+mcpfold scan            # audit every detected client + the canonical config
+mcpfold scan --json     # machine-readable findings for CI
+```
+
 ## Threat model
 
 The consolidated, all-surfaces view — including the web console — lives in
@@ -76,9 +102,13 @@ The shim resolves a server's secret refs and execs the real server, keeping toke
   or tampered config is a code-execution vector. Trust-on-first-use for new/changed commands and
   version-integrity signing on synced config are addressed in S9.2; pinning (above) bounds the
   supply-chain risk of `@latest`.
-- **Secret exposure.** Resolved values are injected into the child's environment/headers in memory
-  and never logged; a resolution failure fails closed with a coded error that never prints the
-  value.
+- **Secret exposure.** Resolved values are injected into the child's environment in memory and never
+  logged; a resolution failure fails closed with a coded error that never prints the value. For
+  remote (`http`/`sse`) servers bridged through `mcp-remote`, the resolved auth value is **never**
+  placed on the child's command line — where any local user could read it from the process list for
+  the process lifetime (S16.4). Instead the `--header` argument carries a `${MCPFOLD_HDR_n}`
+  placeholder and the secret travels through an environment variable that `mcp-remote` substitutes
+  at connect time, so argv holds only the non-secret placeholder.
 - **Signal handling.** SIGINT/SIGTERM are forwarded to the child so the shim adds no lifecycle gap.
 
 ### Curation proxy
@@ -87,6 +117,36 @@ The optional proxy trims `tools/list` to an allow/deny set. It is a faithful JSO
 (ids, notifications, errors preserved) and is **off by default** — it only sits in the launch path
 when a server declares a `tools` directive. It transforms only the tool list; it never inspects or
 rewrites secret material.
+
+#### Tool-call audit log (S18.4)
+
+Because the proxy already sits in the call path, it can record a redacted audit trail of tool
+activity for compliance and monitoring. It is **opt-in and off by default**: set `MCPFOLD_AUDIT_LOG`
+(or pass `mcpfold run <name> --audit-log <path>`, which overrides the env var) to a writable path.
+Enabling it routes stdio servers through the proxy so calls are logged even without a `tools`
+directive.
+
+Each line is one JSON object (JSONL). **Redacted by construction:** an event records the argument
+_shape_ — each argument key mapped to its JSON type — and **never argument values**, so no secret
+can reach the log regardless of the redaction pass. Events cover `tools/call` (outcome `ok` /
+`error` / `denied`) and pinned-surface `filter-drift`; denied and drift events carry the server,
+tool, and rule/reason so they are alertable. The log rotates to `<path>.1` when it reaches ~5 MB,
+and a corrupt or unwritable log emits one stderr note and is then ignored — it can never interrupt
+the proxied session.
+
+```jsonc
+// ok call: shape only, no values
+{"ts":"2026-07-08T12:00:01.123Z","server":"github","type":"tools/call","tool":"search_issues","outcome":"ok","durationMs":142,"argShape":{"query":"string","limit":"number"}}
+// a filtered call, refused before reaching the server
+{"ts":"2026-07-08T12:00:04.881Z","server":"github","type":"tools/call","tool":"delete_repo","outcome":"denied","reason":"filtered by mcpfold"}
+// tool definitions drifted from the trusted surface
+{"ts":"2026-07-08T12:01:10.002Z","server":"github","type":"filter-drift","reason":"1 added, 0 removed, 2 changed"}
+```
+
+**SIEM ingestion.** The format is line-delimited JSON, so a collector can tail it directly — e.g.
+a Vector/Fluent Bit `tail` source with a `json` parser, or `promtail` shipping to Loki. Alert on
+`outcome == "denied"` (a client attempted a curated-out tool) and on any `type == "filter-drift"`
+(a server changed its tool surface since it was trusted).
 
 ### Sync channel (`login` / `push` / `pull`)
 

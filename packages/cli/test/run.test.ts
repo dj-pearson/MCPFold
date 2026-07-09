@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { isMcpfoldError, MCP_REMOTE_SPEC } from '@mcpfold/core';
 import { envProvider } from '@mcpfold/secrets';
-import { runRun, type Spawner } from '../src/commands/run.js';
+import { runRun, type ProxySpawner, type Spawner } from '../src/commands/run.js';
 import type { TrustGate } from '../src/trust/tofu.js';
 
 // These tests exercise launch/resolution, not TOFU — trust every server (S9.2 gate tested separately).
@@ -60,8 +60,10 @@ describe('runRun (S4.7)', () => {
 
   it('bridges a remote server via mcp-remote with the resolved Authorization header', async () => {
     let args: string[] = [];
-    const spawnFn: Spawner = async (_c, a) => {
+    let env: NodeJS.ProcessEnv = {};
+    const spawnFn: Spawner = async (_c, a, e) => {
       args = a;
+      env = e;
       return 0;
     };
     await runRun({ cwd, name: 'remote', providers: [envProvider({ MY_TOKEN: 'tok' })], spawnFn });
@@ -70,7 +72,46 @@ describe('runRun (S4.7)', () => {
     expect(args).toContain(MCP_REMOTE_SPEC);
     expect(args).not.toContain('mcp-remote');
     expect(MCP_REMOTE_SPEC).toMatch(/^mcp-remote@\d+\.\d+\.\d+$/);
-    expect(args).toContain('Authorization: Bearer tok');
+    // S16.4: the header arg references an env placeholder, and the resolved secret VALUE never
+    // appears anywhere in argv — it is delivered to mcp-remote through the environment instead.
+    expect(args).toContain('Authorization: Bearer ${MCPFOLD_HDR_0}');
+    expect(args.join('\n')).not.toContain('tok');
+    expect(env.MCPFOLD_HDR_0).toBe('tok');
+  });
+
+  it('keeps custom header secrets out of argv too (S16.4)', async () => {
+    writeFileSync(
+      join(cwd, 'mcp.config.jsonc'),
+      `{
+        "version": 1,
+        "servers": {
+          "hdr": {
+            "transport": "sse",
+            "url": "https://api.example/sse/",
+            "auth": { "type": "header", "headers": { "X-Api-Key": "\${env:MY_TOKEN}" } },
+            "tags": ["t"]
+          }
+        },
+        "profiles": {}
+      }`,
+    );
+    let args: string[] = [];
+    let env: NodeJS.ProcessEnv = {};
+    const spawnFn: Spawner = async (_c, a, e) => {
+      args = a;
+      env = e;
+      return 0;
+    };
+    await runRun({
+      cwd,
+      name: 'hdr',
+      providers: [envProvider({ MY_TOKEN: 'k3y-secret' })],
+      spawnFn,
+    });
+    // The whole custom value moves to the env; argv carries only the placeholder.
+    expect(args).toContain('X-Api-Key: ${MCPFOLD_HDR_0}');
+    expect(args.join('\n')).not.toContain('k3y-secret');
+    expect(env.MCPFOLD_HDR_0).toBe('k3y-secret');
   });
 
   it('propagates the child exit code', async () => {
@@ -96,5 +137,28 @@ describe('runRun (S4.7)', () => {
 
   it('errors clearly for an unknown server name', async () => {
     await expect(runRun({ cwd, name: 'nope', providers: [] })).rejects.toThrow(/No server "nope"/);
+  });
+
+  it('routes stdio through the proxy with an audit recorder when auditLogPath is set (S18.4)', async () => {
+    // 'local' has no tools directive and no pinned surface, so without auditing it would take the
+    // plain passthrough. Enabling the audit log must reroute it through the proxy with a recorder.
+    let audit: unknown;
+    const plain = vi.fn<Spawner>(async () => 0);
+    const proxySpawnFn: ProxySpawner = async (_c, _a, _e, _t, _p, recorder) => {
+      audit = recorder;
+      return 0;
+    };
+    const code = await runRun({
+      cwd,
+      name: 'local',
+      providers: [envProvider({ MY_TOKEN: 'x' })],
+      spawnFn: plain,
+      proxySpawnFn,
+      trust: trustAll,
+      auditLogPath: join(cwd, 'audit.jsonl'),
+    });
+    expect(code).toBe(0);
+    expect(plain).not.toHaveBeenCalled(); // did not fall through to plain passthrough
+    expect(audit).toBeTypeOf('object'); // a real recorder was constructed and threaded through
   });
 });

@@ -109,6 +109,10 @@ jobs:
       - name: Build docs (link-check + schema staging)
         run: pnpm docs:build
 
+      # Every security-posture claim must keep a resolvable evidence link (S18.5).
+      - name: Check security-posture evidence links
+        run: pnpm check:evidence
+
       # Deployment bootstrap (S8.5): the runbook's env matrix must stay in sync with the real
       # sources, and the secret-minting script must be shellcheck-clean.
       - name: Deployment env matrix in sync
@@ -199,10 +203,18 @@ jobs:
         run: bash services/edge/scripts/container-smoke.sh
 
   # Web console e2e (S7.1): Playwright drives the login flow + gated-route redirect against a Vite
-  # dev server with mock auth (VITE_E2E=1) — no live Supabase needed.
+  # dev server with mock auth (VITE_E2E=1) — no live Supabase needed. Runs on Linux + Windows
+  # (S20.4) so browser rendering and path/dev-server assumptions are covered cross-OS, not just on
+  # ubuntu. Flake policy: `fail-fast: false` so one OS's flake never cancels the other; a genuinely
+  # flaky spec is quarantined with a linked issue rather than left to fail the matrix. What mock
+  # mode does NOT cover is documented in apps/web/test/README.md.
   web-e2e:
     name: web e2e (playwright)
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -225,8 +237,15 @@ jobs:
       - name: Build core
         run: pnpm --filter @mcpfold/core build
 
-      - name: Install Playwright browser
+      # `--with-deps` installs system libraries and only works on Linux; on Windows the browser
+      # binary is enough.
+      - name: Install Playwright browser (Linux)
+        if: runner.os == 'Linux'
         run: pnpm --filter @mcpfold/web exec playwright install --with-deps chromium
+
+      - name: Install Playwright browser (Windows)
+        if: runner.os == 'Windows'
+        run: pnpm --filter @mcpfold/web exec playwright install chromium
 
       - name: Run web e2e
         run: pnpm --filter @mcpfold/web e2e

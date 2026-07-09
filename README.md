@@ -127,7 +127,7 @@ one's native format from a single source of truth. (New adapters are a
 ```jsonc
 {
   "$schema": "https://mcpfold.com/schema/v1.json",
-  "version": 1
+  "version": 1,
   // …
 }
 ```
@@ -154,6 +154,14 @@ The schema is generated from the zod source (`packages/schema`); a CI check fail
 **Core purity** is enforced: `packages/core` may not import `node:fs`, `node:os`, `node:path`, or any
 network/process library. All I/O is injected through `ClientAdapter` / `SecretProvider`. Guarded by an
 ESLint `no-restricted-imports` rule and the `scripts/check-core-purity.mjs` CI gate.
+
+## Security
+
+Secret **values** never touch disk or logs — only references (`${scheme:path}`) are stored, and
+values are resolved in memory at launch. Every security property is paired with the test or CI job
+that proves it in the [Security posture](./docs/security-posture.md) ledger (CI-guarded so a claim
+can't outlive its evidence); the narrative [Security](./docs/security.md) and
+[Threat model](./docs/threat-model.md) pages cover the surfaces and honest boundaries.
 
 ## Development
 

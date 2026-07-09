@@ -8,8 +8,11 @@ import {
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import {
   connectProxy,
+  createAuditRecorder,
+  fileAuditSink,
   renderToolSurfaceDiff,
   streamTransport,
+  type AuditRecorder,
   type PinnedToolsOptions,
 } from '@mcpfold/proxy';
 import { loadConfigFromDisk } from '../util/config.js';
@@ -57,9 +60,10 @@ export type ProxySpawner = (
   env: NodeJS.ProcessEnv,
   tools: ToolsDirective | undefined,
   pinned?: PinnedToolsOptions,
+  audit?: AuditRecorder,
 ) => Promise<number>;
 
-const defaultProxySpawner: ProxySpawner = (command, args, env, tools, pinned) =>
+const defaultProxySpawner: ProxySpawner = (command, args, env, tools, pinned, audit) =>
   new Promise<number>((resolve) => {
     // stderr is inherited so the server's logs still reach the terminal; stdin/stdout are
     // piped so the proxy can sit between the MCP client (our process) and the real server.
@@ -71,7 +75,11 @@ const defaultProxySpawner: ProxySpawner = (command, args, env, tools, pinned) =>
     });
     const clientTransport = streamTransport(process.stdin, process.stdout);
     const serverTransport = streamTransport(child.stdout!, child.stdin!);
-    const dispose = connectProxy(clientTransport, serverTransport, { tools, pinnedTools: pinned });
+    const dispose = connectProxy(clientTransport, serverTransport, {
+      tools,
+      pinnedTools: pinned,
+      audit,
+    });
 
     const forward = (signal: NodeJS.Signals): void => {
       if (!child.killed) child.kill(signal);
@@ -109,6 +117,12 @@ export interface RunOptions {
   strictTools?: boolean;
   /** Sink for the drift warning line(s); defaults to stderr. Injectable for tests. */
   warn?: (line: string) => void;
+  /**
+   * Path to the redacted tool-call audit log (S18.4). When set, stdio servers are routed through
+   * the proxy so calls are audited even without a tools directive. Defaults to MCPFOLD_AUDIT_LOG;
+   * unset means auditing is off.
+   */
+  auditLogPath?: string;
 }
 
 /** Rewrite an `@latest` package spec to the pinned version (supply-chain hygiene). */
@@ -117,17 +131,39 @@ function applyPin(args: string[] | undefined, pin: string | undefined): string[]
   return args.map((a) => a.replace(/@latest$/, `@${pin}`));
 }
 
-/** Build `mcp-remote` args for a remote server, injecting resolved auth headers. The bridge is
- * pinned to a CVE-safe version via MCP_REMOTE_SPEC (see @mcpfold/core bridge.ts). */
-function remoteArgs(server: ResolvedServer): string[] {
+/** Prefix for the per-header env vars that carry resolved secret values to mcp-remote (S16.4). */
+const HEADER_ENV_PREFIX = 'MCPFOLD_HDR_';
+
+/**
+ * Build the `mcp-remote` invocation (args + env) for a remote server. The bridge is pinned to a
+ * CVE-safe version via MCP_REMOTE_SPEC (see @mcpfold/core bridge.ts).
+ *
+ * S16.4: the resolved secret VALUE is never placed in argv, where any local user could read it
+ * for the process lifetime. Instead each header value is passed through an environment variable and
+ * referenced from the `--header` argument as `${MCPFOLD_HDR_n}`; mcp-remote (>=0.1.x) substitutes
+ * `${VAR}` in header values from `process.env` at connect time. The argv therefore only ever
+ * contains the non-secret placeholder.
+ */
+function remoteInvocation(server: ResolvedServer): { args: string[]; env: NodeJS.ProcessEnv } {
   const args = ['-y', MCP_REMOTE_SPEC, server.url ?? ''];
+  const env: NodeJS.ProcessEnv = {};
+  let n = 0;
+  // Push a `Name: <prefix>${VAR}` header whose secret part lives only in the child env.
+  const pushHeader = (name: string, literalPrefix: string, secret: string): void => {
+    const varName = `${HEADER_ENV_PREFIX}${n++}`;
+    env[varName] = secret;
+    args.push('--header', `${name}: ${literalPrefix}\${${varName}}`);
+  };
+
   if (server.auth?.type === 'bearer' && server.auth.token) {
-    args.push('--header', `Authorization: Bearer ${server.auth.token}`);
+    // Keep the non-secret "Bearer " scheme visible; only the token moves to the env.
+    pushHeader('Authorization', 'Bearer ', server.auth.token);
   }
   for (const [k, v] of Object.entries(server.auth?.headers ?? {})) {
-    args.push('--header', `${k}: ${v}`);
+    // Custom header values may be secret in full → move the whole value to the env.
+    pushHeader(k, '', v);
   }
-  return args;
+  return { args, env };
 }
 
 export async function runRun(options: RunOptions): Promise<number> {
@@ -184,14 +220,25 @@ export async function runRun(options: RunOptions): Promise<number> {
       },
     };
 
-    // S5.3: when the server declares a `tools` directive OR has a pinned surface, route stdio
-    // through the proxy. With neither, plain passthrough — no proxy overhead.
-    if (s.tools || pinned) {
+    // Redacted tool-call audit log (S18.4): opt-in via --audit-log / MCPFOLD_AUDIT_LOG. When on,
+    // route stdio through the proxy so calls are logged even without a tools directive.
+    const auditLogPath = options.auditLogPath ?? process.env.MCPFOLD_AUDIT_LOG;
+    const audit: AuditRecorder | undefined = auditLogPath
+      ? createAuditRecorder({
+          server: options.name,
+          sink: fileAuditSink(auditLogPath, { warn }),
+        })
+      : undefined;
+
+    // S5.3: when the server declares a `tools` directive, has a pinned surface, or auditing is on,
+    // route stdio through the proxy. With none of these, plain passthrough — no proxy overhead.
+    if (s.tools || pinned || audit) {
       const proxySpawner = options.proxySpawnFn ?? defaultProxySpawner;
-      return proxySpawner(s.command ?? '', args, env, s.tools, pinned);
+      return proxySpawner(s.command ?? '', args, env, s.tools, pinned, audit);
     }
     return spawner(s.command ?? '', args, env);
   }
-  // http / sse → bridge with mcp-remote and resolved headers.
-  return spawner('npx', remoteArgs(s), { ...process.env });
+  // http / sse → bridge with mcp-remote. Resolved auth values travel via env (S16.4), never argv.
+  const remote = remoteInvocation(s);
+  return spawner('npx', remote.args, { ...process.env, ...remote.env });
 }

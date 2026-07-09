@@ -39,6 +39,27 @@ export function detectChannel(execPath: string): UpdateChannel {
   return 'npm';
 }
 
+/**
+ * Decide how to launch the detached background cache-refresh, per install channel (S16.8).
+ *
+ * A standalone binary (pkg/yao-pkg) IS the mcpfold executable, and `process.argv[1]` is unreliable
+ * under it — so we must NOT depend on a node script path. Instead re-invoke the binary's own hidden
+ * `__refresh-update` subcommand directly. Every other channel (npm/npx, homebrew, scoop) runs under
+ * `node` with a real JS entry script, so we re-run that script with the subcommand as before.
+ * Returns null when no runnable target exists (e.g. a non-binary install with no known script path).
+ */
+export function refreshSpawnTarget(
+  channel: UpdateChannel,
+  execPath: string,
+  scriptPath: string | undefined,
+): { command: string; args: string[] } | null {
+  if (channel === 'binary') {
+    return { command: execPath, args: ['__refresh-update'] };
+  }
+  if (!scriptPath) return null;
+  return { command: execPath, args: [scriptPath, '__refresh-update'] };
+}
+
 export function upgradeCommand(channel: UpdateChannel): string {
   switch (channel) {
     case 'homebrew':

@@ -23,6 +23,7 @@
     "typecheck": "pnpm -r typecheck",
     "docs:build": "node scripts/build-docs.mjs",
     "docs:check": "node scripts/build-docs.mjs --check",
+    "check:evidence": "node scripts/check-evidence-links.mjs",
     "smoke": "node scripts/pack-smoke.mjs",
     "build:binaries": "node scripts/build-binary.mjs",
     "check:version-parity": "node scripts/check-version-parity.mjs",

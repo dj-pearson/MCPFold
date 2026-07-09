@@ -5,6 +5,7 @@ import { runDiff } from './commands/diff.js';
 import { runInit } from './commands/init.js';
 import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
+import { runScan } from './commands/scan.js';
 import { runStatus } from './commands/status.js';
 import { runTest } from './commands/test.js';
 import { runRestore } from './commands/restore.js';
@@ -17,9 +18,11 @@ import {
 } from './commands/completions.js';
 import {
   defaultCachePath,
+  detectChannel,
   getUpdateNotice,
   isNotifierEnabled,
   isRefreshDue,
+  refreshSpawnTarget,
   refreshUpdateCache,
 } from './update-notifier.js';
 import { spawn } from 'node:child_process';
@@ -234,6 +237,15 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
 
   addGlobalFlags(
     program
+      .command('scan')
+      .description('security preflight: audit every client config for known incident root causes'),
+  ).action(async (opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('scan', ctx.json, () => runScan({ cwd: ctx.cwd }), writer));
+  });
+
+  addGlobalFlags(
+    program
       .command('status')
       .description('at-a-glance health: detected clients, drift, config health, cloud state'),
   ).action(async (opts: GlobalFlags) => {
@@ -328,11 +340,15 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     program
       .command('run')
       .description('internal shim launcher (resolve secrets, inject, exec the server)')
-      .argument('<name>', 'server name from the canonical config'),
-  ).action(async (name: string, opts: GlobalFlags) => {
+      .argument('<name>', 'server name from the canonical config')
+      .option(
+        '--audit-log <path>',
+        'append a redacted JSONL tool-call audit log here (overrides MCPFOLD_AUDIT_LOG)',
+      ),
+  ).action(async (name: string, opts: GlobalFlags & { auditLog?: string }) => {
     const ctx = resolve(opts);
     try {
-      setExit((await runRun({ cwd: ctx.cwd, name })) as ExitCode);
+      setExit((await runRun({ cwd: ctx.cwd, name, auditLogPath: opts.auditLog })) as ExitCode);
     } catch (error) {
       const enorm = toEnvelopeError(error);
       errWrite(`error: ${enorm.message}\n`);
@@ -512,27 +528,42 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       .command('pull')
       .description('pull the canonical config from the cloud and diff/apply it')
       .option('--yes', 'apply the pulled config without confirmation', false)
+      .option(
+        '--allow-unsigned',
+        'apply even when the config integrity cannot be verified (signed-but-keyless or unsigned)',
+        false,
+      )
       .option('--team <id>', 'pull a team config instead of your personal one')
       .option('--config-version <n>', 'pull a specific version instead of the latest'),
-  ).action(async (opts: GlobalFlags & { yes?: boolean; team?: string; configVersion?: string }) => {
-    const ctx = resolve(opts);
-    setExit(
-      await runCommand(
-        'pull',
-        ctx.json,
-        () =>
-          runPull({
-            cwd: ctx.cwd,
-            api: httpCloudApi(resolveEndpoint()),
-            backend: osKeychainBackend(),
-            yes: opts.yes,
-            teamId: opts.team,
-            version: opts.configVersion !== undefined ? Number(opts.configVersion) : undefined,
-          }),
-        writer,
-      ),
-    );
-  });
+  ).action(
+    async (
+      opts: GlobalFlags & {
+        yes?: boolean;
+        allowUnsigned?: boolean;
+        team?: string;
+        configVersion?: string;
+      },
+    ) => {
+      const ctx = resolve(opts);
+      setExit(
+        await runCommand(
+          'pull',
+          ctx.json,
+          () =>
+            runPull({
+              cwd: ctx.cwd,
+              api: httpCloudApi(resolveEndpoint()),
+              backend: osKeychainBackend(),
+              yes: opts.yes,
+              allowUnsigned: opts.allowUnsigned,
+              teamId: opts.team,
+              version: opts.configVersion !== undefined ? Number(opts.configVersion) : undefined,
+            }),
+          writer,
+        ),
+      );
+    },
+  );
 
   return { program, getExitCode: () => exitCode };
 }
@@ -573,9 +604,13 @@ function maybeNotifyUpdate(command: string | undefined, w: Writer): void {
 
     if (!isNotifierEnabled(process.env, Boolean(process.stdout.isTTY))) return;
     if (!isRefreshDue(defaultCachePath(), new Date())) return;
-    const bin = process.argv[1];
-    if (!bin) return;
-    const child = spawn(process.execPath, [bin, '__refresh-update'], {
+    // Channel-aware background refresh (S16.8): a standalone binary re-invokes its own
+    // `__refresh-update` subcommand (process.argv[1] is unreliable under pkg/yao-pkg), while
+    // node-based installs re-run the JS entry script as before.
+    const channel = detectChannel(process.execPath);
+    const target = refreshSpawnTarget(channel, process.execPath, process.argv[1]);
+    if (!target) return;
+    const child = spawn(target.command, target.args, {
       detached: true,
       stdio: 'ignore',
     });

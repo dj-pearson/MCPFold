@@ -54,7 +54,10 @@ it to the _tool surface_.
 - **No values synced.** `push` uploads references only; the client guard, server guard, and DB
   CHECK are three independent layers rejecting a raw secret (S6.4/S9.1).
 - **Integrity.** Each pushed version is HMAC-signed; `pull` rejects a tampered (bad-signature)
-  version and warns on unsigned (S9.2).
+  version outright (S9.2). A config it cannot positively verify — signed but no local signing key,
+  or unsigned — is not applied by `--yes` alone: it requires an explicit `--allow-unsigned`, so
+  `--yes` never doubles as an integrity bypass, and the TOFU launch-command auto-approval that rides
+  on `--yes` only happens for a verified or explicitly allow-unsigned config (S16.5).
 - **Sessions.** Access tokens are short-lived; device-code hardening + per-machine revocation are
   addressed in S9.5.
 

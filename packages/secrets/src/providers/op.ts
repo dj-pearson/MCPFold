@@ -20,11 +20,12 @@ export function opProvider(config: OpConfig = {}): SecretProvider {
   const exec = config.exec ?? defaultExec;
   return {
     scheme: 'op',
-    async resolve(path) {
+    async resolve(path, ctx) {
       const reference = opReference(path);
       let result;
       try {
-        result = await exec('op', ['read', reference]);
+        // Thread the resolver's timeout signal through so a hung `op` child is killed (S20.4).
+        result = await exec('op', ['read', reference], { signal: ctx?.signal });
       } catch {
         throw new Error(
           'the 1Password CLI `op` is not installed or not on PATH — install it from https://developer.1password.com/docs/cli',

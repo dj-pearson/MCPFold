@@ -7,6 +7,7 @@ import {
   getUpdateNotice,
   isNewer,
   isNotifierEnabled,
+  refreshSpawnTarget,
   refreshUpdateCache,
   upgradeCommand,
 } from '../src/update-notifier.js';
@@ -41,6 +42,36 @@ describe('channel detection + upgrade command (S11.3)', () => {
     expect(upgradeCommand('homebrew')).toBe('brew upgrade mcpfold');
     expect(upgradeCommand('npm')).toContain('npm install -g mcpfold');
     expect(upgradeCommand('binary')).toContain('install.sh');
+  });
+});
+
+describe('refreshSpawnTarget — channel-aware background refresh (S16.8)', () => {
+  it('re-invokes the standalone binary itself, ignoring the unreliable script path', () => {
+    // Under pkg/yao-pkg the binary IS mcpfold and process.argv[1] can't be trusted; the refresh
+    // must run the binary's own hidden subcommand regardless.
+    expect(refreshSpawnTarget('binary', '/usr/local/bin/mcpfold', undefined)).toEqual({
+      command: '/usr/local/bin/mcpfold',
+      args: ['__refresh-update'],
+    });
+    expect(refreshSpawnTarget('binary', '/usr/local/bin/mcpfold', '/bogus/snapshot/path')).toEqual({
+      command: '/usr/local/bin/mcpfold',
+      args: ['__refresh-update'],
+    });
+  });
+
+  it('re-runs the JS entry under node for npm/homebrew/scoop installs', () => {
+    expect(refreshSpawnTarget('npm', '/usr/bin/node', '/opt/mcpfold/dist/bin.js')).toEqual({
+      command: '/usr/bin/node',
+      args: ['/opt/mcpfold/dist/bin.js', '__refresh-update'],
+    });
+    expect(refreshSpawnTarget('homebrew', '/usr/bin/node', '/x/bin.js')?.args).toEqual([
+      '/x/bin.js',
+      '__refresh-update',
+    ]);
+  });
+
+  it('returns null for a node-based install with no known script path', () => {
+    expect(refreshSpawnTarget('npm', '/usr/bin/node', undefined)).toBeNull();
   });
 });
 
