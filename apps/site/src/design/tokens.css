@@ -92,3 +92,44 @@ code {
   border-radius: 4px;
   font-size: 0.9em;
 }
+
+/* Global navigation / IA (S13.9) ------------------------------------------------------------- */
+
+/* Skip-to-content: visually hidden until focused, then pinned top-left over everything. */
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: -3rem;
+  z-index: 100;
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: var(--space-2);
+}
+
+/* Header nav is a flex row on desktop; the hamburger is hidden. */
+.nav-desktop {
+  display: flex;
+}
+.nav-toggle {
+  display: none;
+}
+
+/* Below the breakpoint: swap the inline nav for the hamburger + mobile panel. */
+@media (max-width: 820px) {
+  .nav-desktop {
+    display: none;
+  }
+  .nav-toggle {
+    display: flex;
+  }
+}
+
+/* Give <main> no default focus ring when targeted via the skip link (it's programmatic). */
+main:focus {
+  outline: none;
+}
