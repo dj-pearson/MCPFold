@@ -471,3 +471,40 @@ count is **not**.
 
 **Follow-ups:** repoint the pillar "deep-dive" links to `/features/<slug>` when S13.10 ships and the
 persona cards to `/use-cases/<id>` when S13.11 ships (both single-sourced already).
+
+---
+
+## S13.9 — Global navigation, header, footer, and site IA
+
+Started/done: 2026-07-09. Replaced the flat S13.1 header/footer with a real information
+architecture driven by a single source, so every page is reachable from anywhere and new pages
+register in one place.
+
+- **`site-structure.ts`** — the single source for header nav + footer link map. Each link carries a
+  `status`; `planned` pages (Features S13.10, Guides S15.5) are registered but **not rendered until
+  they exist**, so the nav never 404s (same "link live only" precedent as the keyword map).
+  `liveInternalPaths()` exposes the registered live paths so the IA can also feed the sitemap.
+- **`nav/Header.tsx`** — responsive header: desktop nav with **active-route indication**
+  (`aria-current="page"`), primary **Install** CTA + secondary **Open app** link, a single
+  always-visible **theme toggle**, and an accessible **mobile menu** (hamburger with
+  `aria-expanded`/`aria-controls`, closes on link click and on **Escape**). Internal routes use the
+  SPA `<Link>`; docs/external use real anchors.
+- **`nav/Footer.tsx`** — the complete grouped link map (Product · Resources · Community · Company)
+  plus the MIT license + no-endorsement note, from the same source.
+- **`Layout.tsx`** — adds a **skip-to-content** link (visually hidden until focused, targets
+  `<main id="main">`) ahead of the header.
+- **`tokens.css`** — responsive nav (desktop row ↔ hamburger at ≤820px), skip-link, and focus
+  styles.
+
+Tests: `nav.e2e.ts` (5) — live/active/planned header, click-to-navigate active-state move, the
+mobile menu (open → navigate → close on link + Escape), the footer link map resolving against the
+route table with planned pages omitted, and the skip link + theme toggle. All existing suites still
+green (theme-toggle is now a single instance).
+
+`verify_all` green (lint, typecheck ×8, `pnpm -r test`, `pnpm -r build`, Prettier, docs:build).
+**Site e2e (35) + prerender e2e (9) pass** — header/footer render in the prerendered HTML and hydrate
+without warnings.
+
+**Follow-ups:** flip Features/Guides to `live` in `site-structure.ts` when S13.10 / S15.5 ship (they
+then appear in nav + footer automatically); wire `liveInternalPaths()` into the sitemap if non-
+enumerated pages are ever added.
