@@ -27,7 +27,7 @@ const HOME: Faq[] = [
   {
     question: 'Which MCP clients does mcpfold support?',
     answer:
-      'mcpfold folds to 12 clients from one config: Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Cline, Gemini CLI, JetBrains AI Assistant, Visual Studio, Continue, and Roo Code. Each client has its own config format and path; mcpfold handles the per-client dialect automatically.',
+      'mcpfold folds to 15 clients from one config: Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Cline, Gemini CLI, JetBrains AI Assistant, Visual Studio, Continue, Roo Code, Goose, Codex CLI, and LM Studio — including non-JSON formats (Goose YAML, Codex CLI TOML). Each client has its own config format and path; mcpfold handles the per-client dialect automatically.',
   },
   {
     question: 'Is mcpfold free?',

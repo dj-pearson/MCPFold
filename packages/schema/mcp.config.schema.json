@@ -139,7 +139,10 @@
                   "jetbrains",
                   "visual-studio",
                   "continue",
-                  "roo-code"
+                  "roo-code",
+                  "goose",
+                  "codex-cli",
+                  "lm-studio"
                 ]
               },
               "scope": {

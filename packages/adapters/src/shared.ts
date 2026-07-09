@@ -125,6 +125,43 @@ export function toMcpEntry(server: ResolvedServer, options: ToEntryOptions = {})
   return entry;
 }
 
+/**
+ * A server normalized to the launch/endpoint parts a bespoke (non-`mcpServers`) adapter needs —
+ * YAML/TOML clients (S19.2). The `mcp-remote` shim decision is applied here just like {@link
+ * toMcpEntry}, so a remote server a client can't fold natively becomes a stdio `npx mcp-remote`
+ * launch expressed in the client's own field names.
+ */
+export interface NormalizedEntry {
+  kind: 'stdio' | 'remote';
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  /** True when the remote endpoint is SSE (vs streamable HTTP). */
+  sse?: boolean;
+}
+
+/** Normalize a resolved server for a bespoke adapter, applying the `mcp-remote` shim per capability. */
+export function normalizeServer(
+  server: ResolvedServer,
+  capability: RemoteCapability,
+): NormalizedEntry {
+  if (remoteNeedsShim(capability, server)) {
+    const shim = renderRemoteShim(server);
+    return { kind: 'stdio', command: shim.command, args: shim.args };
+  }
+  if (server.transport === 'stdio') {
+    return { kind: 'stdio', command: server.command ?? '', args: server.args, env: server.env };
+  }
+  return {
+    kind: 'remote',
+    url: server.url ?? '',
+    headers: server.auth?.headers,
+    sse: server.transport === 'sse',
+  };
+}
+
 /** Build the `{ [name]: entry }` map from resolved servers. */
 export function toMcpServersShape(
   servers: ResolvedServer[],
@@ -206,7 +243,8 @@ export function createMcpServersAdapter(config: McpServersAdapterConfig): Client
     needsRestart,
     remote: config.remote,
     resolvePath: config.resolvePath,
-    render(servers, ctx = realOsContext()): RenderedFile {
+    // `mcpServers`-style clients own a dedicated JSON file, so `existing` is ignored (full rewrite).
+    render(servers, ctx = realOsContext(), _existing?: string): RenderedFile {
       const shape = toMcpServersShape(servers, {
         includeType: config.includeType,
         remote: config.remote,

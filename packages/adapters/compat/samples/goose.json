@@ -1,0 +1,11 @@
+{
+  "client": "goose",
+  "source": {
+    "type": "captured",
+    "capturedAt": "2026-07-09"
+  },
+  "format": "yaml",
+  "rootKeys": ["extensions"],
+  "serverContainer": "extensions",
+  "entryKeys": ["args", "cmd", "enabled", "envs", "headers", "name", "type", "uri"]
+}

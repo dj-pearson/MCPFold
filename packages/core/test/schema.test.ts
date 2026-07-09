@@ -7,11 +7,17 @@ import {
   SECRET_REF_RE,
 } from '../src/schema.js';
 
-// S17.3/S19.1: the doc comment on CLIENT_IDS claims a count ("twelve clients"); keep it honest.
-describe('CLIENT_IDS (S17.3, S19.1)', () => {
-  it('has exactly twelve clients (matches the "twelve clients" comment)', () => {
-    expect(CLIENT_IDS).toHaveLength(12);
+// S17.3/S19.1/S19.2: the doc comment on CLIENT_IDS claims a count ("fifteen clients"); keep it honest.
+describe('CLIENT_IDS (S17.3, S19.1, S19.2)', () => {
+  it('has exactly fifteen clients (matches the "fifteen clients" comment)', () => {
+    expect(CLIENT_IDS).toHaveLength(15);
     expect(new Set(CLIENT_IDS).size).toBe(CLIENT_IDS.length); // no duplicates
+  });
+
+  it('includes the wave-2 bespoke-format adapters (S19.2)', () => {
+    for (const id of ['goose', 'codex-cli', 'lm-studio'] as const) {
+      expect(CLIENT_IDS).toContain(id);
+    }
   });
 
   it('includes the wave-1 adapters (S19.1)', () => {

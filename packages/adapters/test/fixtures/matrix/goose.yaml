@@ -1,0 +1,16 @@
+extensions:
+  github:
+    name: github
+    type: streamable_http
+    enabled: true
+    uri: https://api.githubcopilot.com/mcp/
+  playwright:
+    name: playwright
+    type: stdio
+    enabled: true
+    cmd: npx
+    args:
+      - -y
+      - "@playwright/mcp@latest"
+    envs:
+      HEADLESS: "true"

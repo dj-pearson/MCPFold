@@ -1,0 +1,11 @@
+{
+  "client": "codex-cli",
+  "source": {
+    "type": "captured",
+    "capturedAt": "2026-07-09"
+  },
+  "format": "toml",
+  "rootKeys": ["mcp_servers"],
+  "serverContainer": "mcp_servers",
+  "entryKeys": ["args", "command", "env", "http_headers", "url"]
+}

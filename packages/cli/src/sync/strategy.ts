@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { findSecretRefs, type ResolvedServer } from '@mcpfold/core';
 import {
   realOsContext,
@@ -97,14 +98,19 @@ export async function renderWithStrategy(
   // Pin @latest → the fixed version at fold time, before any strategy transform.
   const pinned = servers.map(applyPinAtFold);
 
+  // S19.2: pass the current on-disk contents so shared-file adapters (Goose YAML, Codex TOML)
+  // preserve unmanaged keys instead of clobbering the file. Adapters with a dedicated file ignore it.
+  const targetPath = adapter.resolvePath(pinned[0]?.scope ?? 'user', pinned[0]?.projectPath, ctx);
+  const existing = existsSync(targetPath) ? readFileSync(targetPath, 'utf8') : undefined;
+
   if (adapter.secretStrategy === 'shim') {
     const transformed = pinned.map((s) => (hasSecrets(s) ? toShim(s) : s));
-    return adapter.render(transformed, ctx);
+    return adapter.render(transformed, ctx, existing);
   }
 
   if (adapter.secretStrategy === 'native-input') {
     // The adapter itself emits the client's secret indirection — never a raw token.
-    return adapter.render(pinned, ctx);
+    return adapter.render(pinned, ctx, existing);
   }
 
   // inline
@@ -112,7 +118,7 @@ export async function renderWithStrategy(
     throw new Error('inline strategy requires a secret resolver (providers) to be supplied.');
   }
   const resolved = (await options.resolve(pinned)).map(toInline);
-  const file = adapter.render(resolved, ctx);
+  const file = adapter.render(resolved, ctx, existing);
   const gitignored = (options.isGitignored ?? defaultGitignored)(file.path);
   if (!gitignored) {
     throw new InlineNotIgnoredError(

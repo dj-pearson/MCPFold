@@ -20,6 +20,9 @@ import { jetbrainsAdapter } from '../src/jetbrains.js';
 import { visualStudioAdapter } from '../src/visual-studio.js';
 import { continueAdapter } from '../src/continue.js';
 import { rooCodeAdapter } from '../src/roo-code.js';
+import { gooseAdapter } from '../src/goose.js';
+import { codexCliAdapter } from '../src/codex-cli.js';
+import { lmStudioAdapter } from '../src/lm-studio.js';
 
 /**
  * Cross-adapter fixture harness (S2.8). A single canonical fixture is folded through every
@@ -56,6 +59,9 @@ const ADAPTERS: { adapter: ClientAdapter; golden: string }[] = [
   { adapter: visualStudioAdapter, golden: 'fixtures/matrix/visual-studio.json' },
   { adapter: continueAdapter, golden: 'fixtures/matrix/continue.json' },
   { adapter: rooCodeAdapter, golden: 'fixtures/matrix/roo-code.json' },
+  { adapter: gooseAdapter, golden: 'fixtures/matrix/goose.yaml' },
+  { adapter: codexCliAdapter, golden: 'fixtures/matrix/codex-cli.toml' },
+  { adapter: lmStudioAdapter, golden: 'fixtures/matrix/lm-studio.json' },
 ];
 
 describe('cross-adapter matrix (S2.8)', () => {
@@ -86,6 +92,6 @@ describe('cross-adapter matrix (S2.8)', () => {
   }
 
   it('covers every registered adapter', () => {
-    expect(ADAPTERS).toHaveLength(12);
+    expect(ADAPTERS).toHaveLength(15);
   });
 });

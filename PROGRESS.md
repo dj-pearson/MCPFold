@@ -542,3 +542,44 @@ overstatement.
 
 `verify_all` green (lint, typecheck ×8, `pnpm -r test`, `pnpm -r build`, Prettier, docs:build).
 **Site e2e (38) + prerender e2e (9) pass**; 92 routes prerender.
+
+---
+
+## S19.2 (partial — wave 2a) — Adapter wave 2: bespoke formats
+
+Started/done: 2026-07-09. Shipped the **bespoke non-JSON** thesis of S19.2 plus the reusable
+preservation architecture. Matrix 12 → **15**.
+
+**Shipped (3), each verified against primary docs (July 2026; records in `docs/coverage.md`):**
+
+- **Goose** (`goose`) — YAML, `~/.config/goose/config.yaml`, root `extensions:`; remote via
+  `type: streamable_http` + `uri`.
+- **Codex CLI** (`codex-cli`) — TOML, `~/.codex/config.toml` (`CODEX_HOME`), `[mcp_servers.<name>]`
+  snake_case tables.
+- **LM Studio** (`lm-studio`) — JSON, `~/.lmstudio/mcp.json`, Cursor-compatible `mcpServers`.
+
+**New architecture — unmanaged-key preservation.** Extended `ClientAdapter.render(servers, ctx,
+existing?)`; `renderWithStrategy` now reads the on-disk file and passes it, so shared-file adapters
+(Goose, Codex — files that also hold the client's own settings) **merge the managed section in and
+preserve every unmanaged key** (and comments, for YAML via the `yaml` Document API). Round-trip +
+preservation are unit-tested. Parse deps (`yaml`, `smol-toml`) live only in `packages/adapters` —
+**core purity stays green**.
+
+**Deferred, with rationale (doc-verified, not speculative):**
+
+- **Warp** — permanent-for-now: its authoritative MCP store is a **synced cloud DB via the UI**, not
+  a canonical file; a file adapter would be non-authoritative and silently overridden.
+- **opencode + GitHub Copilot CLI** — next wave (2b); both documented + stable JSON, they land next
+  reusing the preservation mechanism. (This is why **S19.2 stays `todo`** — wave 2b completes it.)
+
+Integration: core `CLIENT_IDS` +3 (+ generated JSON Schema regenerated), `all.ts`/`index.ts`
+registration, `detectClients` (adapter-driven, auto), compat harness extended for YAML/TOML +
+3 samples, matrix goldens (`goose.yaml`, `codex-cli.toml`, `lm-studio.json`), site client count
+12 → 15 (FAQ + homepage list), coverage.md.
+
+`verify_all` green (lint, typecheck ×8, `pnpm -r test`, `pnpm -r build`, Prettier); adapters 112,
+compat harness 15/15 compatible, site e2e green. (token-store DPAPI test is a pre-existing
+parallel-run flake — passes in isolation.)
+
+**Remaining for S19.2 done:** opencode + Copilot CLI adapters (wave 2b) + their compat samples,
+goldens, and coverage rows.

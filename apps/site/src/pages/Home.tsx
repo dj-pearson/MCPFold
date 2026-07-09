@@ -131,6 +131,9 @@ const CLIENTS = [
   'Visual Studio',
   'Continue',
   'Roo Code',
+  'Goose',
+  'Codex CLI',
+  'LM Studio',
 ].map((name) => ({ name, href: '/docs/coverage.html' }));
 
 // Internal-link graph out of the homepage (existing pages; guides/glossary link in with S15.5/S15.6).
