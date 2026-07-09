@@ -17,10 +17,13 @@ import type { OsContext } from './types.js';
  */
 export const windsurfAdapter = createMcpServersAdapter({
   id: 'windsurf',
+  // Default `shim`; declares the `${env:VAR}` dialect so a profile/server can opt into `native-env`
+  // (S19.4).
   secretStrategy: 'shim',
   needsRestart: true,
   // Native unauthenticated remotes, but authed remotes must go through the mcp-remote shim.
   remote: { nativeHttp: true, nativeOauth: false, fieldShape: 'url' },
+  envInterpolation: (name) => '${env:' + name + '}',
   resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
     if (scope !== 'user') {
       throw new Error('Windsurf only supports user scope (no project/workspace config).');

@@ -17,10 +17,13 @@ import type { OsContext } from './types.js';
  */
 export const warpAdapter = createMcpServersAdapter({
   id: 'warp',
+  // Default `shim`; declares the `${VARIABLE_NAME}` dialect so a profile/server can opt into
+  // `native-env` (S19.4).
   secretStrategy: 'shim',
   needsRestart: false,
   // Native http/sse remotes with header auth (`url` + `headers`, no `type`).
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
+  envInterpolation: (name) => '${' + name + '}',
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope === 'user') return joinFor(ctx, ctx.home, '.warp', '.mcp.json');
     if (!projectPath) throw new Error('Warp project scope requires a project path.');

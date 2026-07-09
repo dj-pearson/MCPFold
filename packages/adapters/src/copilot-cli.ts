@@ -20,11 +20,14 @@ import type { OsContext } from './types.js';
  */
 export const copilotCliAdapter = createMcpServersAdapter({
   id: 'copilot-cli',
+  // Default `shim`; declares the `${VAR}` dialect (shell-env substitution in mcp-config.json) so a
+  // profile/server can opt into `native-env` (S19.4).
   secretStrategy: 'shim',
   needsRestart: false,
   includeType: true,
   // Native http remotes with header auth; entries name the transport via `type`.
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'type+url' },
+  envInterpolation: (name) => '${' + name + '}',
   resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
     if (scope !== 'user') throw new Error('Copilot CLI only supports user scope.');
     const home = ctx.env.COPILOT_HOME ?? joinFor(ctx, ctx.home, '.copilot');

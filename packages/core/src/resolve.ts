@@ -54,6 +54,8 @@ function toResolved(name: string, server: ServerConfig, profile: ProfileConfig):
     client: profile.client,
     scope: profile.scope,
     projectPath: profile.path,
+    // S19.4: a server's own strategy override wins over the profile's; undefined ⇒ adapter default.
+    secretStrategy: server.secretStrategy ?? profile.secretStrategy,
   };
 }
 

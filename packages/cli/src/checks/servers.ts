@@ -108,3 +108,39 @@ export function checkSecretSchemes(config: Config, file: string): Finding[] {
   }
   return findings;
 }
+
+/**
+ * Native-env fallback explainer (S19.4). The `native-env` strategy only works for `${env:...}` refs —
+ * a server that opts in but uses a non-env scheme (infisical/keychain/op/dotenv) is silently and
+ * safely folded via the `mcpfold run` shim instead, since the client can't resolve those. This
+ * surfaces that as an `info` finding so the behavior is explained, not mysterious.
+ */
+export function checkNativeEnvFallback(config: Config, file: string): Finding[] {
+  const findings: Finding[] = [];
+  const hasNonEnv = (server: (typeof config.servers)[string]): boolean =>
+    findSecretRefs(server).some((r) => r.scheme !== 'env');
+  const explain = (name: string, where: string): void => {
+    findings.push({
+      severity: 'info',
+      file,
+      where,
+      message: `Server "${name}" requests native-env but uses a non-env secret scheme the client can't resolve — it folds via the \`mcpfold run\` shim instead (safe, automatic).`,
+      fix: `Nothing required. To fold shim-free, use only \${env:...} refs on native-env servers; or set this server's secretStrategy to "shim" to make the choice explicit.`,
+    });
+  };
+  // Per-server native-env opt-in with a non-env scheme.
+  for (const [name, server] of Object.entries(config.servers)) {
+    if (server.secretStrategy === 'native-env' && hasNonEnv(server))
+      explain(name, `servers.${name}`);
+  }
+  // Per-profile native-env: any matched server with a non-env scheme that didn't set its own override.
+  for (const [pname, profile] of Object.entries(config.profiles)) {
+    if (profile.secretStrategy !== 'native-env') continue;
+    for (const [name, server] of Object.entries(config.servers)) {
+      if (server.secretStrategy) continue; // its own override already governs it (handled above)
+      if (!server.tags.some((t) => profile.include.includes(t))) continue;
+      if (hasNonEnv(server)) explain(name, `profiles.${pname} → servers.${name}`);
+    }
+  }
+  return findings;
+}

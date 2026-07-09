@@ -1,5 +1,6 @@
 import { applyEdits, modify } from 'jsonc-parser';
 import type { Config, ResolvedServer, ServerConfig } from '@mcpfold/core';
+import { envRefCanonicalizer } from './shared.js';
 import { expandHome, joinFor, realOsContext } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
@@ -60,10 +61,13 @@ function xdgConfigHome(ctx: OsContext): string {
 
 export const opencodeAdapter: ClientAdapter = {
   id: 'opencode',
+  // Default `shim`; declares the single-brace `{env:VAR}` dialect (NOT `${...}`) so a profile/server
+  // can opt into `native-env` (S19.4).
   secretStrategy: 'shim',
   needsRestart: false,
   // opencode calls http/sse remotes natively; OAuth is prompted on first use.
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
+  envInterpolation: (name) => '{env:' + name + '}',
 
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope === 'user') return joinFor(ctx, xdgConfigHome(ctx), 'opencode', 'opencode.json');
@@ -94,6 +98,10 @@ export const opencodeAdapter: ClientAdapter = {
 
   parse(contents): Partial<Config> {
     const raw = JSON.parse(contents) as { mcp?: Record<string, unknown> };
+    // S19.4: reverse opencode's single-brace `{env:NAME}` dialect back to canonical `${env:NAME}`.
+    const canon = envRefCanonicalizer(opencodeAdapter.envInterpolation!);
+    const mapVals = (r: Record<string, string>): Record<string, string> =>
+      Object.fromEntries(Object.entries(r).map(([k, v]) => [k, canon(v)]));
     const servers: Record<string, ServerConfig> = {};
     for (const [name, value] of Object.entries(raw.mcp ?? {})) {
       if (!value || typeof value !== 'object') continue;
@@ -104,7 +112,7 @@ export const opencodeAdapter: ClientAdapter = {
         const server: ServerConfig = { transport: 'stdio', command: cmd[0] ?? '', tags: [] };
         if (cmd.length > 1) server.args = cmd.slice(1);
         if (entry.environment && typeof entry.environment === 'object') {
-          server.env = entry.environment as Record<string, string>;
+          server.env = mapVals(entry.environment as Record<string, string>);
         }
         servers[name] = server;
       } else if (type === 'remote' || typeof entry.url === 'string') {
@@ -114,7 +122,10 @@ export const opencodeAdapter: ClientAdapter = {
           tags: [],
         };
         if (entry.headers && typeof entry.headers === 'object') {
-          server.auth = { type: 'header', headers: entry.headers as Record<string, string> };
+          server.auth = {
+            type: 'header',
+            headers: mapVals(entry.headers as Record<string, string>),
+          };
         }
         servers[name] = server;
       }

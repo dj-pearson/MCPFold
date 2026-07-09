@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { findSecretRefs, type ResolvedServer } from '@mcpfold/core';
+import { findSecretRefs, type ResolvedServer, type SecretStrategy } from '@mcpfold/core';
 import {
   realOsContext,
   type ClientAdapter,
@@ -33,10 +33,12 @@ export interface StrategyOptions {
    * unmanaged keys a user keeps alongside their MCP servers. Ignored by dedicated-file adapters.
    */
   existing?: string;
-}
-
-function hasSecrets(server: ResolvedServer): boolean {
-  return findSecretRefs(server).length > 0;
+  /**
+   * Per-profile secret-strategy override (S19.4). A server's own `secretStrategy` still wins over
+   * this; both fall back to the adapter's default. Only meaningful for shim-default adapters (the
+   * `native-env` opt-in) — `native-input`/`inline` adapters keep their intrinsic behavior.
+   */
+  strategyOverride?: SecretStrategy;
 }
 
 /**
@@ -63,6 +65,60 @@ function toShim(server: ResolvedServer): ResolvedServer {
     projectPath: server.projectPath,
     tools: server.tools,
   };
+}
+
+/** Rewrite every `${env:NAME}` occurrence in a string into the client's own dialect (S19.4). */
+function rewriteEnvRefs(value: string, dialect: (name: string) => string): string {
+  return value.replace(/\$\{env:([^}]+)\}/g, (_, name: string) => dialect(name.trim()));
+}
+
+/**
+ * `native-env` transform (S19.4): rewrite a server's env-scheme secret refs into the client's own
+ * interpolation dialect, so the CLIENT resolves them — no wrapper process, and the value is never
+ * written (only the placeholder name). A bearer token becomes an `Authorization` header carrying the
+ * native placeholder (the client interpolates it at launch). Only called when every ref is env-scheme.
+ */
+function toNativeEnv(server: ResolvedServer, dialect: (name: string) => string): ResolvedServer {
+  const out: ResolvedServer = { ...server };
+  if (server.env) {
+    out.env = Object.fromEntries(
+      Object.entries(server.env).map(([k, v]) => [k, rewriteEnvRefs(v, dialect)]),
+    );
+  }
+  if (server.auth?.type === 'bearer' && server.auth.token) {
+    const headers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(server.auth.headers ?? {}))
+      headers[k] = rewriteEnvRefs(v, dialect);
+    headers.Authorization = `Bearer ${rewriteEnvRefs(server.auth.token, dialect)}`;
+    out.auth = { type: 'header', headers };
+  } else if (server.auth?.headers) {
+    out.auth = {
+      ...server.auth,
+      headers: Object.fromEntries(
+        Object.entries(server.auth.headers).map(([k, v]) => [k, rewriteEnvRefs(v, dialect)]),
+      ),
+    };
+  }
+  return out;
+}
+
+/**
+ * The effective per-server strategy for a shim-default adapter (S19.4): the server's own override,
+ * else the profile override, else `shim`. `native-env` only applies when the adapter declares a
+ * dialect AND every secret ref is env-scheme; otherwise it falls back to `shim` (doctor explains why).
+ */
+function transformSecret(
+  server: ResolvedServer,
+  adapter: ClientAdapter,
+  profileOverride: SecretStrategy | undefined,
+): ResolvedServer {
+  const refs = findSecretRefs(server);
+  if (refs.length === 0) return server;
+  const want = server.secretStrategy ?? profileOverride ?? adapter.secretStrategy;
+  if (want === 'native-env' && adapter.envInterpolation && refs.every((r) => r.scheme === 'env')) {
+    return toNativeEnv(server, adapter.envInterpolation);
+  }
+  return toShim(server);
 }
 
 /** Inline a resolved server's secrets so the adapter emits real values (bearer → header). */
@@ -103,14 +159,18 @@ export async function renderWithStrategy(
   // Pin @latest → the fixed version at fold time, before any strategy transform.
   const pinned = servers.map(applyPinAtFold);
 
-  if (adapter.secretStrategy === 'shim') {
-    const transformed = pinned.map((s) => (hasSecrets(s) ? toShim(s) : s));
-    return adapter.render(transformed, ctx, options.existing);
+  if (adapter.secretStrategy === 'native-input') {
+    // The adapter itself emits the client's secret indirection — never a raw token. Intrinsic; not
+    // user-overridable (its own indirection is already value-free).
+    return adapter.render(pinned, ctx, options.existing);
   }
 
-  if (adapter.secretStrategy === 'native-input') {
-    // The adapter itself emits the client's secret indirection — never a raw token.
-    return adapter.render(pinned, ctx, options.existing);
+  if (adapter.secretStrategy !== 'inline') {
+    // Shim-default adapters (the vast majority). Each secret-bearing server folds via the shim, or —
+    // when the profile/server opts into `native-env` and the adapter has a dialect — via the client's
+    // own env interpolation. Non-env schemes silently fall back to the shim (safe by construction).
+    const transformed = pinned.map((s) => transformSecret(s, adapter, options.strategyOverride));
+    return adapter.render(transformed, ctx, options.existing);
   }
 
   // inline

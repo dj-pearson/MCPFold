@@ -1,4 +1,5 @@
 import { serialize, type Config, type ResolvedServer, type ServerConfig } from '@mcpfold/core';
+import { envRefCanonicalizer } from './shared.js';
 import { expandHome, joinFor, realOsContext } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
@@ -50,10 +51,13 @@ function toGeminiEntry(server: ResolvedServer): GeminiEntry {
 
 export const geminiCliAdapter: ClientAdapter = {
   id: 'gemini-cli',
+  // Default `shim`; declares the `${VAR}` dialect (Gemini expands `$VAR`/`${VAR}` across all string
+  // values) so a profile/server can opt into `native-env` (S19.4).
   secretStrategy: 'shim',
   needsRestart: false,
   // Native remotes with header auth; streamable HTTP under `httpUrl`, SSE under `url`.
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'httpUrl' },
+  envInterpolation: (name) => '${' + name + '}',
 
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope !== 'user') {
@@ -77,6 +81,10 @@ export const geminiCliAdapter: ClientAdapter = {
 
   parse(contents): Partial<Config> {
     const raw = JSON.parse(contents) as { mcpServers?: Record<string, unknown> };
+    // S19.4: reverse Gemini's `${NAME}` env dialect back to the canonical `${env:NAME}` on parse.
+    const canon = envRefCanonicalizer(geminiCliAdapter.envInterpolation!);
+    const mapVals = (r: Record<string, string>): Record<string, string> =>
+      Object.fromEntries(Object.entries(r).map(([k, v]) => [k, canon(v)]));
     const servers: Record<string, ServerConfig> = {};
     for (const [name, value] of Object.entries(raw.mcpServers ?? {})) {
       if (!value || typeof value !== 'object') continue;
@@ -85,19 +93,25 @@ export const geminiCliAdapter: ClientAdapter = {
         const server: ServerConfig = { transport: 'stdio', command: entry.command, tags: [] };
         if (Array.isArray(entry.args)) server.args = entry.args as string[];
         if (entry.env && typeof entry.env === 'object') {
-          server.env = entry.env as Record<string, string>;
+          server.env = mapVals(entry.env as Record<string, string>);
         }
         servers[name] = server;
       } else if (typeof entry.httpUrl === 'string') {
         const server: ServerConfig = { transport: 'streamable-http', url: entry.httpUrl, tags: [] };
         if (entry.headers && typeof entry.headers === 'object') {
-          server.auth = { type: 'header', headers: entry.headers as Record<string, string> };
+          server.auth = {
+            type: 'header',
+            headers: mapVals(entry.headers as Record<string, string>),
+          };
         }
         servers[name] = server;
       } else if (typeof entry.url === 'string') {
         const server: ServerConfig = { transport: 'sse', url: entry.url, tags: [] };
         if (entry.headers && typeof entry.headers === 'object') {
-          server.auth = { type: 'header', headers: entry.headers as Record<string, string> };
+          server.auth = {
+            type: 'header',
+            headers: mapVals(entry.headers as Record<string, string>),
+          };
         }
         servers[name] = server;
       }

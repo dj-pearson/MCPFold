@@ -632,3 +632,44 @@ docs:build). adapters 142 / core 92 / cli 257. Same pre-existing Windows-only re
 **Follow-ups:** the install-probe locations are a living table (like the format matrix) — refresh as
 apps move; JetBrains/Visual Studio presence is detected at the family level (any JetBrains IDE / any
 VS install), not per-product.
+
+---
+
+## S19.4 — Native-interpolation secret strategy (`native-env`)
+
+Started/done: 2026-07-09. For a plain `${env:NAME}` ref, the `mcpfold run` shim adds a wrapper
+process for nothing — many clients expand env placeholders in their own config. `native-env` writes
+the client's OWN dialect instead, so the client resolves the var at launch and mcpfold stays out of
+the path. The value is never written — only the placeholder name — so the leak harness stays green by
+construction. Stacked on S19.3. Per-client dialects verified against primary docs (one research pass;
+sources in `docs/coverage.md`/`docs/secrets.md`).
+
+- **Capability**: adapters declare an `envInterpolation(name)` dialect; 7 clients support it (verified
+  July 2026): Cursor/Windsurf `${env:NAME}`, Claude Code/Gemini/Warp/Copilot CLI `${NAME}`, opencode
+  single-brace `{env:NAME}`. VS Code keeps `native-input`; Claude Desktop/Zed/JetBrains/Cline/Codex
+  CLI/LM Studio/Goose(stdio) have no env interpolation → stay shim.
+- **Opt-in, no silent change**: the default stays each adapter's own strategy (shim). A profile or
+  server opts in via a new `secretStrategy: "shim" | "native-env"` field (server override wins over
+  profile). Core `SECRET_STRATEGIES`/`STRATEGY_OVERRIDES` + `ResolvedServer.secretStrategy`;
+  `resolveProfile` threads server→profile precedence; `renderWithStrategy` applies it per server.
+- **Automatic shim fallback**: a native-env server with a NON-env scheme (infisical/keychain/op/
+  dotenv) can't be resolved by the client, so it folds via the shim — `doctor` emits an `info`
+  finding (`checkNativeEnvFallback`) explaining which server and why.
+- **Round-trip**: `envRefCanonicalizer` derives each dialect's inverse from the dialect itself and
+  reverses it on parse (factory adapters + the two bespoke ones), so `import`/drift reconstructs the
+  canonical `${env:NAME}`.
+- **Leak proof**: the S9.1 harness gains a native-env pass asserting the resolved SENTINEL value
+  reaches ZERO artifacts across all 7 supporting adapters (only the placeholder name is written).
+
+Tests: per-dialect render + round-trip (7), bearer→native Authorization header, non-env shim fallback,
+per-server override, no-silent-change default, the doctor `info` finding, and the leak-harness
+extension. JSON schema regenerated for the two `secretStrategy` fields.
+
+`verify_all` green (eslint + core-purity, typecheck ×10, `pnpm -r test`, `pnpm -r build`, Prettier,
+docs:build; demo unchanged). adapters 24 files / core 13 / cli 36 / security 1. Same pre-existing
+Windows-only red (`e2e/deploy-env.test.ts`; passes on CI ubuntu).
+
+**Follow-ups:** field-scoped dialects (Roo Code `${env:VAR}` in `args` only; Goose `${VAR}` in remote
+headers/uri only) were conservatively left on the shim — revisit if users ask. Version-sensitivity
+smoke tests (Copilot CLI `${VAR}` regressed in v0.0.407; Gemini env substitution has lagged docs)
+would harden the guarantee.
