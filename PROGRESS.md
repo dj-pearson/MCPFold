@@ -197,3 +197,42 @@ db-integration job (which stands up Postgres — not runnable locally).
 
 **Follow-ups (not blocking):** pending-invite redemption + SSO (S20.3); a live-Stripe smoke test in a
 dedicated environment; per-seat pricing if the team tier moves from per-team to per-member.
+
+---
+
+## S18.3 — Org-managed policy: server allow/deny lists enforced at sync, add, and run
+
+**Started** 2026-07-09 · branch `story/S18.3-org-policy` · priority p1, deps: none.
+
+**Done** 2026-07-09 (CLI-side, fully local-verified).
+
+An org can now publish ONE `mcp.policy.jsonc` that mcpfold enforces on every dev machine and in CI,
+cross-client — the control the individual clients only ship walled. **Deny always wins over local
+trust** (policy is org intent; TOFU stays the per-machine approval).
+
+- **`packages/core/src/policy.ts` (new, pure):** versioned zod schema; rules match by `name` /
+  `package` prefix / `namespace` (`@scope`) / `url` glob (AND over a rule's matchers);
+  `mode: strict` (allow-list) vs `permissive` (deny-list, default). One shared `evaluatePolicy`
+  (deny → `not-allowlisted` in strict → permitted), with package/namespace extraction from runner
+  args. Exported from core.
+- **Published schema:** `packages/schema` generates + commits `mcp.policy.schema.json`, served at
+  `/schema/policy/v1.json` (staged by the docs build), drift-checked like the config schema.
+- **CLI discovery (`util/policy.ts`):** first-found of project `mcp.policy.jsonc` → `$MCPFOLD_POLICY`
+  → machine-managed location (per-OS: `%PROGRAMDATA%`/`/Library/Application Support`/`/etc`). One
+  `checkServer` + `describeViolation` (carries rule + file provenance).
+- **Enforcement (one evaluator, four call-sites):** `run` and `add` refuse a denied server outright;
+  `sync` strips denied servers + warns (permissive) or refuses to write anything (strict); `sync
+--check` exits nonzero on a violation and `scan` reports it — both with rule + policy-file
+  provenance.
+- **Docs:** `docs/team-config-as-code.md` gains the org-policy story with an example policy file,
+  discovery/precedence, and a CI snippet.
+
+Tests: `core/test/policy.test.ts` (matchers, namespace/package extraction, strict/permissive,
+deny-wins, schema rejection) + `cli/test/policy.test.ts` (discovery precedence, sync strip/strict-
+fail/`--check` provenance, add refuse, run refuse **deny-wins-over-trust** + allow) + schema drift.
+`verify_all` green (lint+purity, typecheck ×8, `pnpm -r test` — core 12 files, cli 33 — build),
+plus `docs:build`, Prettier, deploy-env.
+
+**Follow-ups (not blocking):** S17.7 (registry) will let `add --from-registry` reuse the same
+evaluator; a managed-machine "policy cannot be overridden by a project file" hard-lock mode if orgs
+want it stricter than first-found-wins.

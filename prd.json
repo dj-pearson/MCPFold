@@ -4190,7 +4190,7 @@
       "epic": "E18",
       "order": 3,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Org-managed policy: server allow/deny lists enforced at sync, add, and run",
       "user_story": "As a platform/security engineer, I want to publish an org policy of allowed/denied MCP servers that mcpfold enforces on every developer machine and in CI, so ungoverned servers can't quietly enter any client config we manage.",

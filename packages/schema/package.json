@@ -15,7 +15,8 @@
   },
   "files": [
     "dist",
-    "mcp.config.schema.json"
+    "mcp.config.schema.json",
+    "mcp.policy.schema.json"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

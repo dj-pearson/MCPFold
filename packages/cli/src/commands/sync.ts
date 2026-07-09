@@ -12,8 +12,15 @@ import {
   type ResolvedServer,
 } from '@mcpfold/core';
 import { realOsContext, registerAll, requireAdapter, type OsContext } from '@mcpfold/adapters';
+import { UsageError } from '@mcpfold/core';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import { findConfigPath, loadConfigFromDisk } from '../util/config.js';
+import {
+  checkServer,
+  describeViolation,
+  loadPolicy,
+  type PolicyViolation,
+} from '../util/policy.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import { backupIfExists } from '../io/backup.js';
 import { type FsWatcher, watchWithDebounce, type WatchHandle } from '../io/watch.js';
@@ -48,6 +55,8 @@ export interface SyncData {
   results: SyncFileResult[];
   drift: boolean;
   wrote: boolean;
+  /** Org-policy violations (S18.3): servers a policy blocked, with rule + file provenance. */
+  policyViolations?: { server: string; profile: string; reason: string; source: string }[];
 }
 
 export interface SyncOptions {
@@ -79,6 +88,40 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
   let drift = false;
   let wrote = false;
 
+  // Org policy (S18.3): evaluate every folded server up front. In strict mode any violation
+  // fails the whole write (nothing is folded); in permissive mode the violating server is stripped
+  // from its fold with a loud warning. `--check`/`--dry-run` report violations and exit nonzero.
+  const loadedPolicy = loadPolicy(options.cwd, ctx);
+  const violations: (PolicyViolation & { profile: string })[] = [];
+  const keptServers = new Map<string, ResolvedServer[]>();
+  for (const name of profileNames) {
+    const kept: ResolvedServer[] = [];
+    for (const server of resolveProfile(config, name)) {
+      const v = checkServer(loadedPolicy, server.name, server);
+      if (v) {
+        violations.push({ ...v, profile: name });
+        if (loadedPolicy!.policy.mode === 'permissive') {
+          warnings.push(`Org policy stripped ${describeViolation(v)} (profile "${name}")`);
+          continue; // strip from the fold
+        }
+      }
+      kept.push(server);
+    }
+    keptServers.set(name, kept);
+  }
+  if (violations.length > 0 && loadedPolicy?.policy.mode === 'strict' && !preview) {
+    throw new UsageError(
+      `Org policy (strict) blocks ${violations.length} server(s); nothing was written.`,
+      { hint: violations.map((v) => describeViolation(v)).join('; ') },
+    );
+  }
+  const policyViolations = violations.map((v) => ({
+    server: v.server,
+    profile: v.profile,
+    reason: v.decision.reason,
+    source: v.source,
+  }));
+
   // Only the `inline` strategy resolves values; shim/native-input never do.
   const providers = options.providers ?? defaultProviders(options.cwd);
   const resolve = (servers: ResolvedServer[]): Promise<ResolvedServer[]> =>
@@ -87,7 +130,7 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
   for (const name of profileNames) {
     const profile = config.profiles[name]!;
     const adapter = requireAdapter(profile.client);
-    const servers = resolveProfile(config, name);
+    const servers = keptServers.get(name)!;
     const file = await renderWithStrategy(adapter, servers, {
       osContext: ctx,
       resolve,
@@ -139,16 +182,26 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
       results.filter((r) => r.action === 'written' && r.needsRestart).map((r) => r.client),
     ),
   ];
-  const human = renderHuman(results, { preview, drift, restartClients });
-  // --check is the CI gate; --dry-run is informational (always exits 0).
-  const exit = options.check && drift ? EXIT.DIFF : EXIT.SUCCESS;
+  const human = renderHuman(results, { preview, drift, restartClients, policyViolations });
+  // --check is the CI gate: fail on drift OR any org-policy violation. --dry-run always exits 0.
+  const exit = options.check && (drift || policyViolations.length > 0) ? EXIT.DIFF : EXIT.SUCCESS;
 
-  return { data: { results, drift, wrote }, human, warnings, exit };
+  return {
+    data: { results, drift, wrote, policyViolations },
+    human,
+    warnings,
+    exit,
+  };
 }
 
 function renderHuman(
   results: SyncFileResult[],
-  meta: { preview: boolean; drift: boolean; restartClients: string[] },
+  meta: {
+    preview: boolean;
+    drift: boolean;
+    restartClients: string[];
+    policyViolations: { server: string; profile: string; reason: string; source: string }[];
+  },
 ): string {
   if (results.length === 0) return 'No profiles to sync.';
   const lines = results.map((r) => {
@@ -166,6 +219,12 @@ function renderHuman(
     return `  ${r.client} (${r.profile}) → ${r.path}: ${tag}${bak}`;
   });
   const footer: string[] = [];
+  if (meta.policyViolations.length > 0) {
+    footer.push('', 'Org-policy violations:');
+    for (const v of meta.policyViolations) {
+      footer.push(`  ✗ ${v.server} (profile "${v.profile}"): ${v.reason} [policy: ${v.source}]`);
+    }
+  }
   if (meta.preview) {
     footer.push(
       '',

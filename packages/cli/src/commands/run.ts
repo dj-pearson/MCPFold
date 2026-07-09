@@ -15,7 +15,9 @@ import {
   type AuditRecorder,
   type PinnedToolsOptions,
 } from '@mcpfold/proxy';
+import { realOsContext, type OsContext } from '@mcpfold/adapters';
 import { loadConfigFromDisk } from '../util/config.js';
+import { checkServer, describeViolation, loadPolicy } from '../util/policy.js';
 import { fileTrustGate, isExecutable, type TrustGate } from '../trust/tofu.js';
 import { resolveCommand } from '../util/spawn.js';
 
@@ -123,6 +125,8 @@ export interface RunOptions {
    * unset means auditing is off.
    */
   auditLogPath?: string;
+  /** OS context for org-policy discovery (S18.3); defaults to the real environment. */
+  osContext?: OsContext;
 }
 
 /** Rewrite an `@latest` package spec to the pinned version (supply-chain hygiene). */
@@ -190,6 +194,16 @@ export async function runRun(options: RunOptions): Promise<number> {
   if (!server) {
     throw new UsageError(`No server "${options.name}" in the canonical config.`, {
       hint: 'Check the server name, or add it and run `mcpfold sync`.',
+    });
+  }
+
+  // Org policy (S18.3): deny always wins over local trust — a denied server never launches,
+  // regardless of TOFU approval. Evaluated before the trust gate so policy can't be bypassed.
+  const policyCtx = options.osContext ?? realOsContext();
+  const violation = checkServer(loadPolicy(options.cwd, policyCtx), options.name, server);
+  if (violation) {
+    throw new UsageError(`Refusing to run "${options.name}": ${violation.decision.reason}.`, {
+      hint: `Org policy blocks this server — ${describeViolation(violation)}. Contact your platform team.`,
     });
   }
 

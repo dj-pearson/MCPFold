@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { isSecretRef, loadConfig, type Config } from '@mcpfold/core';
 import { ALL_ADAPTERS, realOsContext, registerAll, type OsContext } from '@mcpfold/adapters';
 import { findConfigPath } from '../util/config.js';
+import { checkServer, describeViolation, loadPolicy } from '../util/policy.js';
 import { maskTokens, Redactor } from '../util/redact.js';
 import { scanClientRaw, securityFindings } from '../checks/security.js';
 import type { Finding } from '../checks/types.js';
@@ -133,6 +134,24 @@ export function runScan(options: ScanOptions): CommandOutput<ScanData> {
     } else {
       registerLiteralSecrets(result.config, redactor);
       tag('canonical', securityFindings(result.config, configPath, { canonical: true }));
+
+      // 3. Org-policy violations (S18.3): any canonical server an org allow/deny policy blocks, with
+      // the deciding rule + policy file as provenance. A denied server is an error-level finding.
+      const loadedPolicy = loadPolicy(options.cwd, ctx);
+      if (loadedPolicy) {
+        for (const [name, server] of Object.entries(result.config.servers)) {
+          const v = checkServer(loadedPolicy, name, server);
+          if (v) {
+            findings.push({
+              client: 'canonical',
+              severity: 'error',
+              file: loadedPolicy.source,
+              message: `Server "${name}" violates org policy: ${describeViolation(v)}.`,
+              fix: 'Remove the server, or update the org policy if this is now approved.',
+            });
+          }
+        }
+      }
     }
   }
 
