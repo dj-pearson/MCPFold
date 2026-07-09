@@ -1,0 +1,63 @@
+{
+  "$id": "https://mcpfold.com/schema/policy/v1.json",
+  "$ref": "#/definitions/McpfoldPolicy",
+  "definitions": {
+    "McpfoldPolicy": {
+      "type": "object",
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "version": {
+          "type": "number",
+          "const": 1
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "permissive"
+          ],
+          "default": "permissive"
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "package": {
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/McpfoldPolicy/properties/allow/items"
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

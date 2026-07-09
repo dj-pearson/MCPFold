@@ -268,11 +268,20 @@ writeFileSync(
   readFileSync(join(ROOT, 'apps', 'site', 'src', 'docs', 'search.js'), 'utf8'),
 );
 
-// ---- Stage the hosted JSON schema at a stable path ------------------------------------
+// ---- Stage the hosted JSON schemas at their stable paths ------------------------------
 const schema = readFileSync(SCHEMA_SRC, 'utf8');
 JSON.parse(schema); // fail if the committed schema isn't valid JSON
 mkdirSync(join(OUT, 'schema'), { recursive: true });
 writeFileSync(join(OUT, 'schema', 'v1.json'), schema);
+
+// The org-policy schema (S18.3), served at /schema/policy/v1.json.
+const policySchema = readFileSync(
+  join(ROOT, 'packages', 'schema', 'mcp.policy.schema.json'),
+  'utf8',
+);
+JSON.parse(policySchema);
+mkdirSync(join(OUT, 'schema', 'policy'), { recursive: true });
+writeFileSync(join(OUT, 'schema', 'policy', 'v1.json'), policySchema);
 
 // Pages plumbing: custom domain + skip Jekyll (we ship finished HTML).
 writeFileSync(join(OUT, 'CNAME'), 'mcpfold.com\n');

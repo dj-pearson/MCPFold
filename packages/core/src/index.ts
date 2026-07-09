@@ -96,6 +96,21 @@ export {
 } from './bridge.js';
 export { DIRECTORY, DIRECTORY_VERSION, searchDirectory, type DirectoryEntry } from './directory.js';
 
+// Org-managed server allow/deny policy (S18.3)
+export {
+  evaluatePolicy,
+  namespaceOf,
+  packageSpecOf,
+  parsePolicy,
+  PolicyRuleSchema,
+  PolicySchema,
+  ruleMatches,
+  type Policy,
+  type PolicyDecision,
+  type PolicyEffect,
+  type PolicyRule,
+} from './policy.js';
+
 // Drift-check engine (S0.8)
 export {
   checkRendered,
