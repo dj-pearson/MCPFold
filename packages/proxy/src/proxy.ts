@@ -1,5 +1,12 @@
 import type { ToolsDirective } from '@mcpfold/core';
-import { errorResponse, isRequest, type JsonRpcId, type JsonRpcMessage } from './jsonrpc.js';
+import { noopAuditRecorder, type AuditRecorder } from './audit.js';
+import {
+  errorResponse,
+  isRequest,
+  isResponse,
+  type JsonRpcId,
+  type JsonRpcMessage,
+} from './jsonrpc.js';
 import { filterTools, isToolAllowed, type McpTool } from './filter.js';
 import {
   canonicalizeTools,
@@ -56,6 +63,8 @@ export interface ProxyOptions {
   rejectFilteredCalls?: boolean;
   /** Pin the trusted tool surface and detect/optionally block drift (S18.1). */
   pinnedTools?: PinnedToolsOptions;
+  /** Opt-in redacted audit recorder for tool calls / drift (S18.4). Defaults to a no-op. */
+  audit?: AuditRecorder;
 }
 
 // MCP error code for a security-policy refusal (invalid params / not permitted).
@@ -92,6 +101,7 @@ export function connectProxy(
   const rejectFiltered = options.rejectFilteredCalls ?? true;
   const pinned = options.pinnedTools;
   const pinnedMode = pinned?.mode ?? 'warn';
+  const audit = options.audit ?? noopAuditRecorder;
   // Track in-flight request ids whose responses carry a tool list to curate or verify — both the
   // session-mode `tools/list` and the stateless-core `server/discover`.
   const pendingToolListing = new Set<JsonRpcId>();
@@ -99,14 +109,10 @@ export function connectProxy(
   client.onMessage((message) => {
     // Reject calls to filtered-out tools before they ever reach the real server. `tools/call`
     // keeps its `params.name` shape in stateless mode, so this enforcement is mode-agnostic.
-    if (
-      directive &&
-      rejectFiltered &&
-      isRequest(message, 'tools/call') &&
-      message.id !== undefined
-    ) {
+    if (isRequest(message, 'tools/call') && message.id !== undefined) {
       const name = callToolName(message);
-      if (name && !isToolAllowed(name, directive)) {
+      if (directive && rejectFiltered && name && !isToolAllowed(name, directive)) {
+        audit.denied(name, 'filtered by mcpfold');
         client.send(
           errorResponse(message.id, {
             code: METHOD_NOT_FOUND,
@@ -115,6 +121,8 @@ export function connectProxy(
         );
         return;
       }
+      // Record the start so the response can be timed and its outcome logged (S18.4).
+      audit.callStart(message.id, name, message.params);
     }
     if (
       (directive || pinned) &&
@@ -127,6 +135,11 @@ export function connectProxy(
   });
 
   server.onMessage((message) => {
+    // Close out an audited tool call as soon as its response returns (S18.4). Harmless no-op for
+    // any response id that wasn't a tracked tools/call (e.g. a tools/list response).
+    if (isResponse(message) && message.id !== undefined) {
+      audit.callEnd(message.id, message.error !== undefined ? 'error' : 'ok');
+    }
     if (
       (directive || pinned) &&
       message.id !== undefined &&
@@ -141,6 +154,9 @@ export function connectProxy(
         const diff = diffToolSurface(pinned.surface, canonicalizeTools(message.result.tools));
         if (hasToolDrift(diff)) {
           pinned.onDrift?.(diff);
+          audit.drift(
+            `${diff.added.length} added, ${diff.removed.length} removed, ${diff.changed.length} changed`,
+          );
           if (pinnedMode === 'block') {
             // Refuse the whole listing — a drifted server shouldn't inject anything into context.
             client.send(

@@ -19,6 +19,16 @@ export {
   type PinnedToolsOptions,
   type ProxyOptions,
 } from './proxy.js';
+export {
+  argumentShape,
+  createAuditRecorder,
+  fileAuditSink,
+  noopAuditRecorder,
+  type AuditEvent,
+  type AuditOutcome,
+  type AuditRecorder,
+  type AuditSink,
+} from './audit.js';
 export { filterTools, isToolAllowed, type McpTool } from './filter.js';
 export {
   canonicalizeTools,

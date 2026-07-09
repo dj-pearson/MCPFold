@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { isMcpfoldError, MCP_REMOTE_SPEC } from '@mcpfold/core';
 import { envProvider } from '@mcpfold/secrets';
-import { runRun, type Spawner } from '../src/commands/run.js';
+import { runRun, type ProxySpawner, type Spawner } from '../src/commands/run.js';
 import type { TrustGate } from '../src/trust/tofu.js';
 
 // These tests exercise launch/resolution, not TOFU — trust every server (S9.2 gate tested separately).
@@ -137,5 +137,28 @@ describe('runRun (S4.7)', () => {
 
   it('errors clearly for an unknown server name', async () => {
     await expect(runRun({ cwd, name: 'nope', providers: [] })).rejects.toThrow(/No server "nope"/);
+  });
+
+  it('routes stdio through the proxy with an audit recorder when auditLogPath is set (S18.4)', async () => {
+    // 'local' has no tools directive and no pinned surface, so without auditing it would take the
+    // plain passthrough. Enabling the audit log must reroute it through the proxy with a recorder.
+    let audit: unknown;
+    const plain = vi.fn<Spawner>(async () => 0);
+    const proxySpawnFn: ProxySpawner = async (_c, _a, _e, _t, _p, recorder) => {
+      audit = recorder;
+      return 0;
+    };
+    const code = await runRun({
+      cwd,
+      name: 'local',
+      providers: [envProvider({ MY_TOKEN: 'x' })],
+      spawnFn: plain,
+      proxySpawnFn,
+      trust: trustAll,
+      auditLogPath: join(cwd, 'audit.jsonl'),
+    });
+    expect(code).toBe(0);
+    expect(plain).not.toHaveBeenCalled(); // did not fall through to plain passthrough
+    expect(audit).toBeTypeOf('object'); // a real recorder was constructed and threaded through
   });
 });

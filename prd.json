@@ -4224,7 +4224,7 @@
       "epic": "E18",
       "order": 4,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Redacted runtime tool-call audit log at the proxy",
       "user_story": "As a security engineer, I want an opt-in, redacted local log of tool calls made through mcpfold's proxy so I can audit agent behavior and feed a SIEM, without any secret material touching the log.",

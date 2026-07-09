@@ -8,8 +8,11 @@ import {
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import {
   connectProxy,
+  createAuditRecorder,
+  fileAuditSink,
   renderToolSurfaceDiff,
   streamTransport,
+  type AuditRecorder,
   type PinnedToolsOptions,
 } from '@mcpfold/proxy';
 import { loadConfigFromDisk } from '../util/config.js';
@@ -57,9 +60,10 @@ export type ProxySpawner = (
   env: NodeJS.ProcessEnv,
   tools: ToolsDirective | undefined,
   pinned?: PinnedToolsOptions,
+  audit?: AuditRecorder,
 ) => Promise<number>;
 
-const defaultProxySpawner: ProxySpawner = (command, args, env, tools, pinned) =>
+const defaultProxySpawner: ProxySpawner = (command, args, env, tools, pinned, audit) =>
   new Promise<number>((resolve) => {
     // stderr is inherited so the server's logs still reach the terminal; stdin/stdout are
     // piped so the proxy can sit between the MCP client (our process) and the real server.
@@ -71,7 +75,11 @@ const defaultProxySpawner: ProxySpawner = (command, args, env, tools, pinned) =>
     });
     const clientTransport = streamTransport(process.stdin, process.stdout);
     const serverTransport = streamTransport(child.stdout!, child.stdin!);
-    const dispose = connectProxy(clientTransport, serverTransport, { tools, pinnedTools: pinned });
+    const dispose = connectProxy(clientTransport, serverTransport, {
+      tools,
+      pinnedTools: pinned,
+      audit,
+    });
 
     const forward = (signal: NodeJS.Signals): void => {
       if (!child.killed) child.kill(signal);
@@ -109,6 +117,12 @@ export interface RunOptions {
   strictTools?: boolean;
   /** Sink for the drift warning line(s); defaults to stderr. Injectable for tests. */
   warn?: (line: string) => void;
+  /**
+   * Path to the redacted tool-call audit log (S18.4). When set, stdio servers are routed through
+   * the proxy so calls are audited even without a tools directive. Defaults to MCPFOLD_AUDIT_LOG;
+   * unset means auditing is off.
+   */
+  auditLogPath?: string;
 }
 
 /** Rewrite an `@latest` package spec to the pinned version (supply-chain hygiene). */
@@ -206,11 +220,21 @@ export async function runRun(options: RunOptions): Promise<number> {
       },
     };
 
-    // S5.3: when the server declares a `tools` directive OR has a pinned surface, route stdio
-    // through the proxy. With neither, plain passthrough — no proxy overhead.
-    if (s.tools || pinned) {
+    // Redacted tool-call audit log (S18.4): opt-in via --audit-log / MCPFOLD_AUDIT_LOG. When on,
+    // route stdio through the proxy so calls are logged even without a tools directive.
+    const auditLogPath = options.auditLogPath ?? process.env.MCPFOLD_AUDIT_LOG;
+    const audit: AuditRecorder | undefined = auditLogPath
+      ? createAuditRecorder({
+          server: options.name,
+          sink: fileAuditSink(auditLogPath, { warn }),
+        })
+      : undefined;
+
+    // S5.3: when the server declares a `tools` directive, has a pinned surface, or auditing is on,
+    // route stdio through the proxy. With none of these, plain passthrough — no proxy overhead.
+    if (s.tools || pinned || audit) {
       const proxySpawner = options.proxySpawnFn ?? defaultProxySpawner;
-      return proxySpawner(s.command ?? '', args, env, s.tools, pinned);
+      return proxySpawner(s.command ?? '', args, env, s.tools, pinned, audit);
     }
     return spawner(s.command ?? '', args, env);
   }

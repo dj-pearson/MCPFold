@@ -330,11 +330,15 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     program
       .command('run')
       .description('internal shim launcher (resolve secrets, inject, exec the server)')
-      .argument('<name>', 'server name from the canonical config'),
-  ).action(async (name: string, opts: GlobalFlags) => {
+      .argument('<name>', 'server name from the canonical config')
+      .option(
+        '--audit-log <path>',
+        'append a redacted JSONL tool-call audit log here (overrides MCPFOLD_AUDIT_LOG)',
+      ),
+  ).action(async (name: string, opts: GlobalFlags & { auditLog?: string }) => {
     const ctx = resolve(opts);
     try {
-      setExit((await runRun({ cwd: ctx.cwd, name })) as ExitCode);
+      setExit((await runRun({ cwd: ctx.cwd, name, auditLogPath: opts.auditLog })) as ExitCode);
     } catch (error) {
       const enorm = toEnvelopeError(error);
       errWrite(`error: ${enorm.message}\n`);

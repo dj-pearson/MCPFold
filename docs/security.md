@@ -92,6 +92,36 @@ The optional proxy trims `tools/list` to an allow/deny set. It is a faithful JSO
 when a server declares a `tools` directive. It transforms only the tool list; it never inspects or
 rewrites secret material.
 
+#### Tool-call audit log (S18.4)
+
+Because the proxy already sits in the call path, it can record a redacted audit trail of tool
+activity for compliance and monitoring. It is **opt-in and off by default**: set `MCPFOLD_AUDIT_LOG`
+(or pass `mcpfold run <name> --audit-log <path>`, which overrides the env var) to a writable path.
+Enabling it routes stdio servers through the proxy so calls are logged even without a `tools`
+directive.
+
+Each line is one JSON object (JSONL). **Redacted by construction:** an event records the argument
+_shape_ — each argument key mapped to its JSON type — and **never argument values**, so no secret
+can reach the log regardless of the redaction pass. Events cover `tools/call` (outcome `ok` /
+`error` / `denied`) and pinned-surface `filter-drift`; denied and drift events carry the server,
+tool, and rule/reason so they are alertable. The log rotates to `<path>.1` when it reaches ~5 MB,
+and a corrupt or unwritable log emits one stderr note and is then ignored — it can never interrupt
+the proxied session.
+
+```jsonc
+// ok call: shape only, no values
+{"ts":"2026-07-08T12:00:01.123Z","server":"github","type":"tools/call","tool":"search_issues","outcome":"ok","durationMs":142,"argShape":{"query":"string","limit":"number"}}
+// a filtered call, refused before reaching the server
+{"ts":"2026-07-08T12:00:04.881Z","server":"github","type":"tools/call","tool":"delete_repo","outcome":"denied","reason":"filtered by mcpfold"}
+// tool definitions drifted from the trusted surface
+{"ts":"2026-07-08T12:01:10.002Z","server":"github","type":"filter-drift","reason":"1 added, 0 removed, 2 changed"}
+```
+
+**SIEM ingestion.** The format is line-delimited JSON, so a collector can tail it directly — e.g.
+a Vector/Fluent Bit `tail` source with a `json` parser, or `promtail` shipping to Loki. Alert on
+`outcome == "denied"` (a client attempted a curated-out tool) and on any `type == "filter-drift"`
+(a server changed its tool surface since it was trusted).
+
 ### Sync channel (`login` / `push` / `pull`)
 
 - **Transport + auth.** All cloud endpoints require a short-lived JWT and are scoped by row-level
