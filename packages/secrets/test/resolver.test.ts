@@ -56,6 +56,24 @@ describe('resolveSecrets (S4.1)', () => {
     );
   });
 
+  it('a provider timeout reports a terminated-provider error, distinct from other failures (S20.4)', async () => {
+    const hang: SecretProvider = {
+      scheme: 'slow',
+      timeoutMs: 20, // fast timeout so the test is quick
+      resolve: () => new Promise<string>(() => {}), // never settles on its own
+    };
+    await expect(
+      resolveSecrets([server({ auth: { type: 'bearer', token: '${slow:x}' } })], {
+        providers: [hang],
+      }),
+    ).rejects.toSatisfy(
+      (e) =>
+        isMcpfoldError(e) &&
+        e.code === 'SECRET_RESOLUTION' &&
+        /Timed out .*after 20ms — the provider was terminated/.test(e.message),
+    );
+  });
+
   it('fails closed — a provider error aborts and injects nothing', async () => {
     const good: SecretProvider = { scheme: 'ok', resolve: async () => 'value' };
     const bad: SecretProvider = {

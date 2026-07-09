@@ -25,7 +25,7 @@ describe('degraded mode (S0.9)', () => {
     await expect(
       resolveSecrets([refServer], { providers: [hung], timeoutMs: 30 }),
     ).rejects.toSatisfy(
-      (e) => isMcpfoldError(e) && e.code === 'SECRET_RESOLUTION' && /timed out/.test(e.message),
+      (e) => isMcpfoldError(e) && e.code === 'SECRET_RESOLUTION' && /timed out/i.test(e.message),
     );
   });
 

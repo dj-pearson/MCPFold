@@ -26,13 +26,22 @@ function buildRegistry(providers: SecretProvider[]): Map<string, SecretProvider>
   return registry;
 }
 
+/** Raised when a provider exceeds its timeout; distinguishes a timeout from a genuine failure. */
+class ProviderTimeoutError extends Error {
+  constructor(public readonly ms: number) {
+    super(`timed out after ${ms}ms`);
+    this.name = 'ProviderTimeoutError';
+  }
+}
+
 async function withTimeout<T>(work: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
+      // Abort first so exec-backed providers terminate their child, THEN reject the race (S20.4).
       controller.abort();
-      reject(new Error(`timed out after ${ms}ms`));
+      reject(new ProviderTimeoutError(ms));
     }, ms);
   });
   try {
@@ -74,6 +83,15 @@ export async function resolveSecrets(
         provider.timeoutMs ?? defaultTimeout,
       );
     } catch (error) {
+      if (error instanceof ProviderTimeoutError) {
+        throw new SecretResolutionError(
+          `Timed out resolving ${raw} via provider "${scheme}" after ${error.ms}ms — the provider was terminated.`,
+          {
+            cause: error,
+            hint: `The "${scheme}" provider did not respond in time; check its backend is reachable and not waiting on input.`,
+          },
+        );
+      }
       throw new SecretResolutionError(
         `Failed to resolve ${raw} via provider "${scheme}": ${(error as Error).message}`,
         {

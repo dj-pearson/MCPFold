@@ -49,11 +49,12 @@ export function keychainProvider(config: KeychainConfig = {}): SecretProvider {
   const exec = config.exec ?? defaultExec;
   return {
     scheme: 'keychain',
-    async resolve(account) {
+    async resolve(account, ctx) {
       const { command, args } = keychainCommand(platform, service, account);
       let result;
       try {
-        result = await exec(command, args);
+        // Thread the resolver's timeout signal through so a hung backend child is killed (S20.4).
+        result = await exec(command, args, { signal: ctx?.signal });
       } catch {
         throw new Error(
           `keychain backend "${command}" is not available — install it (macOS: built-in; ` +
