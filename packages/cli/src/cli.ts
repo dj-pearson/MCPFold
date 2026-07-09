@@ -5,6 +5,7 @@ import { runDiff } from './commands/diff.js';
 import { runInit } from './commands/init.js';
 import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
+import { runScan } from './commands/scan.js';
 import { runStatus } from './commands/status.js';
 import { runTest } from './commands/test.js';
 import { runRestore } from './commands/restore.js';
@@ -232,6 +233,15 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   ).action(async (opts: GlobalFlags) => {
     const ctx = resolve(opts);
     setExit(await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer));
+  });
+
+  addGlobalFlags(
+    program
+      .command('scan')
+      .description('security preflight: audit every client config for known incident root causes'),
+  ).action(async (opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('scan', ctx.json, () => runScan({ cwd: ctx.cwd }), writer));
   });
 
   addGlobalFlags(

@@ -4157,7 +4157,7 @@
       "epic": "E18",
       "order": 2,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "mcpfold scan: preflight security audit of existing client configs",
       "user_story": "As a user with MCP configs accumulated across clients, I want one command that audits them for the known incident root causes — plaintext secrets, unpinned packages, known-vulnerable versions — so mcpfold finds the problems, not just avoids creating them.",

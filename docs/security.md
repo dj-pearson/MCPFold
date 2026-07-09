@@ -66,6 +66,29 @@ The [Security workflow](../.github/workflows/security.yml) runs on every push an
 The main [CI](ci.md) pipeline additionally runs the leak harness and the full test suite on the
 Windows/macOS/Linux matrix.
 
+## Preflight audit: `mcpfold scan`
+
+Where `doctor` checks config **validity**, `scan` is the **security preflight**: it audits every
+detected client's on-disk config (and the canonical config) for the verified 2025–26 MCP incident
+root causes, so mcpfold finds pre-existing problems — not just avoids creating new ones.
+
+Each finding names the client, file, location, severity, and a concrete fix. Checks include:
+cleartext secret-shaped values in env/auth/headers; unpinned `@latest` or bare (unversioned) stdio
+packages; `mcp-remote` bridges below the CVE-2025-6514 floor (the vulnerable-version table lives in
+one updatable module, `packages/cli/src/checks/security.ts`); and informational nudges for
+uncurated canonical servers. It reads the **raw** on-disk config, not the adapter-normalized model,
+so an adapter that rewrites a field on parse can't hide a finding.
+
+Secret **values** never appear in scan output: findings carry only locations, and every literal
+secret discovered is registered with the redactor so any accidental echo is scrubbed (test-proven).
+The exit code is CI-gateable — `0` clean, `1` when actionable findings exist (info-only stays
+clean), `2` on error — and `--json` emits the machine-readable envelope.
+
+```bash
+mcpfold scan            # audit every detected client + the canonical config
+mcpfold scan --json     # machine-readable findings for CI
+```
+
 ## Threat model
 
 The consolidated, all-surfaces view — including the web console — lives in
