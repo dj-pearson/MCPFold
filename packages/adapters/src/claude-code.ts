@@ -14,6 +14,8 @@ export const claudeCodeAdapter = createMcpServersAdapter({
   secretStrategy: 'shim',
   needsRestart: false,
   includeType: true,
+  // Native HTTP remotes with OAuth (verified July 2026); explicit `type` next to `url`.
+  remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'type+url' },
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope === 'user') return joinFor(ctx, ctx.home, '.claude.json');
     if (!projectPath) throw new Error('Claude Code project scope requires a project path.');

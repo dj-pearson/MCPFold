@@ -1,12 +1,76 @@
 import {
+  findMcpRemoteArg,
+  MCP_REMOTE_SPEC,
   serialize,
   type ClientId,
   type Config,
   type ResolvedServer,
   type ServerConfig,
 } from '@mcpfold/core';
-import type { ClientAdapter, OsContext, RenderedFile, SecretStrategy } from './types.js';
+import type {
+  ClientAdapter,
+  OsContext,
+  RemoteCapability,
+  RenderedFile,
+  SecretStrategy,
+} from './types.js';
 import { realOsContext } from './paths.js';
+
+/**
+ * The `mcp-remote` bridge decision (S17.2). A remote server must be shimmed to a pinned
+ * `npx mcp-remote` stdio launch when the target client either can't reach remotes at all
+ * (`!nativeHttp`, e.g. Claude Desktop's stdio-only config) or can't attach auth to a native
+ * remote entry (`authed && !nativeOauth`, e.g. Windsurf). Everything else folds natively.
+ */
+export function remoteNeedsShim(capability: RemoteCapability, server: ResolvedServer): boolean {
+  const isRemote = server.transport === 'http' || server.transport === 'sse';
+  if (!isRemote) return false;
+  const isAuthed = Boolean(server.auth && server.auth.type !== 'none');
+  return !capability.nativeHttp || (isAuthed && !capability.nativeOauth);
+}
+
+/** `--header` args carrying each of a server's auth values (refs pass through; resolved at S4.6). */
+function shimHeaderArgs(server: ResolvedServer): string[] {
+  const args: string[] = [];
+  if (server.auth?.type === 'bearer' && server.auth.token) {
+    args.push('--header', `Authorization: Bearer ${server.auth.token}`);
+  }
+  for (const [name, value] of Object.entries(server.auth?.headers ?? {})) {
+    args.push('--header', `${name}: ${value}`);
+  }
+  return args;
+}
+
+/** Render a remote server as a pinned `npx mcp-remote` stdio entry (the shim). */
+export function renderRemoteShim(server: ResolvedServer): McpStdioEntry {
+  return {
+    command: 'npx',
+    args: ['-y', MCP_REMOTE_SPEC, server.url ?? '', ...shimHeaderArgs(server)],
+  };
+}
+
+/**
+ * Reverse an `mcp-remote` shim entry back to a canonical http server, or `null` if the entry
+ * isn't a shim. Recognizes both the pinned spec and legacy unpinned `mcp-remote`.
+ */
+export function parseRemoteShim(entry: Record<string, unknown>): ServerConfig | null {
+  if (entry.command !== 'npx') return null;
+  const args = Array.isArray(entry.args) ? (entry.args as string[]) : [];
+  const idx = findMcpRemoteArg(args)?.index ?? -1;
+  if (idx === -1) return null;
+  const url = args[idx + 1] ?? '';
+  const headers: Record<string, string> = {};
+  for (let i = idx + 2; i < args.length - 1; i++) {
+    if (args[i] === '--header') {
+      const raw = args[i + 1] ?? '';
+      const sep = raw.indexOf(':');
+      if (sep !== -1) headers[raw.slice(0, sep).trim()] = raw.slice(sep + 1).trim();
+    }
+  }
+  const server: ServerConfig = { transport: 'http', url, tags: [] };
+  if (Object.keys(headers).length > 0) server.auth = { type: 'header', headers };
+  return server;
+}
 
 /**
  * Shared helpers for the many clients that use the `mcpServers`-style shape (Cursor,
@@ -36,10 +100,16 @@ export type McpServerEntry = McpStdioEntry | McpRemoteEntry;
 export interface ToEntryOptions {
   /** Emit an explicit `type` field (Claude Code does; others infer from command/url). */
   includeType?: boolean;
+  /** Remote capability (S17.2); when set, a remote server that needs the shim is bridged. */
+  remote?: RemoteCapability;
 }
 
-/** Map one resolved server to its native `mcpServers`-style entry. */
+/** Map one resolved server to its native `mcpServers`-style entry (or a shim, per capability). */
 export function toMcpEntry(server: ResolvedServer, options: ToEntryOptions = {}): McpServerEntry {
+  // S17.2: a remote server the client can't fold natively becomes a pinned mcp-remote stdio launch.
+  if (options.remote && remoteNeedsShim(options.remote, server)) {
+    return renderRemoteShim(server);
+  }
   if (server.transport === 'stdio') {
     const entry: McpStdioEntry = { command: server.command ?? '' };
     if (options.includeType) entry.type = 'stdio';
@@ -73,6 +143,12 @@ export function fromMcpServersShape(raw: unknown): Partial<Config> {
     for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
       if (!value || typeof value !== 'object') continue;
       const entry = value as Record<string, unknown>;
+      // S17.2: reverse an mcp-remote shim back to the canonical http server it stands in for.
+      const unshimmed = parseRemoteShim(entry);
+      if (unshimmed) {
+        servers[name] = unshimmed;
+        continue;
+      }
       if (typeof entry.command === 'string') {
         const server: ServerConfig = { transport: 'stdio', command: entry.command, tags: [] };
         if (Array.isArray(entry.args)) server.args = entry.args as string[];
@@ -102,6 +178,8 @@ export interface McpServersAdapterConfig {
   needsRestart?: boolean;
   /** Emit an explicit per-server `type` field (Claude Code). */
   includeType?: boolean;
+  /** Remote-transport capability (S17.2) — drives native-entry vs `mcp-remote` shim folding. */
+  remote: RemoteCapability;
   /** Client-specific path resolution. */
   resolvePath: (
     scope: Parameters<ClientAdapter['resolvePath']>[0],
@@ -112,7 +190,8 @@ export interface McpServersAdapterConfig {
 
 /**
  * Build a {@link ClientAdapter} for an `mcpServers`-style client. Reused by Cursor,
- * Claude Desktop, and Claude Code — each supplies only its path resolution and quirks.
+ * Claude Desktop, and Claude Code — each supplies only its path resolution and quirks. Remote
+ * servers fold natively or via the pinned `mcp-remote` shim per the declared `remote` capability.
  */
 export function createMcpServersAdapter(config: McpServersAdapterConfig): ClientAdapter {
   const rootKey = config.rootKey ?? 'mcpServers';
@@ -123,9 +202,13 @@ export function createMcpServersAdapter(config: McpServersAdapterConfig): Client
     id: config.id,
     secretStrategy,
     needsRestart,
+    remote: config.remote,
     resolvePath: config.resolvePath,
     render(servers, ctx = realOsContext()): RenderedFile {
-      const shape = toMcpServersShape(servers, { includeType: config.includeType });
+      const shape = toMcpServersShape(servers, {
+        includeType: config.includeType,
+        remote: config.remote,
+      });
       const scope = servers[0]?.scope ?? 'user';
       const projectPath = servers[0]?.projectPath;
       return {

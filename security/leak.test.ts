@@ -108,6 +108,7 @@ describe('S9.1 — inline may hold the value ONLY in a gitignored target', () =>
   const inlineAdapter = createMcpServersAdapter({
     id: 'cursor',
     secretStrategy: 'inline',
+    remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
     resolvePath: (_s, _p, c) => join((c ?? ctx).home, '.cursor', 'mcp.json'),
   });
   const server: ResolvedServer = {

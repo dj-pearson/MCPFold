@@ -15,6 +15,8 @@ export const zedAdapter = createMcpServersAdapter({
   rootKey: 'context_servers',
   secretStrategy: 'shim',
   needsRestart: false,
+  // Native HTTP remotes with OAuth (verified July 2026); `url` under `context_servers`.
+  remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
   resolvePath(_scope, _projectPath, ctx: OsContext = realOsContext()) {
     if (ctx.platform === 'win32') {
       const appData = ctx.env.APPDATA ?? joinFor(ctx, ctx.home, 'AppData', 'Roaming');

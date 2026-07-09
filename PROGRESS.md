@@ -111,3 +111,44 @@ resolve `@mcpfold/core`'s dist → `--filter "@mcpfold/site..."` (deps-first, li
 
 **Follow-ups (not blocking):** S20.2 (Stripe billing) and S20.3 (SSO) remain; S19.4 would let
 export target native `${{ secrets }}` interpolation for Continue instead of shim.
+
+---
+
+## S17.2 — Per-client native-remote vs mcp-remote-shim decision matrix
+
+**Started** 2026-07-09 · branch `story/S17.2-remote-capability-matrix` · priority p1, deps: S17.1.
+
+**Done** 2026-07-09.
+
+`mcp-remote` is explicitly transitional, so mcpfold now folds a remote server to each client's own
+native entry wherever it can and bridges with the pinned shim only for the residue — driven by an
+explicit per-adapter capability, not ad-hoc per-adapter code.
+
+- **Capability contract:** `ClientAdapter.remote: { nativeHttp, nativeOauth, fieldShape }` (new in
+  `types.ts`), declared for all 12 adapters (verified against primary docs). Shim predicate
+  (`remoteNeedsShim`): a server is bridged only when it's remote **and** (`!nativeHttp` OR
+  `authed && !nativeOauth`).
+- **Unified shim path:** `renderRemoteShim` / `parseRemoteShim` / `remoteNeedsShim` live in the
+  shared factory; `createMcpServersAdapter` renders native-or-shim per capability and reverses shims
+  on parse. **Windsurf** collapsed from ~130 bespoke lines to the factory + its capability.
+- **Correctness fix:** **Claude Desktop**'s config is stdio-only (verified — remotes go through the
+  Connectors UI, not the file), so it was previously emitting a `url` entry it can't read. It now
+  correctly shims **all** remotes (`nativeHttp: false`). Native clients (Claude Code/Cursor/VS
+  Code/Zed/…) emit their native remote entry.
+- **`mcpfold run`:** added `planRemoteRun` — the explicit seam that prefers a direct connection but
+  falls back to the pinned bridge, because the CLI ships no native HTTP transport (adding one would
+  mean a heavy dep + more attack surface, against this story's own goal).
+- Docs: `docs/coverage.md` gains a **Remote transport** column + the capability explainer. Matrix
+  goldens updated (only claude-desktop changed — now a shim); compat sample updated.
+
+Tests: new `remote-capability.test.ts` (capability metadata, shim predicate, native-vs-shim per
+client, unauth-vs-authed, **capability-override flips the form**, shim round-trip) + a `planRemoteRun`
+unit test. Adapters 100 (+7), CLI 219 (+1).
+
+`verify_all` green (lint + purity, typecheck ×8 workspaces, `pnpm -r test`, `pnpm -r build`), plus
+`docs:build`, Prettier `--check`, and no demo drift. End-to-end smoke-tested against the built
+adapters (native `type+url` for Claude Code; shim for Claude Desktop + authed Windsurf).
+
+**Follow-ups (not blocking):** S17.5 (schema v2 naming), S17.7 (registry), and the still-open
+pre-existing gemini-cli compat-sample drift (re-capture; the compat harness is a separate scheduled
+job, not part of `verify_all`).

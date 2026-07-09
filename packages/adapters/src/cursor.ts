@@ -11,6 +11,8 @@ export const cursorAdapter = createMcpServersAdapter({
   id: 'cursor',
   secretStrategy: 'shim',
   needsRestart: false,
+  // Native HTTP remotes with OAuth (verified July 2026); bare `url` + optional `headers`.
+  remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope === 'user') return joinFor(ctx, ctx.home, '.cursor', 'mcp.json');
     if (!projectPath) throw new Error('Cursor project/workspace scope requires a project path.');

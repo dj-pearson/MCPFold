@@ -106,8 +106,10 @@ export {
 } from './sync/strategy.js';
 export {
   runRun,
+  planRemoteRun,
   shouldUseProxy,
   type ProxySpawner,
+  type RemoteRunPlan,
   type RunOptions,
   type Spawner,
 } from './commands/run.js';

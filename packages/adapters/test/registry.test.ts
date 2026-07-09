@@ -9,7 +9,11 @@ import {
 import { createMcpServersAdapter } from '../src/shared.js';
 
 const makeAdapter = (id: 'cursor' | 'zed') =>
-  createMcpServersAdapter({ id, resolvePath: () => `/tmp/${id}.json` });
+  createMcpServersAdapter({
+    id,
+    remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
+    resolvePath: () => `/tmp/${id}.json`,
+  });
 
 afterEach(() => clearAdapters());
 

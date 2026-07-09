@@ -135,6 +135,21 @@ function applyPin(args: string[] | undefined, pin: string | undefined): string[]
 const HEADER_ENV_PREFIX = 'MCPFOLD_HDR_';
 
 /**
+ * How `mcpfold run` reaches a remote server (S17.2). mcpfold prefers a direct connection where the
+ * CLI itself can speak the remote transport — but it has no built-in streamable-HTTP/SSE MCP
+ * transport today (adding one would pull a heavy client dep and *more* attack surface, the opposite
+ * of this story's goal). So every remote currently falls back to the pinned `mcp-remote` bridge.
+ *
+ * This is the single, explicit decision point: when the CLI gains a native transport, return
+ * `{ mode: 'direct' }` for the servers it can handle and the rest keep bridging unchanged.
+ */
+export type RemoteRunPlan = { mode: 'direct' } | { mode: 'bridge'; spec: string };
+
+export function planRemoteRun(_server: ResolvedServer): RemoteRunPlan {
+  return { mode: 'bridge', spec: MCP_REMOTE_SPEC };
+}
+
+/**
  * Build the `mcp-remote` invocation (args + env) for a remote server. The bridge is pinned to a
  * CVE-safe version via MCP_REMOTE_SPEC (see @mcpfold/core bridge.ts).
  *
@@ -238,7 +253,15 @@ export async function runRun(options: RunOptions): Promise<number> {
     }
     return spawner(s.command ?? '', args, env);
   }
-  // http / sse → bridge with mcp-remote. Resolved auth values travel via env (S16.4), never argv.
+  // http / sse (S17.2): prefer a direct connection where the CLI can; today it can't, so fall back
+  // to the pinned mcp-remote bridge. Resolved auth values travel via env (S16.4), never argv.
+  const plan = planRemoteRun(s);
+  if (plan.mode === 'direct') {
+    // Reserved for a future native transport; no code path reaches here yet (see planRemoteRun).
+    throw new UsageError(`Direct remote connection is not implemented for "${options.name}".`, {
+      hint: 'This build bridges remote servers with mcp-remote; update planRemoteRun to add a native path.',
+    });
+  }
   const remote = remoteInvocation(s);
   return spawner('npx', remote.args, { ...process.env, ...remote.env });
 }

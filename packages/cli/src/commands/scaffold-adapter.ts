@@ -46,6 +46,9 @@ export const ${name}Adapter = createMcpServersAdapter({
   id: '${name}' as ClientId,
   secretStrategy: 'shim',
   needsRestart: false,
+  // TODO (S17.2): verify ${name}'s remote support. nativeHttp=false shims ALL remotes;
+  // nativeOauth=false shims only authenticated ones; fieldShape is how it names the url field.
+  remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
   resolvePath(_scope, _projectPath, ctx: OsContext = realOsContext()) {
     // TODO: return the real ${name} config path for user (and project) scope, per OS.
     return joinFor(ctx, ctx.home, '.${name}', 'mcp.json');

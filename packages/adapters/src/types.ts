@@ -11,6 +11,35 @@ import type { ClientId, Config, ResolvedServer, Scope } from '@mcpfold/core';
 /** How a client wants secrets handled (spec §6). */
 export type SecretStrategy = 'inline' | 'native-input' | 'shim';
 
+/**
+ * How a client names the remote-endpoint field in its native config, or `shim` when it can't
+ * take a remote entry at all and must be bridged with `mcp-remote` (S17.2):
+ *   - `url`      — a bare `url` alongside optional `headers` (Cursor, Zed, Cline, …)
+ *   - `type+url` — an explicit `type: 'http'|'sse'` next to `url` (Claude Code, VS Code)
+ *   - `httpUrl`  — streamable HTTP under `httpUrl`, SSE under `url` (Gemini CLI)
+ *   - `shim`     — no native remote support; folds to a pinned `npx mcp-remote` stdio launch
+ */
+export type RemoteFieldShape = 'url' | 'type+url' | 'httpUrl' | 'shim';
+
+/**
+ * A client's remote-transport capability (S17.2) — the per-adapter contract that decides whether
+ * a remote server folds to a native entry or is bridged with the pinned `mcp-remote` shim.
+ *
+ * `mcp-remote` is explicitly transitional ("as soon as your client supports remote, authorized
+ * servers, you can remove it"), so mcpfold folds natively wherever a client can and shims only the
+ * residue. The shim is needed when a server is remote AND either the client can't call remotes at
+ * all (`!nativeHttp`) or the server is authenticated and the client can't attach auth to a native
+ * remote entry (`authed && !nativeOauth`).
+ */
+export interface RemoteCapability {
+  /** Can the client reach an http/sse remote from its own config (no `mcp-remote` bridge)? */
+  readonly nativeHttp: boolean;
+  /** Can it authenticate a native remote entry itself (auth headers / OAuth), not via the bridge? */
+  readonly nativeOauth: boolean;
+  /** The field shape the client uses for remote entries (or `shim` when it has none). */
+  readonly fieldShape: RemoteFieldShape;
+}
+
 /** A native config file mcpfold would write for a client. */
 export interface RenderedFile {
   /** Absolute, OS-resolved path. */
@@ -38,6 +67,8 @@ export interface ClientAdapter {
   readonly secretStrategy: SecretStrategy;
   /** Whether writing this client's config requires a restart to take effect. */
   readonly needsRestart: boolean;
+  /** Remote-transport capability (S17.2) — drives native-entry vs `mcp-remote` shim folding. */
+  readonly remote: RemoteCapability;
 
   /** Resolve the on-disk config path for a scope/project on a given OS. */
   resolvePath(scope: Scope, projectPath?: string, ctx?: OsContext): string;

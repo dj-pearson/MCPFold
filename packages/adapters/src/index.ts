@@ -4,13 +4,23 @@
  * (S2.2–S2.7) register themselves here as they are implemented.
  */
 
-export type { ClientAdapter, OsContext, RenderedFile, SecretStrategy } from './types.js';
+export type {
+  ClientAdapter,
+  OsContext,
+  RemoteCapability,
+  RemoteFieldShape,
+  RenderedFile,
+  SecretStrategy,
+} from './types.js';
 
 export { expandHome, joinFor, pathFor, realOsContext, userConfigDir } from './paths.js';
 
 export {
   createMcpServersAdapter,
   fromMcpServersShape,
+  parseRemoteShim,
+  remoteNeedsShim,
+  renderRemoteShim,
   toMcpEntry,
   toMcpServersShape,
   type McpRemoteEntry,

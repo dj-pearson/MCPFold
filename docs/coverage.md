@@ -6,25 +6,39 @@ prioritized. Adding a client is a one-PR job — see [Adapters](./adapters.md) a
 
 ## Supported clients
 
-| Client         | Config root        | Scopes        | Secret strategy | Restart on change |
-| -------------- | ------------------ | ------------- | --------------- | ----------------- |
-| Claude Code    | `mcpServers`       | user          | shim            | no                |
-| Claude Desktop | `mcpServers`       | user          | shim            | **yes**           |
-| Cursor         | `mcpServers`       | user, project | shim            | no                |
-| VS Code        | `servers`          | user, project | native input    | no                |
-| Windsurf       | `mcpServers`\*     | user          | shim            | **yes**           |
-| Zed            | `context_servers`  | user          | shim            | no                |
-| Cline          | `mcpServers`       | user          | shim            | no                |
-| Gemini CLI     | `mcpServers`       | user          | shim            | no                |
-| JetBrains      | `mcpServers`       | user, project | shim            | no                |
-| Visual Studio  | `servers`\*\*      | user, project | native input    | no                |
-| Continue       | `mcpServers`\*\*\* | user, project | shim            | no                |
-| Roo Code       | `mcpServers`       | user, project | shim            | no                |
+| Client         | Config root        | Scopes        | Secret strategy | Restart on change | Remote transport               |
+| -------------- | ------------------ | ------------- | --------------- | ----------------- | ------------------------------ |
+| Claude Code    | `mcpServers`       | user          | shim            | no                | native `type`+`url`            |
+| Claude Desktop | `mcpServers`       | user          | shim            | **yes**           | shim (stdio-only)†             |
+| Cursor         | `mcpServers`       | user, project | shim            | no                | native `url`                   |
+| VS Code        | `servers`          | user, project | native input    | no                | native `type`+`url`            |
+| Windsurf       | `mcpServers`\*     | user          | shim            | **yes**           | native `url`; shim if authed\* |
+| Zed            | `context_servers`  | user          | shim            | no                | native `url`                   |
+| Cline          | `mcpServers`       | user          | shim            | no                | native `url`                   |
+| Gemini CLI     | `mcpServers`       | user          | shim            | no                | native `httpUrl`/`url`         |
+| JetBrains      | `mcpServers`       | user, project | shim            | no                | native `url`                   |
+| Visual Studio  | `servers`\*\*      | user, project | native input    | no                | native `type`+`url`            |
+| Continue       | `mcpServers`\*\*\* | user, project | shim            | no                | native `url`                   |
+| Roo Code       | `mcpServers`       | user, project | shim            | no                | native `url`                   |
 
-\* Windsurf can't natively call authenticated remote servers, so authed http/sse servers are
-rewritten to a `mcp-remote` stdio invocation (reversible on import). The bridge is always pinned
-to a CVE-safe version (`mcp-remote@0.1.38`; floor `0.1.16` fixes CVE-2025-6514) — never unpinned —
-and `mcpfold doctor` warns if it finds an unpinned or vulnerable `mcp-remote` in a client config.
+**Remote transport (S17.2).** `mcp-remote` is explicitly transitional ("as soon as your client
+supports remote, authorized servers, you can remove it"), so mcpfold folds a remote server to the
+client's own native entry wherever it can and bridges with the pinned `mcp-remote` shim only for the
+residue. Each adapter declares a `remote` capability (`nativeHttp`, `nativeOauth`, `fieldShape`); a
+server is shimmed only when it is remote **and** the client either can't reach remotes at all
+(`!nativeHttp`) or can't attach auth to a native remote entry (authenticated **and** `!nativeOauth`).
+`mcpfold run`'s own remote connection likewise prefers a direct path where the CLI can — but the CLI
+ships no built-in HTTP transport (that would add a heavy dependency and more attack surface), so it
+falls back to the same pinned bridge.
+
+† **Claude Desktop**'s `claude_desktop_config.json` is stdio-only (remotes go through the Connectors
+UI, not the config file), so **every** remote server folds to the `mcp-remote` shim.
+
+\* Windsurf can natively call an unauthenticated remote (`url`), but **can't attach auth to a native
+remote entry**, so authenticated http/sse servers are rewritten to a `mcp-remote` stdio invocation
+(reversible on import). The bridge is always pinned to a CVE-safe version (`mcp-remote@0.1.38`; floor
+`0.1.16` fixes CVE-2025-6514) — never unpinned — and `mcpfold doctor` warns if it finds an unpinned
+or vulnerable `mcp-remote` in a client config.
 
 \*\* Visual Studio reads MCP config in the **VS Code dialect** (root key `servers` + a top-level
 `inputs` array), so its adapter reuses the VS Code render/parse verbatim and only changes path

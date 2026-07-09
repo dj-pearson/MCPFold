@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { isMcpfoldError, MCP_REMOTE_SPEC } from '@mcpfold/core';
 import { envProvider } from '@mcpfold/secrets';
-import { runRun, type ProxySpawner, type Spawner } from '../src/commands/run.js';
+import { planRemoteRun, runRun, type ProxySpawner, type Spawner } from '../src/commands/run.js';
 import type { TrustGate } from '../src/trust/tofu.js';
 
 // These tests exercise launch/resolution, not TOFU — trust every server (S9.2 gate tested separately).
@@ -77,6 +77,19 @@ describe('runRun (S4.7)', () => {
     expect(args).toContain('Authorization: Bearer ${MCPFOLD_HDR_0}');
     expect(args.join('\n')).not.toContain('tok');
     expect(env.MCPFOLD_HDR_0).toBe('tok');
+  });
+
+  it('planRemoteRun falls back to the pinned bridge (no native transport yet, S17.2)', () => {
+    const plan = planRemoteRun({
+      name: 'remote',
+      transport: 'http',
+      url: 'https://api.example/mcp/',
+      tags: [],
+      client: 'claude-code',
+      scope: 'user',
+    });
+    expect(plan.mode).toBe('bridge');
+    if (plan.mode === 'bridge') expect(plan.spec).toBe(MCP_REMOTE_SPEC);
   });
 
   it('keeps custom header secrets out of argv too (S16.4)', async () => {
