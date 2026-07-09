@@ -2,13 +2,18 @@ import type { ReactNode } from 'react';
 import { Container } from '../design/components';
 import { Hero } from '../home/Hero';
 import { Calculator } from '../benchmark/Calculator';
+import { HowItWorks } from '../home/HowItWorks';
+import { UseCases } from '../home/UseCases';
+import { Credibility } from '../home/Credibility';
+import { FinalCta } from '../home/FinalCta';
 import { FaqSection } from '../seo/FaqSection';
 
 /**
- * Homepage (S13.2; on-page SEO S15.3). Hero + benchmark proof, then keyword-targeted H2 sections
- * (each a focus cluster with the supported clients rendered as crawlable links), and an
- * internal-link graph out to the directory, docs, install, and pricing. Benchmark numbers come from
- * the committed source so the site and docs never disagree.
+ * Homepage (S13.2; on-page SEO S15.3; full narrative S13.8). Hero + benchmark proof, then the full
+ * body: a four-pillar features overview (each linking to its live deep-dive), a how-it-works command
+ * sequence, a use-cases teaser, an OSS-credibility slot, the internal-link graph, and a closing CTA.
+ * Keyword-targeted H2s stay indexable; benchmark numbers come from committed source so the site and
+ * docs never disagree.
  */
 export function Home() {
   return (
@@ -20,8 +25,8 @@ export function Home() {
       </Container>
 
       <Container style={{ paddingBottom: 'var(--space-8)' }}>
-        {/* Keyword-cluster sections — semantic H2s a crawler and an answer engine can index. */}
-        <section aria-label="What mcpfold does">
+        {/* Features overview — the four pillars, each a keyword-led H2 linking to its deep-dive. */}
+        <section aria-label="What mcpfold does" data-testid="features">
           <SeoBlock
             heading="Manage every MCP server from one file"
             keyword="MCP config"
@@ -59,6 +64,12 @@ export function Home() {
         </section>
       </Container>
 
+      <HowItWorks />
+
+      <UseCases />
+
+      <Credibility />
+
       <Container style={{ paddingBottom: 'var(--space-16)' }}>
         <section aria-labelledby="explore-heading">
           <h2 id="explore-heading">Explore mcpfold</h2>
@@ -71,6 +82,8 @@ export function Home() {
           </ul>
         </section>
       </Container>
+
+      <FinalCta />
 
       <FaqSection path="/" />
     </>

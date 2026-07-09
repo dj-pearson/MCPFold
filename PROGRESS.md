@@ -436,3 +436,38 @@ Prettier, docs:build). **Site e2e (24) + prerender e2e (8) pass**; 91 routes pre
 **Follow-ups:** grow the curated set toward 150+ (more verified servers per category); add
 remote/`streamable-http` servers once a hosted set is curated; surface category nav in the global
 site IA when S13.9 lands.
+
+---
+
+## S13.8 — Homepage: full narrative below the hero
+
+Started/done: 2026-07-09. Completed the homepage body so a visitor who scrolls past the hero +
+benchmark gets the whole story and converts without leaving.
+
+- **Features overview** — the four pillars (one config for every client · curate tools/cut the
+  context tax · secrets as references · sync/diff drift), each a keyword-led H2 **linking to its
+  live `/docs` deep-dive**. (S13.10 will expand these into `/features` pages; today the docs deep-
+  dives are the real, live targets — no dead links, matching the S15.3 "link live only" precedent.)
+- **How it works** (`home/HowItWorks.tsx`) — the **init → import → sync → diff** sequence, each step
+  a real CLI command with a copy-paste `CopyBlock`.
+- **Use-cases teaser** (`home/UseCases.tsx` + `personas.ts`) — three persona cards (solo devs /
+  teams / power users), each linking to a live surface now; `personas.ts` is the single source
+  S13.11 turns into dedicated pages.
+- **OSS-credibility slot** (`home/Credibility.tsx`) — MIT + the **npm version sourced from the build**
+  (`__APP_VERSION__`, the committed CLI package) are baked into the **prerendered HTML**; the live
+  **GitHub star count is fetched client-side and degrades gracefully** (repo link always present, no
+  count/no error if the API is unavailable). No implied endorsement — factual signals only.
+- **Final CTA** (`home/FinalCta.tsx`) — repeats the primary Install action + secondary team-cloud
+  action.
+
+Tests: `home.e2e.ts` gains seven cases — features deep-dive links, the four how-it-works commands +
+copy buttons, persona links, credibility-from-source, the **star signal live + graceful-degrade**
+(GitHub API mocked available/aborted), and the final CTA. `prerender.e2e.ts` proves the full
+narrative (commands, use-cases, MIT, npm version) is in the no-JS HTML and that the client-only star
+count is **not**.
+
+`verify_all` green (lint, typecheck ×8, `pnpm -r test`, `pnpm -r build`, Prettier, docs:build).
+**Site e2e (30) + prerender e2e (9) pass.**
+
+**Follow-ups:** repoint the pillar "deep-dive" links to `/features/<slug>` when S13.10 ships and the
+persona cards to `/use-cases/<id>` when S13.11 ships (both single-sourced already).

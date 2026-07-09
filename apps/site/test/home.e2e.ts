@@ -83,3 +83,84 @@ test('the homepage anchors the internal-link graph', async ({ page }) => {
   );
   await expect(explore.getByRole('link', { name: 'Pricing' })).toHaveAttribute('href', '/pricing');
 });
+
+// ------------------------------------------------------------------------------------------------
+// Full homepage narrative (S13.8): features → how-it-works → use-cases → credibility → CTA
+// ------------------------------------------------------------------------------------------------
+test('the features overview links each pillar to its deep-dive', async ({ page }) => {
+  await page.goto('/');
+  const features = page.getByTestId('features');
+  await expect(features.getByRole('link', { name: /config format/i })).toHaveAttribute(
+    'href',
+    '/docs/config-format.html',
+  );
+  await expect(features.getByRole('link', { name: /secrets work/i })).toHaveAttribute(
+    'href',
+    '/docs/secrets.html',
+  );
+});
+
+test('the how-it-works section walks init → import → sync → diff with copy commands', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const how = page.getByTestId('how-it-works');
+  for (const cmd of ['mcpfold init', 'mcpfold import', 'mcpfold sync', 'mcpfold diff']) {
+    await expect(how.getByRole('heading', { name: cmd })).toBeVisible();
+  }
+  // Each step has a copy button (4 steps).
+  await expect(how.getByTestId('copy-button')).toHaveCount(4);
+});
+
+test('the use-cases teaser links each persona to a live page', async ({ page }) => {
+  await page.goto('/');
+  const uc = page.getByTestId('use-cases');
+  await expect(uc.getByTestId('persona-solo').getByRole('link')).toHaveAttribute(
+    'href',
+    '/install',
+  );
+  await expect(uc.getByTestId('persona-teams').getByRole('link')).toHaveAttribute(
+    'href',
+    '/pricing',
+  );
+  await expect(uc.getByTestId('persona-power-users').getByRole('link')).toHaveAttribute(
+    'href',
+    '/directory',
+  );
+});
+
+test('the credibility slot renders npm version + MIT from source', async ({ page }) => {
+  await page.goto('/');
+  const cred = page.getByTestId('credibility');
+  // Version is sourced from the build (the committed CLI package), not hardcoded copy.
+  await expect(cred.getByTestId('npm-version')).toHaveText(/^v\d+\.\d+\.\d+/);
+  await expect(cred.getByRole('link', { name: 'MIT license' })).toBeVisible();
+  await expect(cred.getByTestId('github-link')).toBeVisible();
+});
+
+test('the GitHub star signal renders live and degrades gracefully', async ({ page }) => {
+  // Available: the count renders from the API.
+  await page.route('https://api.github.com/**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{"stargazers_count":4242}',
+    }),
+  );
+  await page.goto('/');
+  await expect(page.getByTestId('github-stars')).toHaveText(/4,242/);
+
+  // Unavailable: no count, no error — the repo link still stands.
+  await page.unroute('https://api.github.com/**');
+  await page.route('https://api.github.com/**', (route) => route.abort());
+  await page.goto('/');
+  await expect(page.getByTestId('credibility').getByTestId('github-link')).toBeVisible();
+  await expect(page.getByTestId('github-stars')).toHaveCount(0);
+});
+
+test('the final CTA repeats install + cloud actions', async ({ page }) => {
+  await page.goto('/');
+  const cta = page.getByTestId('final-cta');
+  await expect(cta.getByTestId('cta-install')).toHaveAttribute('href', '/install');
+  await expect(cta.getByTestId('cta-cloud')).toHaveAttribute('href', '/pricing');
+});

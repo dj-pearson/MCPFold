@@ -36,6 +36,24 @@ test('homepage: real content + SoftwareApplication JSON-LD in no-JS HTML', async
   expect(app!.name).toBe('mcpfold');
 });
 
+test('homepage: the full narrative (S13.8) is in the prerendered no-JS HTML', async ({
+  request,
+}) => {
+  const html = await rawHtml(request, '/');
+  // How it works (static, build-time) — the command sequence is server-rendered.
+  for (const cmd of ['mcpfold init', 'mcpfold import', 'mcpfold sync', 'mcpfold diff']) {
+    expect(html, `how-it-works: ${cmd}`).toContain(cmd);
+  }
+  // Use-cases + CTA copy.
+  expect(html).toContain('Who mcpfold is for');
+  expect(html).toContain('Install mcpfold');
+  // Credibility: MIT + the npm version sourced from the build are present without JS. The live
+  // star count is client-only, so it must NOT be in the static HTML.
+  expect(html).toContain('MIT license');
+  expect(html).toMatch(/data-testid="npm-version">v\d+\.\d+\.\d+/);
+  expect(html).not.toContain('github-stars');
+});
+
 test('/directory: heading + ItemList JSON-LD in no-JS HTML', async ({ request }) => {
   const html = await rawHtml(request, '/directory');
   expect(html).toContain('MCP server directory');
