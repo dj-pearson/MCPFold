@@ -65,7 +65,7 @@ test('footer link map resolves against the route table (no 404) and omits planne
   const hrefs = await links.evaluateAll((els) => els.map((e) => e.getAttribute('href') ?? ''));
   expect(hrefs.length).toBeGreaterThan(6);
 
-  const validInternal = /^\/($|install$|directory$|pricing$|changelog$|blog$|docs(\/|$))/;
+  const validInternal = /^\/($|install$|directory$|pricing$|security$|changelog$|blog$|docs(\/|$))/;
   for (const href of hrefs) {
     if (href.startsWith('http')) continue; // external
     expect(href, `footer link ${href} must resolve`).toMatch(validInternal);

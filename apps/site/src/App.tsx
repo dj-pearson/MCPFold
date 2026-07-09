@@ -6,6 +6,7 @@ import { DirectoryList } from './directory/DirectoryList';
 import { CategoryPage } from './directory/CategoryPage';
 import { ServerPage } from './directory/ServerPage';
 import { PricingPage } from './pricing/PricingPage';
+import { SecurityPage } from './security/SecurityPage';
 import { BlogIndex } from './blog/BlogIndex';
 import { BlogPost } from './blog/BlogPost';
 import { Changelog } from './blog/Changelog';
@@ -21,6 +22,7 @@ export function App() {
         <Route path="/directory/category/:cat" element={<CategoryPage />} />
         <Route path="/directory/:id" element={<ServerPage />} />
         <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/security" element={<SecurityPage />} />
         <Route path="/blog" element={<BlogIndex />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/changelog" element={<Changelog />} />

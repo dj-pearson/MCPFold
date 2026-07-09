@@ -77,7 +77,7 @@ export const FOOTER_GROUPS: NavGroup[] = [
   {
     title: 'Company',
     links: [
-      { label: 'Security', href: '/docs/security.html' },
+      { label: 'Security & trust', href: '/security' },
       { label: 'MIT license', href: `${GITHUB}/blob/main/LICENSE`, external: true },
     ],
   },

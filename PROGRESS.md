@@ -508,3 +508,37 @@ without warnings.
 **Follow-ups:** flip Features/Guides to `live` in `site-structure.ts` when S13.10 / S15.5 ship (they
 then appear in nav + footer automatically); wire `liveInternalPaths()` into the sitemap if non-
 enumerated pages are ever added.
+
+---
+
+## S13.13 — Security & trust page
+
+Started/done: 2026-07-09. Added a public `/security` trust page for security-conscious adopters —
+plain-language, every claim mirrored to the authoritative docs (`docs/security.md`,
+`docs/secrets.md`, `docs/threat-model.md`, `docs/security-posture.md`) and `SECURITY.md`, with the
+honest caveats stated rather than glossed.
+
+- **`security/SecurityPage.tsx`** — seven sections: refs-only secret handling (with the honest
+  boundary — a value is written only via the **opt-in `inline` strategy to a gitignored target**,
+  else refused, not a blanket "never touches disk"); nothing sensitive synced to the cloud (client
+  guard + server ref-only guard + DB `config_is_ref_only` backstop); local-first by default;
+  redacted diagnostics + telemetry **off unless `MCPFOLD_TELEMETRY=1`** (allow-listed
+  non-identifying fields, `DO_NOT_TRACK` honored); supply-chain/integrity (`doctor`/`pin`/`scan`,
+  plus the honest "config is executable code" caveat); machine-verified by the leak harness + CI
+  gitleaks/audit; and a **responsible-disclosure** section linking `SECURITY.md` + the private
+  advisory path + email. Each section deep-links its authoritative doc (all four verified to exist
+  and build).
+- **Wiring** — `/security` route + SEO meta + prerender + sitemap; footer "Security & trust" points
+  here (single-source `site-structure.ts`); `FaqSection` gained an optional `moreLink`, used on the
+  pricing FAQ to link the page.
+
+Tests: `security.e2e.ts` (3) — the page renders the secret-handling summary (incl. the `gitignored`
+caveat) and the disclosure links (`SECURITY.md` + advisory), and is reachable from both the footer
+and the pricing FAQ. `nav.e2e.ts` footer-route allow-list updated for `/security`.
+
+Accuracy: claims cross-checked against `SECURITY.md` and `docs/security.md` — the inline-strategy
+nuance, the telemetry opt-in, and the config-is-executable-code caveat are stated explicitly; no
+overstatement.
+
+`verify_all` green (lint, typecheck ×8, `pnpm -r test`, `pnpm -r build`, Prettier, docs:build).
+**Site e2e (38) + prerender e2e (9) pass**; 92 routes prerender.
