@@ -11,10 +11,21 @@
 import type { DeviceAuthConfig, Sql } from "../../lib/device.ts";
 import { authenticate, json, readJson } from "../../lib/http.ts";
 import { asUser } from "../../lib/rls.ts";
+import {
+  type EntitlementChecker,
+  EntitlementError,
+  requireEntitlement,
+} from "../../lib/entitlements.ts";
 
 export interface TeamDeps {
   sql: Sql;
   cfg: DeviceAuthConfig;
+  /**
+   * Server-side billing gate (S20.2). When supplied (the production router always does), adding
+   * team members requires the team's `team-config` entitlement — i.e. an active `team`+ subscription.
+   * Omitted in unit tests that aren't exercising billing.
+   */
+  entitlements?: EntitlementChecker;
   now?: () => Date;
 }
 
@@ -87,6 +98,19 @@ export function createTeamInviteHandler(deps: TeamDeps): (req: Request) => Promi
     const email = typeof body.email === "string" ? body.email.trim() : "";
     const role = body.role === "admin" || body.role === "member" ? body.role : "member";
     if (!teamId || !email) return json({ error: "invalid_request" }, 400);
+
+    // S20.2: inviting members is a paid team feature — gate it on the team's entitlement (402 when
+    // the team is on the free tier). The upgrade path is Stripe Checkout via …/billing/checkout.
+    if (deps.entitlements) {
+      try {
+        await requireEntitlement(deps.entitlements, teamId, "team-config");
+      } catch (e) {
+        if (e instanceof EntitlementError) {
+          return json({ error: "payment_required", entitlement: e.entitlement }, 402);
+        }
+        throw e;
+      }
+    }
 
     // The invited user must already have an account; a pending-invite flow (S9.6 tokens) is future.
     const [invitee] = await deps.sql`select id from public.users where email = ${email}`;

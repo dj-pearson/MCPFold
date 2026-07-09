@@ -13,17 +13,24 @@ test('create a team, manage a member, and see the audit trail (S7.6)', async ({ 
   await page.getByRole('link', { name: 'Teams' }).click();
   await expect(page).toHaveURL(/\/teams$/);
 
-  // Teams are marked a paid feature (billing gate stub).
-  await expect(page.getByTestId('billing-gate')).toBeVisible();
-
   // Create a team → it opens with the owner as the sole member and an audit entry.
   await page.getByLabel('New team name').fill('Acme');
   await page.getByTestId('create-team').click();
   await expect(page.getByTestId('member-dev@mcpfold.com')).toBeVisible();
-  // The audit trail shows the change with a per-version diff.
   await expect(page.getByTestId('audit-1')).toContainText('github');
 
-  // Invite a member with a role…
+  // S20.2: a new team is on the FREE tier — inviting members is gated behind an upgrade.
+  await expect(page.getByTestId('billing-gate')).toHaveAttribute('data-tier', 'cloud-free');
+  await expect(page.getByTestId('upgrade-cta')).toBeVisible();
+  await expect(page.getByTestId('invite')).toBeDisabled();
+
+  // Upgrade (mock Checkout completes the subscription) → tier flips to Team, invite unlocks.
+  await page.getByTestId('upgrade').click();
+  await expect(page.getByTestId('billing-gate')).toHaveAttribute('data-tier', 'team');
+  await expect(page.getByTestId('upgrade-cta')).toHaveCount(0);
+  await expect(page.getByTestId('manage-billing')).toBeVisible();
+
+  // Now inviting a member works…
   await page.getByLabel('Invite by email').fill('bob@example.com');
   await page.getByTestId('invite').click();
   await expect(page.getByTestId('member-bob@example.com')).toBeVisible();

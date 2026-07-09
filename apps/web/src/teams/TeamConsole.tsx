@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
-import { type AuditEntry, createTeamsApi, type Member, type Team } from './teamsApi';
+import {
+  type AuditEntry,
+  createTeamsApi,
+  isPaidTier,
+  type Member,
+  type Team,
+  type Tier,
+} from './teamsApi';
+
+const TIER_LABEL: Record<Tier, string> = {
+  'cloud-free': 'Free',
+  team: 'Team',
+  enterprise: 'Enterprise',
+};
 
 /**
  * Team console (S7.6): create teams, manage members + roles, and review the change-audit trail
@@ -24,6 +37,7 @@ export function TeamConsole() {
   const [newTeam, setNewTeam] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
+  const [tier, setTier] = useState<Tier>('cloud-free');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,9 +53,30 @@ export function TeamConsole() {
     try {
       setMembers(await api.listMembers(id));
       setAudit(await api.audit(id));
+      setTier(await api.entitlement(id));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load team.');
     }
+  }
+
+  async function upgrade(): Promise<void> {
+    if (!selected) return;
+    await guard(async () => {
+      const { url } = await api.checkout(selected);
+      if (url) {
+        window.location.href = url; // redirect to Stripe Checkout
+        return;
+      }
+      setTier(await api.entitlement(selected)); // preview/mock: no redirect, just refresh
+    });
+  }
+
+  async function manageBilling(): Promise<void> {
+    if (!selected) return;
+    await guard(async () => {
+      const { url } = await api.portal(selected);
+      if (url) window.location.href = url;
+    });
   }
 
   async function guard(fn: () => Promise<void>): Promise<void> {
@@ -57,13 +92,15 @@ export function TeamConsole() {
     <div className="page">
       <div className="editor-head">
         <h2>Teams</h2>
-        <span className="badge-behind" data-testid="billing-gate">
-          Paid feature
-        </span>
+        {selected && (
+          <span className="badge-behind" data-testid="billing-gate" data-tier={tier}>
+            {TIER_LABEL[tier]} tier
+          </span>
+        )}
       </div>
       <p className="muted">
-        Shared team configs with member roles and an audit trail. Billing integration is coming soon
-        — teams are free during the preview.
+        Shared team configs with member roles and an audit trail. Inviting members is a paid team
+        feature — free teams can be created, then upgraded to add members.
       </p>
       {error && (
         <p className="error" role="alert">
@@ -133,20 +170,37 @@ export function TeamConsole() {
                 </li>
               ))}
             </ul>
+            {!isPaidTier(tier) && (
+              <p className="muted" data-testid="upgrade-cta">
+                Inviting members needs the Team tier.{' '}
+                <button className="link" data-testid="upgrade" onClick={() => void upgrade()}>
+                  Upgrade
+                </button>{' '}
+                to add teammates.
+              </p>
+            )}
             <label>
               Invite by email
-              <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
+              <input
+                value={inviteEmail}
+                disabled={!isPaidTier(tier)}
+                onChange={(e) => setInviteEmail(e.target.value)}
+              />
             </label>
             <label>
               Role
-              <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+              <select
+                value={inviteRole}
+                disabled={!isPaidTier(tier)}
+                onChange={(e) => setInviteRole(e.target.value)}
+              >
                 <option value="member">member</option>
                 <option value="admin">admin</option>
               </select>
             </label>
             <button
               data-testid="invite"
-              disabled={!inviteEmail.trim()}
+              disabled={!inviteEmail.trim() || !isPaidTier(tier)}
               onClick={() =>
                 void guard(async () => {
                   await api.invite(selected, inviteEmail.trim(), inviteRole);
@@ -157,6 +211,15 @@ export function TeamConsole() {
             >
               Invite
             </button>
+            {isPaidTier(tier) && (
+              <button
+                className="link"
+                data-testid="manage-billing"
+                onClick={() => void manageBilling()}
+              >
+                Manage billing
+              </button>
+            )}
           </section>
 
           <section className="card">

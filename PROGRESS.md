@@ -152,3 +152,48 @@ adapters (native `type+url` for Claude Code; shim for Claude Desktop + authed Wi
 **Follow-ups (not blocking):** S17.5 (schema v2 naming), S17.7 (registry), and the still-open
 pre-existing gemini-cli compat-sample drift (re-capture; the compat harness is a separate scheduled
 job, not part of `verify_all`).
+
+---
+
+## S20.2 — Wire Stripe billing into the entitlement stub
+
+**Started** 2026-07-09 · branch `story/S20.2-stripe-entitlements` · priority p1, deps: none.
+
+**Done** 2026-07-09 (mock-mode; no live Stripe keys — verified via Deno unit tests, web e2e mock,
+and CI's db-integration for the RLS + live-DB paths).
+
+The stub granted `team` to everyone; that grant is **gone**. Team cloud features are now gated by a
+real, Stripe-backed, **fail-closed-to-free** entitlement per team.
+
+- **Edge (Deno):**
+  - `lib/entitlements.ts` rewritten: `dbEntitlementChecker` reads `public.entitlements` and returns
+    the stored tier only while the subscription is active-ish; missing/inactive/error → `cloud-free`
+    (never `team`). `requireEntitlement` guard.
+  - `lib/stripe.ts` (new): webhook **signature verification** via WebCrypto HMAC-SHA256 (Stripe's
+    `t=…,v1=…` scheme with replay-tolerance) — no SDK, fully offline-testable; `tierForPriceId`; an
+    injectable `StripeClient` (live REST client for Checkout/Portal, faked in tests).
+  - `functions/billing/` (new): `POST …/billing/webhook` (signature-verified, **idempotent** via a
+    `billing_events` PK ledger, upserts entitlements from `customer.subscription.*`), `checkout` +
+    `portal` (owner-gated Stripe URLs), `entitlement` (RLS-read tier). Wired into `server.ts`.
+  - `functions/teams`: inviting members now returns **402** unless the team has the `team-config`
+    entitlement (enforced only when the checker is injected — the production router always does).
+- **Migration `0007_entitlements.sql`:** `entitlements` (one row/team, tier + Stripe ids) and
+  `billing_events` (idempotency ledger), both RLS-enabled. Members can READ their team's entitlement;
+  no client write policy (webhook writes as the BYPASSRLS service connection); `billing_events` is
+  not client-accessible. RLS asserted in `test-rls.sh`.
+- **Web:** `TeamConsole` shows the tier badge, gates the invite form on the free tier with an
+  **Upgrade** (Checkout) CTA, and a **Manage billing** (Portal) link on paid tiers; `teamsApi` gains
+  `entitlement`/`checkout`/`portal`. The teams e2e now drives the full free → upgrade → team flow.
+- **CLI stays ungated:** new `e2e/cli-ungated.test.ts` structurally asserts the OSS CLI imports no
+  entitlement/billing code — a paywall can never leak into the free tool.
+- **Docs:** `pricing-model.md` §Billing rewritten from "not yet integrated" to the implemented
+  behavior; the four optional `STRIPE_*` env vars documented in `deployment.md`.
+
+Verification: `deno test` (26 passed — 12 new billing tests: signature valid/wrong/tampered/replay,
+tier fail-closed, webhook idempotency, subscription.deleted downgrade, owner-gated checkout, invite
+402/allow), teams playwright e2e (green), `pnpm -r test` (all packages), lint + typecheck ×8 +
+Prettier + `docs:build` + deploy-env. The RLS migration + full DB-backed edge tests run in CI's
+db-integration job (which stands up Postgres — not runnable locally).
+
+**Follow-ups (not blocking):** pending-invite redemption + SSO (S20.3); a live-Stripe smoke test in a
+dedicated environment; per-seat pricing if the team tier moves from per-team to per-member.

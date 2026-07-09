@@ -4476,7 +4476,7 @@
       "epic": "E20",
       "order": 2,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Wire Stripe billing into the entitlement stub",
       "user_story": "As the maintainer, I want real entitlement checks backed by Stripe subscriptions so team features can be commercially gated instead of granting everyone the team tier forever.",
