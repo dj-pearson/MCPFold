@@ -60,8 +60,10 @@ describe('runRun (S4.7)', () => {
 
   it('bridges a remote server via mcp-remote with the resolved Authorization header', async () => {
     let args: string[] = [];
-    const spawnFn: Spawner = async (_c, a) => {
+    let env: NodeJS.ProcessEnv = {};
+    const spawnFn: Spawner = async (_c, a, e) => {
       args = a;
+      env = e;
       return 0;
     };
     await runRun({ cwd, name: 'remote', providers: [envProvider({ MY_TOKEN: 'tok' })], spawnFn });
@@ -70,7 +72,46 @@ describe('runRun (S4.7)', () => {
     expect(args).toContain(MCP_REMOTE_SPEC);
     expect(args).not.toContain('mcp-remote');
     expect(MCP_REMOTE_SPEC).toMatch(/^mcp-remote@\d+\.\d+\.\d+$/);
-    expect(args).toContain('Authorization: Bearer tok');
+    // S16.4: the header arg references an env placeholder, and the resolved secret VALUE never
+    // appears anywhere in argv — it is delivered to mcp-remote through the environment instead.
+    expect(args).toContain('Authorization: Bearer ${MCPFOLD_HDR_0}');
+    expect(args.join('\n')).not.toContain('tok');
+    expect(env.MCPFOLD_HDR_0).toBe('tok');
+  });
+
+  it('keeps custom header secrets out of argv too (S16.4)', async () => {
+    writeFileSync(
+      join(cwd, 'mcp.config.jsonc'),
+      `{
+        "version": 1,
+        "servers": {
+          "hdr": {
+            "transport": "sse",
+            "url": "https://api.example/sse/",
+            "auth": { "type": "header", "headers": { "X-Api-Key": "\${env:MY_TOKEN}" } },
+            "tags": ["t"]
+          }
+        },
+        "profiles": {}
+      }`,
+    );
+    let args: string[] = [];
+    let env: NodeJS.ProcessEnv = {};
+    const spawnFn: Spawner = async (_c, a, e) => {
+      args = a;
+      env = e;
+      return 0;
+    };
+    await runRun({
+      cwd,
+      name: 'hdr',
+      providers: [envProvider({ MY_TOKEN: 'k3y-secret' })],
+      spawnFn,
+    });
+    // The whole custom value moves to the env; argv carries only the placeholder.
+    expect(args).toContain('X-Api-Key: ${MCPFOLD_HDR_0}');
+    expect(args.join('\n')).not.toContain('k3y-secret');
+    expect(env.MCPFOLD_HDR_0).toBe('k3y-secret');
   });
 
   it('propagates the child exit code', async () => {

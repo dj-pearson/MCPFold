@@ -117,17 +117,39 @@ function applyPin(args: string[] | undefined, pin: string | undefined): string[]
   return args.map((a) => a.replace(/@latest$/, `@${pin}`));
 }
 
-/** Build `mcp-remote` args for a remote server, injecting resolved auth headers. The bridge is
- * pinned to a CVE-safe version via MCP_REMOTE_SPEC (see @mcpfold/core bridge.ts). */
-function remoteArgs(server: ResolvedServer): string[] {
+/** Prefix for the per-header env vars that carry resolved secret values to mcp-remote (S16.4). */
+const HEADER_ENV_PREFIX = 'MCPFOLD_HDR_';
+
+/**
+ * Build the `mcp-remote` invocation (args + env) for a remote server. The bridge is pinned to a
+ * CVE-safe version via MCP_REMOTE_SPEC (see @mcpfold/core bridge.ts).
+ *
+ * S16.4: the resolved secret VALUE is never placed in argv, where any local user could read it
+ * for the process lifetime. Instead each header value is passed through an environment variable and
+ * referenced from the `--header` argument as `${MCPFOLD_HDR_n}`; mcp-remote (>=0.1.x) substitutes
+ * `${VAR}` in header values from `process.env` at connect time. The argv therefore only ever
+ * contains the non-secret placeholder.
+ */
+function remoteInvocation(server: ResolvedServer): { args: string[]; env: NodeJS.ProcessEnv } {
   const args = ['-y', MCP_REMOTE_SPEC, server.url ?? ''];
+  const env: NodeJS.ProcessEnv = {};
+  let n = 0;
+  // Push a `Name: <prefix>${VAR}` header whose secret part lives only in the child env.
+  const pushHeader = (name: string, literalPrefix: string, secret: string): void => {
+    const varName = `${HEADER_ENV_PREFIX}${n++}`;
+    env[varName] = secret;
+    args.push('--header', `${name}: ${literalPrefix}\${${varName}}`);
+  };
+
   if (server.auth?.type === 'bearer' && server.auth.token) {
-    args.push('--header', `Authorization: Bearer ${server.auth.token}`);
+    // Keep the non-secret "Bearer " scheme visible; only the token moves to the env.
+    pushHeader('Authorization', 'Bearer ', server.auth.token);
   }
   for (const [k, v] of Object.entries(server.auth?.headers ?? {})) {
-    args.push('--header', `${k}: ${v}`);
+    // Custom header values may be secret in full → move the whole value to the env.
+    pushHeader(k, '', v);
   }
-  return args;
+  return { args, env };
 }
 
 export async function runRun(options: RunOptions): Promise<number> {
@@ -192,6 +214,7 @@ export async function runRun(options: RunOptions): Promise<number> {
     }
     return spawner(s.command ?? '', args, env);
   }
-  // http / sse → bridge with mcp-remote and resolved headers.
-  return spawner('npx', remoteArgs(s), { ...process.env });
+  // http / sse → bridge with mcp-remote. Resolved auth values travel via env (S16.4), never argv.
+  const remote = remoteInvocation(s);
+  return spawner('npx', remote.args, { ...process.env, ...remote.env });
 }

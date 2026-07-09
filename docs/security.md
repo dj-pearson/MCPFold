@@ -76,9 +76,13 @@ The shim resolves a server's secret refs and execs the real server, keeping toke
   or tampered config is a code-execution vector. Trust-on-first-use for new/changed commands and
   version-integrity signing on synced config are addressed in S9.2; pinning (above) bounds the
   supply-chain risk of `@latest`.
-- **Secret exposure.** Resolved values are injected into the child's environment/headers in memory
-  and never logged; a resolution failure fails closed with a coded error that never prints the
-  value.
+- **Secret exposure.** Resolved values are injected into the child's environment in memory and never
+  logged; a resolution failure fails closed with a coded error that never prints the value. For
+  remote (`http`/`sse`) servers bridged through `mcp-remote`, the resolved auth value is **never**
+  placed on the child's command line — where any local user could read it from the process list for
+  the process lifetime (S16.4). Instead the `--header` argument carries a `${MCPFOLD_HDR_n}`
+  placeholder and the secret travels through an environment variable that `mcp-remote` substitutes
+  at connect time, so argv holds only the non-secret placeholder.
 - **Signal handling.** SIGINT/SIGTERM are forwarded to the child so the shim adds no lifecycle gap.
 
 ### Curation proxy
