@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,7 +15,14 @@ import {
 } from '@mcpfold/adapters';
 import { runSync, runRun, renderWithStrategy, type Spawner, type TrustGate } from 'mcpfold';
 
-const trustAll: TrustGate = { status: () => 'trusted', isTrusted: () => true, approve: () => {} };
+const trustAll: TrustGate = {
+  status: () => 'trusted',
+  isTrusted: () => true,
+  approve: () => {},
+  trustedTools: () => undefined,
+  toolsStatus: () => 'unpinned',
+  approveTools: () => {},
+};
 import {
   assertRefOnlyForPush,
   findRawSecretsForPush,
@@ -93,6 +100,34 @@ describe('S9.1 — the sentinel appears in ZERO artifacts for shim + native-inpu
       });
       expect(file.contents).not.toContain(SENTINEL);
     }
+  });
+});
+
+describe('S9.1 — native-env folds the reference, never the value (S19.4)', () => {
+  const NATIVE_CONFIG = `{
+    "version": 1,
+    "servers": {
+      "gh": { "transport": "http", "url": "https://api.example/mcp/", "auth": { "type": "bearer", "token": "\${env:GH_PAT}" }, "tags": ["all"] },
+      "local": { "transport": "stdio", "command": "srv", "env": { "API_TOKEN": "\${env:GH_PAT}" }, "tags": ["all"] }
+    },
+    "profiles": {
+      "cursor": { "client": "cursor", "scope": "user", "include": ["all"], "strategy": "native-env" },
+      "windsurf": { "client": "windsurf", "scope": "user", "include": ["all"], "strategy": "native-env" }
+    }
+  }`;
+
+  it('native-env sync leaks no value; the client file carries the ${env:…} reference, not a shim', async () => {
+    writeFileSync(join(cwd, 'mcp.config.jsonc'), NATIVE_CONFIG);
+    // A provider that would return the sentinel IF anything resolved — native-env must not.
+    await runSync({ cwd, osContext: ctx, providers: [sentinelProvider('env')] });
+
+    // The sentinel VALUE appears in zero artifacts across the native-env adapters.
+    expect(scanForSentinel(home)).toEqual([]);
+
+    // The reference is folded natively (present, and NOT rewritten to the shim launcher).
+    const cursorFile = readFileSync(join(home, '.cursor', 'mcp.json'), 'utf8');
+    expect(cursorFile).toContain('${env:GH_PAT}');
+    expect(cursorFile).not.toContain('"mcpfold"');
   });
 });
 

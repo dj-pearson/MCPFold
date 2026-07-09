@@ -17,6 +17,7 @@ export {
   SCOPES,
   SECRET_REF_RE,
   SECRET_SCHEMES,
+  SECRET_STRATEGIES,
   SecretRef,
   ServerSchema,
   ToolsSchema,

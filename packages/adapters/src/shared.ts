@@ -5,7 +5,13 @@ import {
   type ResolvedServer,
   type ServerConfig,
 } from '@mcpfold/core';
-import type { ClientAdapter, OsContext, RenderedFile, SecretStrategy } from './types.js';
+import type {
+  ClientAdapter,
+  InterpolationDialect,
+  OsContext,
+  RenderedFile,
+  SecretStrategy,
+} from './types.js';
 import { realOsContext } from './paths.js';
 
 /**
@@ -99,6 +105,8 @@ export interface McpServersAdapterConfig {
   /** Native root key. Default `mcpServers`; VS Code uses `servers`, Zed `context_servers`. */
   rootKey?: string;
   secretStrategy?: SecretStrategy;
+  /** Native env-interpolation dialect, enabling the `native-env` strategy (S19.4). */
+  interpolation?: InterpolationDialect;
   needsRestart?: boolean;
   /** Emit an explicit per-server `type` field (Claude Code). */
   includeType?: boolean;
@@ -122,6 +130,7 @@ export function createMcpServersAdapter(config: McpServersAdapterConfig): Client
   return {
     id: config.id,
     secretStrategy,
+    interpolation: config.interpolation,
     needsRestart,
     resolvePath: config.resolvePath,
     render(servers, ctx = realOsContext()): RenderedFile {

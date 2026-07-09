@@ -3,8 +3,10 @@ import { findSecretRefs, type ResolvedServer } from '@mcpfold/core';
 import {
   realOsContext,
   type ClientAdapter,
+  type InterpolationDialect,
   type OsContext,
   type RenderedFile,
+  type SecretStrategy,
 } from '@mcpfold/adapters';
 
 /**
@@ -25,8 +27,10 @@ export interface StrategyOptions {
   resolve?: (servers: ResolvedServer[]) => Promise<ResolvedServer[]>;
   /** Whether a path is gitignored; injectable for tests. Defaults to `git check-ignore`. */
   isGitignored?: (path: string) => boolean;
-  /** Loud-warning sink for the inline strategy. */
+  /** Loud-warning sink for the inline / native-env strategies. */
   onWarn?: (message: string) => void;
+  /** Per-profile override of the adapter's default strategy (S19.4). */
+  strategyOverride?: SecretStrategy;
 }
 
 function hasSecrets(server: ResolvedServer): boolean {
@@ -73,6 +77,36 @@ function toInline(server: ResolvedServer): ResolvedServer {
   return server;
 }
 
+/** Rewrite every `${env:NAME}` reference in a string into the client's native dialect. */
+function toNativeEnv(value: string, dialect: InterpolationDialect): string {
+  return value.replace(/\$\{env:([^}]+)\}/g, (_, name: string) => dialect.toNative(name));
+}
+
+/**
+ * Fold a server's env-scheme refs into the client's native interpolation (S19.4), keeping the
+ * REFERENCE (never a value) so the client resolves it from the process env at launch — no shim.
+ * A bearer token is first moved into an `Authorization` header (where the client can interpolate
+ * it), reusing the inline transform's shape but on the still-unresolved reference.
+ */
+function toNativeEnvServer(server: ResolvedServer, dialect: InterpolationDialect): ResolvedServer {
+  const moved = toInline(server); // bearer token → Authorization header, ref preserved
+  const clone: ResolvedServer = { ...moved };
+  if (moved.env) {
+    clone.env = Object.fromEntries(
+      Object.entries(moved.env).map(([k, v]) => [k, toNativeEnv(v, dialect)]),
+    );
+  }
+  if (moved.auth?.headers) {
+    clone.auth = {
+      ...moved.auth,
+      headers: Object.fromEntries(
+        Object.entries(moved.auth.headers).map(([k, v]) => [k, toNativeEnv(v, dialect)]),
+      ),
+    };
+  }
+  return clone;
+}
+
 function defaultGitignored(path: string): boolean {
   const result = spawnSync('git', ['check-ignore', '-q', path], { stdio: 'ignore' });
   return result.status === 0;
@@ -94,17 +128,39 @@ export async function renderWithStrategy(
   options: StrategyOptions = {},
 ): Promise<RenderedFile> {
   const ctx = options.osContext ?? realOsContext();
+  const strategy = options.strategyOverride ?? adapter.secretStrategy;
   // Pin @latest → the fixed version at fold time, before any strategy transform.
   const pinned = servers.map(applyPinAtFold);
 
-  if (adapter.secretStrategy === 'shim') {
+  if (strategy === 'shim') {
     const transformed = pinned.map((s) => (hasSecrets(s) ? toShim(s) : s));
     return adapter.render(transformed, ctx);
   }
 
-  if (adapter.secretStrategy === 'native-input') {
+  if (strategy === 'native-input') {
     // The adapter itself emits the client's secret indirection — never a raw token.
     return adapter.render(pinned, ctx);
+  }
+
+  if (strategy === 'native-env') {
+    // Fold env-scheme refs into the client's own interpolation so it resolves them itself — no
+    // shim. Non-env refs (infisical/op/keychain) can't be client-resolved, and a client without a
+    // declared dialect can't interpolate at all, so those fall back to the shim with an explanation.
+    const dialect = adapter.interpolation;
+    const transformed = pinned.map((server) => {
+      const refs = findSecretRefs(server);
+      if (refs.length === 0) return server;
+      const allEnv = refs.every((r) => r.scheme === 'env');
+      if (dialect && allEnv) return toNativeEnvServer(server, dialect);
+      const why = !dialect
+        ? `${adapter.id} has no native env interpolation`
+        : `it uses a non-env secret (\${${refs.find((r) => r.scheme !== 'env')?.scheme}:…})`;
+      options.onWarn?.(
+        `native-env: server "${server.name}" falls back to the shim launcher because ${why}.`,
+      );
+      return toShim(server);
+    });
+    return adapter.render(transformed, ctx);
   }
 
   // inline

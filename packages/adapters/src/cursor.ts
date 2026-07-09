@@ -1,4 +1,5 @@
 import { createMcpServersAdapter } from './shared.js';
+import { envIdentityDialect } from './interpolation.js';
 import { expandHome, joinFor, realOsContext } from './paths.js';
 import type { OsContext } from './types.js';
 
@@ -10,6 +11,7 @@ import type { OsContext } from './types.js';
 export const cursorAdapter = createMcpServersAdapter({
   id: 'cursor',
   secretStrategy: 'shim',
+  interpolation: envIdentityDialect,
   needsRestart: false,
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope === 'user') return joinFor(ctx, ctx.home, '.cursor', 'mcp.json');

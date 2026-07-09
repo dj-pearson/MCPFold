@@ -4,7 +4,14 @@
  * (S2.2–S2.7) register themselves here as they are implemented.
  */
 
-export type { ClientAdapter, OsContext, RenderedFile, SecretStrategy } from './types.js';
+export type {
+  ClientAdapter,
+  InterpolationDialect,
+  OsContext,
+  RenderedFile,
+  SecretStrategy,
+} from './types.js';
+export { envIdentityDialect } from './interpolation.js';
 
 export { expandHome, joinFor, pathFor, realOsContext, userConfigDir } from './paths.js';
 

@@ -8,8 +8,19 @@ import type { ClientId, Config, ResolvedServer, Scope } from '@mcpfold/core';
  * semantics, secret strategy) is quarantined here.
  */
 
-/** How a client wants secrets handled (spec §6). */
-export type SecretStrategy = 'inline' | 'native-input' | 'shim';
+/** How a client wants secrets handled (spec §6, S19.4). */
+export type SecretStrategy = 'inline' | 'native-input' | 'shim' | 'native-env';
+
+/**
+ * How a client natively interpolates environment variables in its config (S19.4). When an adapter
+ * declares one, the `native-env` strategy can fold `${env:NAME}` references into the client's own
+ * syntax and let the client resolve them at launch — no mcpfold shim process needed. `toNative`
+ * renders a canonical env var name into the client's form (e.g. Cursor/VS Code `${env:NAME}`,
+ * Claude Code `${NAME}`).
+ */
+export interface InterpolationDialect {
+  toNative(name: string): string;
+}
 
 /** A native config file mcpfold would write for a client. */
 export interface RenderedFile {
@@ -36,6 +47,12 @@ export interface ClientAdapter {
   readonly id: ClientId;
   /** Default secret strategy for this client. */
   readonly secretStrategy: SecretStrategy;
+  /**
+   * The client's native env-interpolation dialect (S19.4). Present only for clients that resolve
+   * `${env:…}`-style references themselves; enables the `native-env` strategy. Absent → the client
+   * can't resolve env refs, so `native-env` falls back to the shim.
+   */
+  readonly interpolation?: InterpolationDialect;
   /** Whether writing this client's config requires a restart to take effect. */
   readonly needsRestart: boolean;
 

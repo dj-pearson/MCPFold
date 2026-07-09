@@ -6,6 +6,7 @@ import {
   type ResolvedServer,
   type ServerConfig,
 } from '@mcpfold/core';
+import { envIdentityDialect } from './interpolation.js';
 import { joinFor, realOsContext } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
@@ -71,6 +72,7 @@ function toWindsurfEntry(server: ResolvedServer): WindsurfEntry {
 export const windsurfAdapter: ClientAdapter = {
   id: 'windsurf',
   secretStrategy: 'shim',
+  interpolation: envIdentityDialect,
   needsRestart: true,
 
   resolvePath(_scope, _projectPath, ctx: OsContext = realOsContext()) {

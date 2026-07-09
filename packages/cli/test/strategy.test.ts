@@ -76,6 +76,75 @@ describe('renderWithStrategy — native-input (S4.6)', () => {
   });
 });
 
+describe('renderWithStrategy — native-env (S19.4)', () => {
+  const ENV_REF = '${env:GH_PAT}';
+  const stdioEnv: ResolvedServer = {
+    ...plainStdio,
+    args: ['-y', '@playwright/mcp@1.4.2'],
+    env: { API_TOKEN: ENV_REF },
+  };
+  const remoteEnv: ResolvedServer = { ...githubSecret, auth: { type: 'bearer', token: ENV_REF } };
+
+  it('folds an env-scheme ref into the client file directly — no shim, no value', async () => {
+    const file = await renderWithStrategy(cursorAdapter, [stdioEnv], {
+      osContext: ctx,
+      strategyOverride: 'native-env',
+    });
+    const entry = JSON.parse(file.contents).mcpServers.playwright;
+    expect(entry.command).toBe('npx'); // rendered directly, NOT the shim
+    expect(entry.env.API_TOKEN).toBe(ENV_REF); // the reference is preserved for the client
+  });
+
+  it('moves a bearer env token into an Authorization header, ref intact', async () => {
+    const file = await renderWithStrategy(cursorAdapter, [remoteEnv], {
+      osContext: ctx,
+      strategyOverride: 'native-env',
+    });
+    const entry = JSON.parse(file.contents).mcpServers.github;
+    expect(entry.command).toBeUndefined(); // not shimmed
+    expect(entry.headers.Authorization).toBe(`Bearer ${ENV_REF}`);
+  });
+
+  it('round-trips: parsing the native file reconstructs the canonical ${env:NAME} ref', async () => {
+    const file = await renderWithStrategy(cursorAdapter, [stdioEnv], {
+      osContext: ctx,
+      strategyOverride: 'native-env',
+    });
+    const parsed = cursorAdapter.parse(file.contents);
+    expect(parsed.servers?.playwright?.env?.API_TOKEN).toBe(ENV_REF);
+  });
+
+  it('falls back to the shim for a NON-env secret, with an explanation', async () => {
+    const warnings: string[] = [];
+    const file = await renderWithStrategy(cursorAdapter, [githubSecret], {
+      osContext: ctx,
+      strategyOverride: 'native-env',
+      onWarn: (w) => warnings.push(w),
+    });
+    expect(JSON.parse(file.contents).mcpServers.github).toEqual({
+      command: 'mcpfold',
+      args: ['run', 'github'],
+    });
+    expect(warnings.some((w) => /non-env secret/.test(w))).toBe(true);
+  });
+
+  it('falls back to the shim when the adapter has no native env dialect', async () => {
+    const noDialect = createMcpServersAdapter({
+      id: 'claude-desktop',
+      secretStrategy: 'shim',
+      resolvePath: () => '/home/dev/claude.json',
+    });
+    const warnings: string[] = [];
+    const file = await renderWithStrategy(noDialect, [{ ...remoteEnv, client: 'claude-desktop' }], {
+      osContext: ctx,
+      strategyOverride: 'native-env',
+      onWarn: (w) => warnings.push(w),
+    });
+    expect(JSON.parse(file.contents).mcpServers.github.command).toBe('mcpfold');
+    expect(warnings.some((w) => /no native env interpolation/.test(w))).toBe(true);
+  });
+});
+
 describe('renderWithStrategy — inline (S4.6)', () => {
   const inlineAdapter = createMcpServersAdapter({
     id: 'cursor',

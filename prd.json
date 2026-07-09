@@ -4383,7 +4383,7 @@
       "epic": "E19",
       "order": 4,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Native-interpolation secret strategy (fold refs into each client's own dialect)",
       "user_story": "As a user on a client with native env-var interpolation, I want mcpfold to fold my secret references into the client's own syntax instead of a shim process, so I get zero extra processes with the same no-plaintext guarantee.",

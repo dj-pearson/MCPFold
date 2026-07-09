@@ -130,6 +130,7 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
       osContext: ctx,
       resolve,
       onWarn: (w) => warnings.push(w),
+      strategyOverride: profile.strategy,
     });
     const onDisk = existsSync(file.path) ? readFileSync(file.path, 'utf8') : undefined;
 

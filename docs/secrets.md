@@ -16,6 +16,28 @@ resolve time, not before.
 | `keychain`  | `${keychain:github}`              | OS keychain (below).                                                     |
 | `op`        | `${op:vault/item/field}`          | 1Password `op` CLI (below).                                              |
 
+## Secret strategies — how a reference reaches the client
+
+How mcpfold gets a resolved reference to each client is the client's **secret strategy**. Every
+strategy keeps the secret VALUE off disk (except the opt-in, gitignored `inline`):
+
+- **`shim`** (default for most clients) — the launch is rewritten to `mcpfold run <name>`, so
+  mcpfold resolves and injects the value into the child at launch. Works for every scheme.
+- **`native-input`** — the adapter emits the client's own secret indirection (e.g. VS Code
+  `${input:…}` + an `inputs` array).
+- **`native-env`** (S19.4) — for a server whose secrets are all **`${env:…}`** references and whose
+  client natively interpolates env vars (Cursor, VS Code, Windsurf), fold the reference straight
+  into the client's own syntax and let the client resolve it from the process environment at launch.
+  No shim process is added. A **non-env** reference (`infisical`/`keychain`/`op`) can't be resolved
+  by the client, so that server automatically falls back to `shim` with an explanation; a client
+  with no documented env dialect falls back entirely. Parsing a native-env file back reconstructs
+  the canonical `${env:NAME}` reference (round-trippable).
+- **`inline`** — last resort: resolve and write the real value, but ONLY if the target file is
+  gitignored, else refuse. Always warns loudly.
+
+The default strategy is per client; override it per profile with `"strategy": "native-env"` (or any
+of the above) in the profile. The default never changes silently.
+
 ## Infisical (`infisical`)
 
 Reference grammar: `env/[folder/…/]KEY` — the first segment is the environment slug, the

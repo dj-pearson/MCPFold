@@ -75,6 +75,9 @@ export const ServerSchema = z
     message: 'stdio servers need `command`; http/sse servers need `url`',
   });
 
+/** Secret strategies a profile may pin, overriding the adapter's default (S4.6, S19.4). */
+export const SECRET_STRATEGIES = ['inline', 'native-input', 'shim', 'native-env'] as const;
+
 export const ProfileSchema = z
   .object({
     client: z.enum(CLIENT_IDS),
@@ -83,6 +86,8 @@ export const ProfileSchema = z
     path: z.string().optional(),
     /** Tag filter — the "fold": only servers whose tags intersect this load into the client. */
     include: z.array(z.string()),
+    /** Override the adapter's default secret strategy for this profile (S19.4). */
+    strategy: z.enum(SECRET_STRATEGIES).optional(),
   })
   .strict()
   .refine((p) => p.scope === 'user' || Boolean(p.path), {
