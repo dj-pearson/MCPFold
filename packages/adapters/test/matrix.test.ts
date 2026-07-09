@@ -16,6 +16,10 @@ import { windsurfAdapter } from '../src/windsurf.js';
 import { zedAdapter } from '../src/zed.js';
 import { clineAdapter } from '../src/cline.js';
 import { geminiCliAdapter } from '../src/gemini-cli.js';
+import { jetbrainsAdapter } from '../src/jetbrains.js';
+import { visualStudioAdapter } from '../src/visual-studio.js';
+import { continueAdapter } from '../src/continue.js';
+import { rooCodeAdapter } from '../src/roo-code.js';
 
 /**
  * Cross-adapter fixture harness (S2.8). A single canonical fixture is folded through every
@@ -48,6 +52,10 @@ const ADAPTERS: { adapter: ClientAdapter; golden: string }[] = [
   { adapter: zedAdapter, golden: 'fixtures/matrix/zed.json' },
   { adapter: clineAdapter, golden: 'fixtures/matrix/cline.json' },
   { adapter: geminiCliAdapter, golden: 'fixtures/matrix/gemini-cli.json' },
+  { adapter: jetbrainsAdapter, golden: 'fixtures/matrix/jetbrains.json' },
+  { adapter: visualStudioAdapter, golden: 'fixtures/matrix/visual-studio.json' },
+  { adapter: continueAdapter, golden: 'fixtures/matrix/continue.json' },
+  { adapter: rooCodeAdapter, golden: 'fixtures/matrix/roo-code.json' },
 ];
 
 describe('cross-adapter matrix (S2.8)', () => {
@@ -77,6 +85,6 @@ describe('cross-adapter matrix (S2.8)', () => {
   }
 
   it('covers every registered adapter', () => {
-    expect(ADAPTERS).toHaveLength(8);
+    expect(ADAPTERS).toHaveLength(12);
   });
 });

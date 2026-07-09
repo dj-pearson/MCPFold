@@ -10,13 +10,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const isWin = process.platform === 'win32';
@@ -49,7 +43,11 @@ const only = process.argv.slice(2).find((a) => a !== '--');
 // Support a single target or a comma-separated list (e.g. from CI matrix)
 const targets = only
   ? Object.fromEntries(
-      only.split(',').map(t => t.trim()).filter(t => TARGETS[t]).map(t => [t, TARGETS[t]])
+      only
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => TARGETS[t])
+        .map((t) => [t, TARGETS[t]]),
     )
   : TARGETS;
 

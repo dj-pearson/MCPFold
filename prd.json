@@ -4284,7 +4284,7 @@
       "epic": "E19",
       "order": 1,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Adapter wave 1: JetBrains AI Assistant, Visual Studio, Continue, Roo Code",
       "user_story": "As a user on JetBrains, Visual Studio, Continue, or Roo Code, I want first-class mcpfold adapters so my client is folded from the same canonical config as everything else.",

@@ -7,6 +7,10 @@ import { windsurfAdapter } from './windsurf.js';
 import { zedAdapter } from './zed.js';
 import { clineAdapter } from './cline.js';
 import { geminiCliAdapter } from './gemini-cli.js';
+import { jetbrainsAdapter } from './jetbrains.js';
+import { visualStudioAdapter } from './visual-studio.js';
+import { continueAdapter } from './continue.js';
+import { rooCodeAdapter } from './roo-code.js';
 import type { ClientAdapter } from './types.js';
 
 /** Every built-in adapter, in a stable order. */
@@ -19,6 +23,10 @@ export const ALL_ADAPTERS: readonly ClientAdapter[] = [
   zedAdapter,
   clineAdapter,
   geminiCliAdapter,
+  jetbrainsAdapter,
+  visualStudioAdapter,
+  continueAdapter,
+  rooCodeAdapter,
 ];
 
 /** Register every built-in adapter into the shared registry. Idempotent. */

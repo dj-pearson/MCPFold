@@ -40,7 +40,7 @@ describe('team config-as-code drift gate (S12.1)', () => {
     expect(() => run(['sync', '--check'])).toThrow();
   });
 
-  it('a new executable command is untrusted until `mcpfold trust` approves it', () => {
+  it('a new executable command is untrusted until `mcpfold trust` approves it', async () => {
     const { config } = loadConfigFromDisk(EXAMPLE);
     const gate = memoryTrustGate(); // a fresh machine trusts nothing
     const before = untrustedServers(config, gate)
@@ -50,7 +50,7 @@ describe('team config-as-code drift gate (S12.1)', () => {
     expect(before).toContain('playwright');
 
     // `mcpfold trust` (no name) approves every untrusted server — the CI --yes-equivalent.
-    const res = runTrust({ cwd: EXAMPLE, gate });
+    const res = await runTrust({ cwd: EXAMPLE, gate });
     expect(res.data.approved.length).toBeGreaterThanOrEqual(2);
     expect(untrustedServers(config, gate)).toHaveLength(0);
   });
