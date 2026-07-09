@@ -4352,7 +4352,7 @@
       "epic": "E19",
       "order": 3,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Project-scope expansion and installed-app detection beyond config-file existence",
       "user_story": "As a team member, I want project-scope folding for every client that supports it, and I want mcpfold to detect clients I have installed but haven't configured yet, so first-run setup and team workflows cover my real environment.",

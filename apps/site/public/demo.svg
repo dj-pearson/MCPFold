@@ -7,7 +7,7 @@
   <text x="20" y="96" fill="#50fa7b" xml:space="preserve">$ mcpfold init</text>
   <text x="20" y="117" fill="#f8f8f2" xml:space="preserve">Created ~/project/mcp.config.jsonc</text>
   <text x="20" y="138" fill="#f8f8f2" xml:space="preserve"></text>
-  <text x="20" y="159" fill="#f8f8f2" xml:space="preserve">Detected clients: cursor.</text>
+  <text x="20" y="159" fill="#f8f8f2" xml:space="preserve">Configured clients: cursor.</text>
   <text x="20" y="180" fill="#f8f8f2" xml:space="preserve"></text>
   <text x="20" y="201" fill="#f8f8f2" xml:space="preserve">Next: edit the config, then run `mcpfold sync` to fold it out.</text>
   <text x="20" y="222" fill="#f8f8f2" xml:space="preserve">Already have a .mcp.json? Run `mcpfold import` to adopt it. Need one for another tool?</text>

@@ -89,7 +89,8 @@ export const gooseAdapter: ClientAdapter = {
   // Goose calls streamable-http/sse remotes natively with header auth (`uri` + `headers`).
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
 
-  resolvePath(_scope, _projectPath, ctx: OsContext = realOsContext()) {
+  resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
+    if (scope !== 'user') throw new Error('Goose only supports user scope.');
     if (ctx.platform === 'win32') {
       const appData = ctx.env.APPDATA ?? joinFor(ctx, ctx.home, 'AppData', 'Roaming');
       return joinFor(ctx, appData, 'Block', 'goose', 'config', 'config.yaml');

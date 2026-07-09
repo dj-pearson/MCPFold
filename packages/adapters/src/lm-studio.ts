@@ -24,7 +24,8 @@ export const lmStudioAdapter = createMcpServersAdapter({
   needsRestart: false,
   // Cursor-compatible: native http/sse remotes with header auth (`url` + `headers`, no `type`).
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
-  resolvePath(_scope, _projectPath, ctx: OsContext = realOsContext()) {
+  resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
+    if (scope !== 'user') throw new Error('LM Studio only supports user scope.');
     return joinFor(ctx, ctx.home, '.lmstudio', 'mcp.json');
   },
 });

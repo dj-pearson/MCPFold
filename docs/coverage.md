@@ -13,9 +13,9 @@ prioritized. Adding a client is a one-PR job — see [Adapters](./adapters.md) a
 | Cursor         | `mcpServers`       | user, project | shim            | no                | native `url`                     |
 | VS Code        | `servers`          | user, project | native input    | no                | native `type`+`url`              |
 | Windsurf       | `mcpServers`\*     | user          | shim            | **yes**           | native `url`; shim if authed\*   |
-| Zed            | `context_servers`  | user          | shim            | no                | native `url`                     |
+| Zed            | `context_servers`  | user, project | shim            | no                | native `url`                     |
 | Cline          | `mcpServers`       | user          | shim            | no                | native `url`                     |
-| Gemini CLI     | `mcpServers`       | user          | shim            | no                | native `httpUrl`/`url`           |
+| Gemini CLI     | `mcpServers`       | user, project | shim            | no                | native `httpUrl`/`url`           |
 | JetBrains      | `mcpServers`       | user, project | shim            | no                | native `url`                     |
 | Visual Studio  | `servers`\*\*      | user, project | native input    | no                | native `type`+`url`              |
 | Continue       | `mcpServers`\*\*\* | user, project | shim            | no                | native `url`                     |
@@ -81,7 +81,37 @@ round-trip) and the deterministic-serialization invariant.
   adapter still holds. A `devin` alias is **deferred** until a distinct Devin config surface exists —
   today it would be a duplicate of the Windsurf adapter with no behavioral difference.
 - **Zed** does **not** require a restart (`needsRestart: false`) — consistent with the adapter,
-  this table, and the spec.
+  this table, and the spec. It supports **project scope** (S19.3): a project-local
+  `.zed/settings.json` with the same `context_servers` schema overrides the user settings for that
+  project (verified July 2026).
+- **Gemini CLI** supports **project scope** (S19.3): a project-local `.gemini/settings.json` with
+  the same `mcpServers` schema (`gemini mcp add` defaults to it; servers merge across levels by
+  name, project winning). mcpfold folds to `~/.gemini/settings.json` (user) or
+  `<project>/.gemini/settings.json` (project).
+
+### Scopes & installed-app detection (S19.3)
+
+**Project scope** is implemented for every client that documents a project-local MCP config:
+Cursor, VS Code, JetBrains, Visual Studio, Continue, Roo Code, Warp, opencode, **Zed**, and
+**Gemini CLI**. The remaining clients are **user-scope only** (verified July 2026) and now **throw**
+on a project/workspace profile rather than silently writing it to the shared user file: **Claude
+Desktop** (single global `claude_desktop_config.json`), **Windsurf** (single
+`~/.codeium/windsurf/mcp_config.json`), **Cline** (MCP servers are global-only; the project
+`.cline/` dir holds rules/hooks, not servers), **LM Studio**, **Goose**, **Codex CLI**, and
+**Copilot CLI**. (For a project-scoped Anthropic target, that role is Claude _Code_'s `.mcp.json`,
+not Claude _Desktop_.)
+
+**Installed-app detection.** `detect-clients` used to report a client only when its MCP config file
+already existed, so an installed-but-unconfigured client (the exact case `init --guided` serves) was
+invisible. It now runs a second, injectable **app-presence probe** — a CLI on PATH, an app
+bundle/install dir, a VS Code-family extension folder, or the durable dot-dir a client writes on
+first run — and exposes a three-way state: `configured` (has an MCP config), `installed-only` (app
+present, not yet configured), or `not-found`. `init --guided`, `status`, and `doctor` surface the
+installed-only clients as fold targets; the `--json` envelope keeps its legacy `installed` field
+(== `configured`) and adds `appPresent` + `state` additively. App-presence probing reads the real
+machine (PATH, install dirs), so it varies by environment; set `MCPFOLD_NO_APP_DETECTION=1` to force
+config-only detection for stable, scripted output (the demo recorder uses this).
+
 - **JetBrains** (S19.1): JetBrains AI Assistant configures MCP via an in-IDE dialog that takes a
   `mcpServers`-shaped paste-in JSON (with "Import from Claude"), which does not persist to a stable
   user-editable file. The JetBrains _agent_ surface (Junie) reads the same `mcpServers` JSON from a

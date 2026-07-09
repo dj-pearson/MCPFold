@@ -1,11 +1,13 @@
 import { serialize, type Config, type ResolvedServer, type ServerConfig } from '@mcpfold/core';
-import { joinFor, realOsContext } from './paths.js';
+import { expandHome, joinFor, realOsContext } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
 /**
- * Gemini CLI adapter (S14.1, corrected S17.3). The Gemini CLI reads MCP servers from the
- * `mcpServers` root of `~/.gemini/settings.json` and picks them up on the next run (no restart).
- * User scope only.
+ * Gemini CLI adapter (S14.1, corrected S17.3, project scope S19.3). The Gemini CLI reads MCP
+ * servers from the `mcpServers` root of `~/.gemini/settings.json` and picks them up on the next
+ * run (no restart). It supports **project scope** too (verified July 2026): a project-local
+ * `.gemini/settings.json` with the same `mcpServers` schema (`gemini mcp add` defaults to it;
+ * `--scope user` targets the home file). Servers merge across levels by name, project winning.
  *
  * Unlike the generic `mcpServers` clients, Gemini distinguishes the two remote transports by KEY,
  * not a `type` field (per current docs): **`httpUrl`** for streamable HTTP, **`url`** for SSE.
@@ -53,16 +55,21 @@ export const geminiCliAdapter: ClientAdapter = {
   // Native remotes with header auth; streamable HTTP under `httpUrl`, SSE under `url`.
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'httpUrl' },
 
-  resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
-    if (scope !== 'user') throw new Error('Gemini CLI only supports user scope.');
+  resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
+    if (scope !== 'user') {
+      if (!projectPath) throw new Error('Gemini CLI project scope requires a project path.');
+      return joinFor(ctx, expandHome(projectPath, ctx.home), '.gemini', 'settings.json');
+    }
     return joinFor(ctx, ctx.home, '.gemini', 'settings.json');
   },
 
   render(servers, ctx: OsContext = realOsContext()): RenderedFile {
     const mcpServers: Record<string, GeminiEntry> = {};
     for (const server of servers) mcpServers[server.name] = toGeminiEntry(server);
+    const scope = servers[0]?.scope ?? 'user';
+    const projectPath = servers[0]?.projectPath;
     return {
-      path: this.resolvePath('user', undefined, ctx),
+      path: this.resolvePath(scope, projectPath, ctx),
       contents: serialize({ mcpServers }),
       needsRestart: false,
     };

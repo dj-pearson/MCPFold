@@ -101,4 +101,22 @@ describe('runGuided (S10.3)', () => {
     expect(readFileSync(configPath, 'utf8')).toContain('playwright');
     expect(result.synced).toBe(true);
   });
+
+  it('offers an installed-but-unconfigured client as a fold target (S19.3)', async () => {
+    writeFileSync(configPath, CONFIG_WITH_FOOTGUN);
+    // Gemini CLI is "installed" (its data dir exists) but has no MCP config → installed-only.
+    mkdirSync(join(home, '.gemini'), { recursive: true });
+    const writes: string[] = [];
+    const result = await runGuided(
+      { cwd, osContext: ctx },
+      { prompt: scriptedPrompter([true, true, true]), write: (l) => writes.push(l) },
+    );
+
+    expect(result.aborted).toBe(false);
+    expect(
+      writes.some(
+        (l) => l.includes('Installed but not yet configured') && l.includes('gemini-cli'),
+      ),
+    ).toBe(true);
+  });
 });

@@ -23,6 +23,8 @@ describe('lmStudioAdapter (S19.2)', () => {
     expect(lmStudioAdapter.resolvePath('user', undefined, win)).toBe(
       'C:\\Users\\dev\\.lmstudio\\mcp.json',
     );
+    // User-scope only (S19.3): a project profile throws rather than misdirecting to the user file.
+    expect(() => lmStudioAdapter.resolvePath('project', '/x', linux)).toThrow(/user scope/);
   });
 
   it('renders Cursor-compatible mcpServers (no type field) and round-trips', () => {

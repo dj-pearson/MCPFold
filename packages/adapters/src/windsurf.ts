@@ -10,6 +10,10 @@ import type { OsContext } from './types.js';
  * render/parse, now live in the shared factory (`remoteNeedsShim`), so this adapter is just its
  * path + capability. Restart required (needsRestart=true). Config path (every OS):
  * `~/.codeium/windsurf/mcp_config.json`.
+ *
+ * **User scope only** (verified July 2026): Windsurf/Cascade loads a single global file and has no
+ * project/workspace-scoped MCP config, so a non-user scope throws (rather than silently writing a
+ * project profile to the shared user file) — S19.3.
  */
 export const windsurfAdapter = createMcpServersAdapter({
   id: 'windsurf',
@@ -17,7 +21,10 @@ export const windsurfAdapter = createMcpServersAdapter({
   needsRestart: true,
   // Native unauthenticated remotes, but authed remotes must go through the mcp-remote shim.
   remote: { nativeHttp: true, nativeOauth: false, fieldShape: 'url' },
-  resolvePath(_scope, _projectPath, ctx: OsContext = realOsContext()) {
+  resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
+    if (scope !== 'user') {
+      throw new Error('Windsurf only supports user scope (no project/workspace config).');
+    }
     return joinFor(ctx, ctx.home, '.codeium', 'windsurf', 'mcp_config.json');
   },
 });

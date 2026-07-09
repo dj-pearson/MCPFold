@@ -39,6 +39,9 @@ const env = {
   USERPROFILE: home,
   APPDATA: join(home, 'AppData/Roaming'),
   NO_COLOR: '1', // deterministic, un-styled output
+  // App-presence detection reads the real machine (PATH, install dirs), which would make the demo
+  // vary by who records it. Force config-only detection so the cast is byte-identical everywhere.
+  MCPFOLD_NO_APP_DETECTION: '1',
 };
 
 /** Normalize volatile bits so the cast is byte-identical on every run. */

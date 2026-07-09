@@ -34,12 +34,26 @@ const servers: ResolvedServer[] = [
   },
 ];
 
-describe('geminiCliAdapter (S14.1, S17.3)', () => {
-  it('resolves ~/.gemini/settings.json for user scope and rejects others', () => {
+describe('geminiCliAdapter (S14.1, S17.3, S19.3)', () => {
+  it('resolves user and project settings.json (S19.3 project scope)', () => {
     expect(geminiCliAdapter.resolvePath('user', undefined, linux)).toBe(
       '/home/dev/.gemini/settings.json',
     );
-    expect(() => geminiCliAdapter.resolvePath('project', '/x', linux)).toThrow(/user scope/);
+    expect(geminiCliAdapter.resolvePath('project', '/repos/x', linux)).toBe(
+      '/repos/x/.gemini/settings.json',
+    );
+    expect(() => geminiCliAdapter.resolvePath('project', undefined, linux)).toThrow(/project path/);
+  });
+
+  it('renders to the project settings.json when the profile is project-scoped (S19.3)', () => {
+    const projectServers = servers.map((s) => ({
+      ...s,
+      scope: 'project' as const,
+      projectPath: '/repos/x',
+    }));
+    const file = geminiCliAdapter.render(projectServers, linux);
+    expect(file.path).toBe('/repos/x/.gemini/settings.json');
+    expect(JSON.parse(file.contents).mcpServers.local.command).toBe('npx');
   });
 
   it('renders `httpUrl` for streamable HTTP and `url` for SSE (per current docs)', () => {

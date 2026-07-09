@@ -25,7 +25,8 @@ export const copilotCliAdapter = createMcpServersAdapter({
   includeType: true,
   // Native http remotes with header auth; entries name the transport via `type`.
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'type+url' },
-  resolvePath(_scope, _projectPath, ctx: OsContext = realOsContext()) {
+  resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
+    if (scope !== 'user') throw new Error('Copilot CLI only supports user scope.');
     const home = ctx.env.COPILOT_HOME ?? joinFor(ctx, ctx.home, '.copilot');
     return joinFor(ctx, home, 'mcp-config.json');
   },

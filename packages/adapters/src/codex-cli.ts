@@ -53,7 +53,8 @@ export const codexCliAdapter: ClientAdapter = {
   // Codex calls streamable-http remotes natively; auth via bearer_token_env_var / oauth.
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'url' },
 
-  resolvePath(_scope, _projectPath, ctx: OsContext = realOsContext()) {
+  resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
+    if (scope !== 'user') throw new Error('Codex CLI only supports user scope.');
     const codexHome = ctx.env.CODEX_HOME ?? joinFor(ctx, ctx.home, '.codex');
     return joinFor(ctx, codexHome, 'config.toml');
   },

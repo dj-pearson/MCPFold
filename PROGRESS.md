@@ -586,3 +586,49 @@ a clean tree, passes on CI ubuntu).
 **Follow-ups:** S19.4 (native-interpolation secrets) can replace the `shim` default for Goose
 (`env_keys`), Continue (`${{ secrets }}`), and opencode variable substitution; S19.5 (compat harness
 v2) can add live evidence + a public compat matrix for the YAML/TOML clients.
+
+---
+
+## S19.3 — Project-scope expansion & installed-app detection
+
+Started/done: 2026-07-09. Two audit gaps closed: (1) clients that support a project-scoped MCP
+config now fold to it, and (2) `detect-clients` sees clients that are **installed but not yet
+configured**, not just already-configured ones. Both parts verified against current primary docs
+(two parallel research passes; sources in `docs/coverage.md`). Stacked on S19.2 (needs the 18-client
+matrix).
+
+**Project scope.** Re-verified all scope-throwing adapters against July-2026 docs:
+
+- **Zed** and **Gemini CLI** DO support project scope → implemented (`<project>/.zed/settings.json`
+  with `context_servers`; `<project>/.gemini/settings.json` with `mcpServers`). Gemini's `render`
+  no longer hard-codes the user path — it honors `servers[0].scope/projectPath` like the others.
+- **Claude Desktop, Windsurf, Cline** confirmed **global-only** → they (and the wave-2 user-only
+  clients LM Studio / Goose / Codex CLI / Copilot CLI) now **throw** on a project/workspace profile
+  instead of silently misdirecting it to the shared user file (Windsurf/Zed previously ignored scope
+  entirely). The "throws on project" list shrinks by Zed + Gemini; the rest is now honest + verified.
+
+**Installed-app detection.** New injectable `install-probes.ts` gives per-client, per-OS presence
+signals — a CLI on PATH, an app bundle / install dir, a VS Code-family extension folder
+(`<host>/extensions/<publisher.id>-*`), or the durable dot-dir a client writes on first run.
+`detect-clients` now returns a three-way `state` (`configured` / `installed-only` / `not-found`)
+plus `appPresent`, keeping the legacy `installed` field (== `configured`) so `--json` consumers are
+unbroken (strictly additive). `DetectProbe` is injected, so every state is unit-tested per platform
+with zero real I/O.
+
+- `init --guided` lists installed-only clients and offers them as fold targets.
+- `init` and `doctor` print "installed but not configured"; `status` adds an `installedUnconfigured`
+  field + a hint line for installed clients with no profile yet.
+
+Tests: `detect-clients.test.ts` (three states via fake probes: bin-on-PATH, extension-dir,
+config-file, configured-wins-over-installed); project-scope resolve + render for Zed and Gemini CLI;
+throw-on-project for the user-only clients (Goose, LM Studio); a guided test that surfaces an
+installed-only client (`~/.gemini` present, no config); `status` `--json` shape updated for the
+additive field.
+
+`verify_all` green (eslint + core-purity, typecheck ×10, `pnpm -r test`, `pnpm -r build`, Prettier,
+docs:build). adapters 142 / core 92 / cli 257. Same pre-existing Windows-only red as S19.2
+(`e2e/deploy-env.test.ts` — Git-Bash path mangling; passes on CI ubuntu).
+
+**Follow-ups:** the install-probe locations are a living table (like the format matrix) — refresh as
+apps move; JetBrains/Visual Studio presence is detected at the family level (any JetBrains IDE / any
+VS install), not per-product.
