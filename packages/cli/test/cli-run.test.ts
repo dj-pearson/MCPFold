@@ -57,6 +57,7 @@ describe('run() — real arg parsing (guards option placement)', () => {
       'import',
       'export',
       'add',
+      'search',
       'sync',
       'diff',
       'doctor',

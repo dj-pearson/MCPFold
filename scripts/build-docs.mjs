@@ -28,6 +28,7 @@ const NAV = [
   ['secrets.md', 'Secrets'],
   ['adapters.md', 'Adapters'],
   ['coverage.md', 'Adapter coverage'],
+  ['registry.md', 'MCP registry'],
   ['benchmark.md', 'Benchmark'],
   ['cli-contract.md', 'CLI contract'],
   ['completions.md', 'Shell completions'],

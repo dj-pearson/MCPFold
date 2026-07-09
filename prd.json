@@ -4060,7 +4060,7 @@
       "epic": "E17",
       "order": 7,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Official MCP registry integration: add --from-registry and search",
       "user_story": "As a user adding a server, I want `mcpfold add --from-registry <name>` to resolve the official registry's metadata into a pinned, integrity-hashed, secret-ref'd canonical entry in one command, so the safest possible config is also the easiest.",

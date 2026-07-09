@@ -94,7 +94,29 @@ export {
   type ExportOptions,
   type UnresolvedRef,
 } from './commands/export.js';
-export { runAdd, type AddData, type AddOptions, type Prompt } from './commands/add.js';
+export {
+  runAdd,
+  deriveLocalName,
+  type AddData,
+  type AddOptions,
+  type Prompt,
+} from './commands/add.js';
+export { runSearch, type SearchData, type SearchOptions } from './commands/search.js';
+export {
+  httpRegistryClient,
+  registryBaseUrl,
+  DEFAULT_REGISTRY_URL,
+  type RegistryClient,
+  type RegistrySearchResult,
+} from './registry/client.js';
+export {
+  mapRegistryServer,
+  toSri,
+  type RegistryServer,
+  type RegistryPackage,
+  type RegistryRemote,
+  type SecretScheme,
+} from './registry/map.js';
 export { detectClients, type DetectedClient } from './util/detect-clients.js';
 export type { Finding, Severity } from './checks/types.js';
 
