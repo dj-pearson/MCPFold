@@ -2,9 +2,22 @@
   "client": "cline",
   "source": {
     "type": "captured",
-    "capturedAt": "2026-07-08"
+    "capturedAt": "2026-07-09"
   },
-  "rootKeys": ["mcpServers"],
+  "rootKeys": [
+    "mcpServers"
+  ],
   "serverContainer": "mcpServers",
-  "entryKeys": ["args", "command", "env", "url"]
+  "entryKeys": [
+    "args",
+    "command",
+    "env",
+    "url"
+  ],
+  "remoteEntryKeys": [
+    "url"
+  ],
+  "paths": {
+    "user": "/home/dev/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
+  }
 }

@@ -673,3 +673,44 @@ Windows-only red (`e2e/deploy-env.test.ts`; passes on CI ubuntu).
 headers/uri only) were conservatively left on the shim — revisit if users ask. Version-sensitivity
 smoke tests (Copilot CLI `${VAR}` regressed in v0.0.407; Gemini env substitution has lagged docs)
 would harden the guarantee.
+
+---
+
+## S19.5 — Adapter-compat harness v2: deep signatures, live evidence, public matrix
+
+Started/done: 2026-07-09. The weekly compat harness compared only top-level/entry KEY shapes against
+hand-captured samples — blind to the exact drifts that hit in 2025-26: a value-position change
+(Windsurf `serverUrl`, Gemini `httpUrl`) or a path move (Windsurf→Devin). This upgrades it on four
+axes. Stacked on S19.4.
+
+- **Deeper signature**: `shapeOf` now collects **remote-entry field keys** separately from stdio
+  keys (a URL-shaped entry is classified remote), so `url→serverUrl` / keeping `httpUrl` is
+  detectable on its own axis; samples also carry the **resolved path pattern per scope**, so a
+  silent path move is flagged. Regression fixtures for the Windsurf/Gemini/path cases. All 18 samples
+  recaptured with the deep signature.
+- **Live upstream checks**: samples for the four clients with fetchable primary docs (VS Code,
+  Cursor, Claude Code, Gemini) carry a `liveUrl`. The scheduled `--live` run confirms those docs
+  still document the keys the adapter renders — catching upstream drift, not just our stale samples.
+  It never parses HTML into a schema (brittle); a missing key token ⇒ divergent, an unreachable doc
+  ⇒ **skipped, never a false pass**. The captured check always runs regardless.
+- **Public compat matrix**: `compat/matrix.ts` + `gen-matrix.ts` generate a dated
+  **[docs/compat-matrix.md](docs/compat-matrix.md)** (also served on the site under /docs) and
+  **apps/site/public/compat-matrix.json** — client × format × scopes × transport × secret-strategy ×
+  **last-verified date** (straight from the harness samples, so it's evidence, not hand-edited). CI
+  gate (`docs` job) fails if the committed matrix drifts from a re-capture.
+- **Richer issue-filing**: the weekly `adapter-compat.yml` runs `--live` and its report now names the
+  exact axis (root/entry key, **remote-entry field**, **path move**, or **upstream doc** token), so
+  drift triage points at the field, not just "something changed."
+
+Tests: deep-signature regression fixtures (remote-entry split, httpUrl→url, url→serverUrl, path
+move), live-check ok/divergent/skipped-never-false-pass, and the matrix module (row derivation +
+Markdown render). Generated `compat-matrix.md`/`.json` and the recaptured `samples/` are
+prettier-ignored (harness-owned, like fixtures) — fixes the recurring capture-vs-prettier friction.
+
+`verify_all` green (eslint + core-purity, typecheck ×10, `pnpm -r test`, `pnpm -r build`, Prettier,
+docs:build + matrix-drift + demo). adapters 25 files / 151 tests. Same pre-existing Windows-only red
+(`e2e/deploy-env.test.ts`; passes on CI ubuntu).
+
+**Follow-ups:** a dedicated styled site page (vs the on-site docs page + JSON asset) for the E13/E15
+marketing tie-in; the live-doc heuristic is token-presence — a schema-parse path could sharpen it for
+clients that publish machine-readable schemas.

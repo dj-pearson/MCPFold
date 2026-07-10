@@ -4414,7 +4414,7 @@
       "epic": "E19",
       "order": 5,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Adapter-compat harness v2: live evidence and a public compat matrix",
       "user_story": "As a user choosing a config manager, I want public, dated evidence that mcpfold's adapters match each client's current format, so currency is proven rather than promised.",

@@ -2,9 +2,29 @@
   "client": "vscode",
   "source": {
     "type": "captured",
-    "capturedAt": "2026-07-08"
+    "capturedAt": "2026-07-09"
   },
-  "rootKeys": ["inputs", "servers"],
+  "rootKeys": [
+    "inputs",
+    "servers"
+  ],
   "serverContainer": "servers",
-  "entryKeys": ["args", "command", "env", "headers", "type", "url"]
+  "entryKeys": [
+    "args",
+    "command",
+    "env",
+    "headers",
+    "type",
+    "url"
+  ],
+  "remoteEntryKeys": [
+    "headers",
+    "type",
+    "url"
+  ],
+  "paths": {
+    "user": "/home/dev/.config/Code/User/mcp.json",
+    "project": "/home/dev/repo/.vscode/mcp.json"
+  },
+  "liveUrl": "https://code.visualstudio.com/docs/copilot/chat/mcp-servers"
 }

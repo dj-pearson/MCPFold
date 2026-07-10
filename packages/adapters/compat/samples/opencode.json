@@ -4,7 +4,24 @@
     "type": "captured",
     "capturedAt": "2026-07-09"
   },
-  "rootKeys": ["mcp"],
+  "rootKeys": [
+    "mcp"
+  ],
   "serverContainer": "mcp",
-  "entryKeys": ["command", "enabled", "environment", "type", "url"]
+  "entryKeys": [
+    "command",
+    "enabled",
+    "environment",
+    "type",
+    "url"
+  ],
+  "remoteEntryKeys": [
+    "enabled",
+    "type",
+    "url"
+  ],
+  "paths": {
+    "user": "/home/dev/.config/opencode/opencode.json",
+    "project": "/home/dev/repo/opencode.json"
+  }
 }

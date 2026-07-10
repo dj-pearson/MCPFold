@@ -2,9 +2,23 @@
   "client": "zed",
   "source": {
     "type": "captured",
-    "capturedAt": "2026-07-08"
+    "capturedAt": "2026-07-09"
   },
-  "rootKeys": ["context_servers"],
+  "rootKeys": [
+    "context_servers"
+  ],
   "serverContainer": "context_servers",
-  "entryKeys": ["args", "command", "env", "url"]
+  "entryKeys": [
+    "args",
+    "command",
+    "env",
+    "url"
+  ],
+  "remoteEntryKeys": [
+    "url"
+  ],
+  "paths": {
+    "user": "/home/dev/.config/zed/settings.json",
+    "project": "/home/dev/repo/.zed/settings.json"
+  }
 }

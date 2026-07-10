@@ -4,6 +4,11 @@ Breadth is the moat. This is the living matrix of clients mcpfold folds to, plus
 prioritized. Adding a client is a one-PR job — see [Adapters](./adapters.md) and
 `mcpfold scaffold-adapter <name>`.
 
+> **Machine-verified evidence:** the [client compatibility matrix](./compat-matrix.md) (format ×
+> scopes × transport × secret strategy × **last-verified date**) is generated from the compat
+> harness — never hand-edited — and the harness re-checks each client's shape (and fetchable clients'
+> upstream docs) weekly. See `.github/workflows/adapter-compat.yml`.
+
 ## Supported clients
 
 | Client         | Config root        | Scopes        | Secret strategy | Restart on change | Remote transport                 |

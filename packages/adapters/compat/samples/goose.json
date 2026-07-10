@@ -5,7 +5,9 @@
     "capturedAt": "2026-07-09"
   },
   "format": "yaml",
-  "rootKeys": ["extensions"],
+  "rootKeys": [
+    "extensions"
+  ],
   "serverContainer": "extensions",
   "entryKeys": [
     "args",
@@ -18,5 +20,17 @@
     "timeout",
     "type",
     "uri"
-  ]
+  ],
+  "remoteEntryKeys": [
+    "bundled",
+    "enabled",
+    "headers",
+    "name",
+    "timeout",
+    "type",
+    "uri"
+  ],
+  "paths": {
+    "user": "/home/dev/.config/goose/config.yaml"
+  }
 }

@@ -130,6 +130,12 @@ jobs:
         run: |
           pnpm demo:record
           git diff --exit-code demo/mcpfold.cast docs/assets/demo.svg apps/site/public/demo.svg
+      # Public compat matrix (S19.5): the docs page + site JSON are generated from the harness
+      # samples — fail if the committed copy drifted from a `--capture` that wasn't re-generated.
+      - name: Compat matrix is up to date
+        run: |
+          npx tsx packages/adapters/compat/gen-matrix.ts
+          git diff --exit-code docs/compat-matrix.md apps/site/public/compat-matrix.json
 
   # Database integration gate (S6.1): stand up the CI Supabase database from the same
   # compose developers use, apply the migrations with the psql runner, and smoke-test the

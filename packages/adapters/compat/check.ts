@@ -27,6 +27,25 @@ export interface CompatSample {
   serverContainer: string;
   /** Keys a server entry may contain. */
   entryKeys: string[];
+  /**
+   * Keys a REMOTE entry uses (S19.5) — the deep signature that makes a value-position change
+   * detectable: Windsurf renaming `url`→`serverUrl`, or Gemini keeping `httpUrl`, changes this set
+   * even though the union of all `entryKeys` might not. A remote entry is one carrying a URL-shaped
+   * field (`url`/`httpUrl`/`uri`/`serverUrl`). Undefined on legacy samples ⇒ not checked.
+   */
+  remoteEntryKeys?: string[];
+  /**
+   * The resolved config-path pattern per scope (S19.5), captured against a fixed OS context so a
+   * silent path move (e.g. Windsurf → Devin docs migration) is flagged. Undefined ⇒ not checked.
+   */
+  paths?: { user?: string; project?: string };
+  /**
+   * A live upstream doc/schema URL (S19.5). The captured check always runs; when a fetcher is
+   * available (the scheduled `--live` run), the harness ALSO confirms the client's primary docs
+   * still document the keys this adapter renders — catching upstream drift, not just our own stale
+   * samples. Unreachable or ambiguous ⇒ the live check degrades to `skipped`, never a false pass.
+   */
+  liveUrl?: string;
 }
 
 /** Parse rendered client config text by its on-disk format (JSON / YAML / TOML). */
@@ -49,37 +68,91 @@ export interface CompatResult {
   reason?: string;
 }
 
-/** Extract the structural shape of a rendered client config. */
+/** URL-shaped fields that mark a server entry as a REMOTE entry (S19.5). */
+const REMOTE_MARKERS = ['url', 'httpUrl', 'uri', 'serverUrl'];
+
+/** Extract the structural shape of a rendered client config, incl. remote-entry keys (S19.5). */
 export function shapeOf(
   rendered: string,
   serverContainer: string,
   format: ConfigFormat = 'json',
-): { rootKeys: string[]; entryKeys: string[] } {
+): { rootKeys: string[]; entryKeys: string[]; remoteEntryKeys: string[] } {
   const json = parseByFormat(rendered, format);
   const rootKeys = Object.keys(json).sort();
   const container = (json[serverContainer] ?? {}) as Record<string, unknown>;
   const entryKeys = new Set<string>();
+  const remoteEntryKeys = new Set<string>();
   for (const entry of Object.values(container)) {
     if (entry && typeof entry === 'object') {
-      for (const k of Object.keys(entry as Record<string, unknown>)) entryKeys.add(k);
+      const keys = Object.keys(entry as Record<string, unknown>);
+      for (const k of keys) entryKeys.add(k);
+      // A remote entry carries a URL-shaped field; collect its keys separately so a value-position
+      // change (e.g. url→serverUrl, or keeping httpUrl) is visible even if the overall union isn't.
+      if (keys.some((k) => REMOTE_MARKERS.includes(k))) {
+        for (const k of keys) remoteEntryKeys.add(k);
+      }
     }
   }
-  return { rootKeys, entryKeys: [...entryKeys].sort() };
+  return {
+    rootKeys,
+    entryKeys: [...entryKeys].sort(),
+    remoteEntryKeys: [...remoteEntryKeys].sort(),
+  };
 }
 
-/** Compare one adapter's rendered output against the client's accepted-format sample. */
-export function checkAdapter(rendered: string, sample: CompatSample): CompatResult {
+/** A two-way set diff, formatted as human divergence lines (S19.5). */
+function diffKeys(
+  label: string,
+  client: string,
+  rendered: string[],
+  accepted: string[],
+  lines: string[],
+): void {
+  for (const k of rendered.filter((x) => !accepted.includes(x))) {
+    lines.push(`renders ${label} key "${k}", not accepted by ${client}`);
+  }
+  for (const k of accepted.filter((x) => !rendered.includes(x))) {
+    lines.push(`${client} expects ${label} key "${k}", but the adapter does not render it`);
+  }
+}
+
+/**
+ * Compare one adapter's rendered output against the client's accepted-format sample. `currentPaths`
+ * (S19.5) is the adapter's freshly-resolved path pattern per scope, compared against the sample's so
+ * a silent path move is flagged.
+ */
+export function checkAdapter(
+  rendered: string,
+  sample: CompatSample,
+  currentPaths?: { user?: string; project?: string },
+): CompatResult {
   const shape = shapeOf(rendered, sample.serverContainer, sample.format);
   const divergence: string[] = [];
 
-  for (const k of shape.rootKeys.filter((x) => !sample.rootKeys.includes(x))) {
-    divergence.push(`renders root key "${k}", not in ${sample.client}'s accepted keys`);
-  }
-  for (const k of sample.rootKeys.filter((x) => !shape.rootKeys.includes(x))) {
-    divergence.push(`${sample.client} expects root key "${k}", but the adapter does not render it`);
-  }
+  diffKeys('root', sample.client, shape.rootKeys, sample.rootKeys, divergence);
+  // Only flag entry keys the adapter renders that the client rejects (the client may accept more).
   for (const k of shape.entryKeys.filter((x) => !sample.entryKeys.includes(x))) {
     divergence.push(`renders server-entry key "${k}", not accepted by ${sample.client}`);
+  }
+  // S19.5: remote-entry field shape (both directions — a missing `httpUrl`/`serverUrl` matters).
+  if (sample.remoteEntryKeys) {
+    diffKeys(
+      'remote-entry',
+      sample.client,
+      shape.remoteEntryKeys,
+      sample.remoteEntryKeys,
+      divergence,
+    );
+  }
+  // S19.5: resolved path pattern per scope.
+  if (sample.paths && currentPaths) {
+    for (const scope of ['user', 'project'] as const) {
+      const want = sample.paths[scope];
+      const got = currentPaths[scope];
+      if (want !== undefined && got !== undefined && want !== got) {
+        divergence.push(`${scope}-scope path moved: "${want}" → "${got}"`);
+      }
+    }
   }
 
   return {
@@ -89,12 +162,61 @@ export function checkAdapter(rendered: string, sample: CompatSample): CompatResu
   };
 }
 
-export type SchemaShape = Pick<CompatSample, 'rootKeys' | 'serverContainer' | 'entryKeys'>;
+export type SchemaShape = Pick<
+  CompatSample,
+  'rootKeys' | 'serverContainer' | 'entryKeys' | 'remoteEntryKeys'
+>;
+
+/** Fetch a client's primary doc/schema text, or `null` if unreachable (S19.5). Injectable for tests. */
+export type DocFetcher = (url: string) => Promise<string | null>;
+
+/**
+ * Live upstream check (S19.5): confirm the client's primary docs still document every root key and
+ * server-container name this adapter renders. A coarse but safe upstream-drift signal —
+ *   - fetch fails / no URL      → `skipped` (never a false pass)
+ *   - a rendered key is absent  → `divergent` (the doc no longer mentions it — likely a rename/move)
+ *   - all present               → `ok`
+ * It intentionally does NOT try to parse HTML into a schema (brittle); token presence is the signal.
+ */
+export async function checkLive(
+  rendered: string,
+  sample: CompatSample,
+  fetchDoc: DocFetcher,
+): Promise<CompatResult> {
+  if (!sample.liveUrl) {
+    return { client: sample.client, status: 'skipped', divergence: [], reason: 'no live source' };
+  }
+  const text = await fetchDoc(sample.liveUrl);
+  if (text === null) {
+    return {
+      client: sample.client,
+      status: 'skipped',
+      divergence: [],
+      reason: 'upstream doc unreachable',
+    };
+  }
+  const shape = shapeOf(rendered, sample.serverContainer, sample.format);
+  const tokens = [...new Set([...shape.rootKeys, sample.serverContainer])].filter(Boolean);
+  const divergence = tokens
+    .filter((t) => !text.includes(t))
+    .map(
+      (t) => `${sample.client}'s upstream docs no longer mention "${t}" — possible format drift`,
+    );
+  return {
+    client: sample.client,
+    status: divergence.length > 0 ? 'divergent' : 'ok',
+    divergence,
+  };
+}
 
 export async function runCompatCheck(
   rendered: Record<string, string>,
   samples: CompatSample[],
-  opts: { fetchLatest?: (url: string) => Promise<SchemaShape | null> } = {},
+  opts: {
+    fetchLatest?: (url: string) => Promise<SchemaShape | null>;
+    /** Freshly-resolved path pattern per client (S19.5) — compared against the sample's paths. */
+    currentPaths?: Record<string, { user?: string; project?: string }>;
+  } = {},
 ): Promise<CompatResult[]> {
   const results: CompatResult[] = [];
   for (const sample of samples) {
@@ -125,7 +247,7 @@ export async function runCompatCheck(
       effective = { ...sample, ...latest };
     }
 
-    results.push(checkAdapter(out, effective));
+    results.push(checkAdapter(out, effective, opts.currentPaths?.[sample.client]));
   }
   return results;
 }
