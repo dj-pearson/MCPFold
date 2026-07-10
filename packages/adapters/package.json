@@ -1,6 +1,6 @@
 {
   "name": "@mcpfold/adapters",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Client adapters: render canonical mcpfold config to each client's native format and back.",
   "license": "MIT",
   "type": "module",
