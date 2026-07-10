@@ -67,13 +67,15 @@ export function buildDiagnoseBundle(options: DiagnoseOptions = {}): DiagnoseBund
 
 export function diagnose(options: DiagnoseOptions = {}): CommandOutput<DiagnoseBundle> {
   const bundle = buildDiagnoseBundle(options);
-  const detected = bundle.clients.filter((c) => c.installed).map((c) => c.id);
+  const configured = bundle.clients.filter((c) => c.state === 'configured').map((c) => c.id);
+  const installedOnly = bundle.clients.filter((c) => c.state === 'installed-only').map((c) => c.id);
   const human = [
     'mcpfold diagnostic bundle',
     `  mcpfold:  ${bundle.mcpfoldVersion}`,
     `  node:     ${bundle.node}`,
     `  platform: ${bundle.platform} (${bundle.arch}) ${bundle.osRelease}`,
-    `  clients:  ${detected.length ? detected.join(', ') : 'none detected'}`,
+    `  clients:  ${configured.length ? configured.join(', ') : 'none configured'}`,
+    `  installed (unconfigured): ${installedOnly.length ? installedOnly.join(', ') : 'none'}`,
     `  config:   ${bundle.configPath ?? 'not provided'}`,
     '',
     'Secrets and ref paths are redacted. Re-run with --json to copy the full bundle.',

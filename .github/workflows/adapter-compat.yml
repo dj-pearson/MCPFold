@@ -26,12 +26,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mcpfold/core build
 
-      - name: Run compat harness
+      - name: Run compat harness (captured + live upstream checks)
         id: check
         continue-on-error: true
         run: |
           set +e
-          npx tsx packages/adapters/compat/run.ts > compat-report.txt 2>&1
+          # --live also confirms each fetchable client's primary docs still document our keys (S19.5);
+          # an unreachable doc degrades to `skipped` and never fails the run.
+          npx tsx packages/adapters/compat/run.ts --live > compat-report.txt 2>&1
           echo "code=$?" >> "$GITHUB_OUTPUT"
           cat compat-report.txt
 
@@ -42,7 +44,7 @@ jobs:
         run: |
           title="Adapter compat drift detected"
           {
-            echo "The scheduled compat harness found a client whose config format diverged from mcpfold's rendered output. Refresh the sample (see packages/adapters/compat/README.md) and update the affected adapter."
+            echo "The scheduled compat harness detected drift. The report below names the exact axis — a root/entry key, a **remote-entry field** (e.g. url→serverUrl / httpUrl), a **resolved path move**, or an **upstream doc** that no longer documents our keys (--live). Refresh the sample (see packages/adapters/compat/README.md), update the affected adapter, and regenerate the public matrix (\`npx tsx packages/adapters/compat/gen-matrix.ts\`)."
             echo
             echo '```'
             cat compat-report.txt

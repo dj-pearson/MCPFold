@@ -24,6 +24,8 @@ describe('gooseAdapter (S19.2)', () => {
     expect(gooseAdapter.resolvePath('user', undefined, win)).toBe(
       'C:\\Users\\dev\\AppData\\Roaming\\Block\\goose\\config\\config.yaml',
     );
+    // User-scope only (S19.3): a project profile throws rather than misdirecting to the user file.
+    expect(() => gooseAdapter.resolvePath('project', '/x', linux)).toThrow(/user scope/);
   });
 
   it('renders the extensions map with cmd/uri (not command/url) and round-trips', () => {

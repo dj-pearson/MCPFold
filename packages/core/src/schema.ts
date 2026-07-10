@@ -32,6 +32,17 @@ export const CLIENT_IDS = [
 /** Secret-provider schemes understood by the resolver (E4). Parsing lives in secret-ref.ts. */
 export const SECRET_SCHEMES = ['env', 'dotenv', 'infisical', 'keychain', 'op'] as const;
 
+/** How a client handles secrets (spec §6; `native-env` added S19.4). Adapters own the default. */
+export const SECRET_STRATEGIES = ['shim', 'native-input', 'inline', 'native-env'] as const;
+
+/**
+ * The user-selectable secret-strategy overrides (S19.4). A profile or server may opt into
+ * `native-env` (write the client's own `${env:NAME}` dialect, no wrapper) or force `shim`; the
+ * adapter's own default (usually `shim`, VS Code `native-input`) applies when unset. `native-input`
+ * and `inline` are adapter-intrinsic and not user-selectable here.
+ */
+export const STRATEGY_OVERRIDES = ['shim', 'native-env'] as const;
+
 /**
  * Canonical transports (schema v2, S17.5). The MCP spec's remote transport is **Streamable HTTP**
  * (the older HTTP+SSE was deprecated 2025-11-25). `streamable-http` is the canonical value; a plain
@@ -97,6 +108,8 @@ export const ServerSchema = z
     /** Optional SRI integrity hash (e.g. `sha512-…`) for the pinned stdio package (S9.2). */
     integrity: z.string().optional(),
     tools: ToolsSchema.optional(),
+    /** Per-server secret-strategy override (S19.4) — wins over the profile's and adapter's default. */
+    secretStrategy: z.enum(STRATEGY_OVERRIDES).optional(),
     tags: z.array(z.string()).default([]),
   })
   .strict()
@@ -112,6 +125,8 @@ export const ProfileSchema = z
     path: z.string().optional(),
     /** Tag filter — the "fold": only servers whose tags intersect this load into the client. */
     include: z.array(z.string()),
+    /** Per-profile secret-strategy override (S19.4); a server's own override still wins over this. */
+    secretStrategy: z.enum(STRATEGY_OVERRIDES).optional(),
   })
   .strict()
   .refine((p) => p.scope === 'user' || Boolean(p.path), {

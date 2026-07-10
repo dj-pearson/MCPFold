@@ -51,6 +51,25 @@ describe('runDoctor (S3.7)', () => {
     expect(result.data.findings.some((f) => f.where === 'servers.modern')).toBe(false);
   });
 
+  it('explains the native-env → shim fallback for a non-env scheme (S19.4)', () => {
+    write(`{
+      "version": 2,
+      "servers": {
+        "envsrv": { "transport": "stdio", "command": "s", "env": { "T": "\${env:TOKEN}" }, "tags": ["all"] },
+        "vaultsrv": { "transport": "stdio", "command": "s", "env": { "T": "\${infisical:dev/x}" }, "tags": ["all"] }
+      },
+      "profiles": {
+        "cursor": { "client": "cursor", "scope": "user", "include": ["all"], "secretStrategy": "native-env" }
+      }
+    }`);
+    const result = runDoctor({ cwd, osContext: ctx });
+    // The env-only server needs no explanation; the infisical one is flagged as a shim fallback.
+    const info = result.data.findings.find((f) => f.message.includes('native-env'));
+    expect(info?.severity).toBe('info');
+    expect(info?.message).toContain('shim');
+    expect(result.data.findings.some((f) => f.where?.includes('envsrv'))).toBe(false);
+  });
+
   it('reports pathed errors for an invalid config (exit 2)', () => {
     // An invalid transport → a real schema error (v2 accepts stdio/streamable-http/sse only).
     write(

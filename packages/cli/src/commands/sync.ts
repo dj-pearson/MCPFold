@@ -141,6 +141,8 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
       resolve,
       onWarn: (w) => warnings.push(w),
       existing: onDisk,
+      // S19.4: per-profile secret-strategy override (a server's own override still wins, applied inside).
+      strategyOverride: profile.secretStrategy,
     });
 
     if (preview) {

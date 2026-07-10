@@ -17,6 +17,7 @@ export { expandHome, joinFor, pathFor, realOsContext, userConfigDir } from './pa
 
 export {
   createMcpServersAdapter,
+  envRefCanonicalizer,
   fromMcpServersShape,
   parseRemoteShim,
   remoteNeedsShim,

@@ -1,11 +1,14 @@
 import { serialize, type Config, type ResolvedServer, type ServerConfig } from '@mcpfold/core';
-import { joinFor, realOsContext } from './paths.js';
+import { envRefCanonicalizer } from './shared.js';
+import { expandHome, joinFor, realOsContext } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
 /**
- * Gemini CLI adapter (S14.1, corrected S17.3). The Gemini CLI reads MCP servers from the
- * `mcpServers` root of `~/.gemini/settings.json` and picks them up on the next run (no restart).
- * User scope only.
+ * Gemini CLI adapter (S14.1, corrected S17.3, project scope S19.3). The Gemini CLI reads MCP
+ * servers from the `mcpServers` root of `~/.gemini/settings.json` and picks them up on the next
+ * run (no restart). It supports **project scope** too (verified July 2026): a project-local
+ * `.gemini/settings.json` with the same `mcpServers` schema (`gemini mcp add` defaults to it;
+ * `--scope user` targets the home file). Servers merge across levels by name, project winning.
  *
  * Unlike the generic `mcpServers` clients, Gemini distinguishes the two remote transports by KEY,
  * not a `type` field (per current docs): **`httpUrl`** for streamable HTTP, **`url`** for SSE.
@@ -48,21 +51,29 @@ function toGeminiEntry(server: ResolvedServer): GeminiEntry {
 
 export const geminiCliAdapter: ClientAdapter = {
   id: 'gemini-cli',
+  // Default `shim`; declares the `${VAR}` dialect (Gemini expands `$VAR`/`${VAR}` across all string
+  // values) so a profile/server can opt into `native-env` (S19.4).
   secretStrategy: 'shim',
   needsRestart: false,
   // Native remotes with header auth; streamable HTTP under `httpUrl`, SSE under `url`.
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'httpUrl' },
+  envInterpolation: (name) => '${' + name + '}',
 
-  resolvePath(scope, _projectPath, ctx: OsContext = realOsContext()) {
-    if (scope !== 'user') throw new Error('Gemini CLI only supports user scope.');
+  resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
+    if (scope !== 'user') {
+      if (!projectPath) throw new Error('Gemini CLI project scope requires a project path.');
+      return joinFor(ctx, expandHome(projectPath, ctx.home), '.gemini', 'settings.json');
+    }
     return joinFor(ctx, ctx.home, '.gemini', 'settings.json');
   },
 
   render(servers, ctx: OsContext = realOsContext()): RenderedFile {
     const mcpServers: Record<string, GeminiEntry> = {};
     for (const server of servers) mcpServers[server.name] = toGeminiEntry(server);
+    const scope = servers[0]?.scope ?? 'user';
+    const projectPath = servers[0]?.projectPath;
     return {
-      path: this.resolvePath('user', undefined, ctx),
+      path: this.resolvePath(scope, projectPath, ctx),
       contents: serialize({ mcpServers }),
       needsRestart: false,
     };
@@ -70,6 +81,10 @@ export const geminiCliAdapter: ClientAdapter = {
 
   parse(contents): Partial<Config> {
     const raw = JSON.parse(contents) as { mcpServers?: Record<string, unknown> };
+    // S19.4: reverse Gemini's `${NAME}` env dialect back to the canonical `${env:NAME}` on parse.
+    const canon = envRefCanonicalizer(geminiCliAdapter.envInterpolation!);
+    const mapVals = (r: Record<string, string>): Record<string, string> =>
+      Object.fromEntries(Object.entries(r).map(([k, v]) => [k, canon(v)]));
     const servers: Record<string, ServerConfig> = {};
     for (const [name, value] of Object.entries(raw.mcpServers ?? {})) {
       if (!value || typeof value !== 'object') continue;
@@ -78,19 +93,25 @@ export const geminiCliAdapter: ClientAdapter = {
         const server: ServerConfig = { transport: 'stdio', command: entry.command, tags: [] };
         if (Array.isArray(entry.args)) server.args = entry.args as string[];
         if (entry.env && typeof entry.env === 'object') {
-          server.env = entry.env as Record<string, string>;
+          server.env = mapVals(entry.env as Record<string, string>);
         }
         servers[name] = server;
       } else if (typeof entry.httpUrl === 'string') {
         const server: ServerConfig = { transport: 'streamable-http', url: entry.httpUrl, tags: [] };
         if (entry.headers && typeof entry.headers === 'object') {
-          server.auth = { type: 'header', headers: entry.headers as Record<string, string> };
+          server.auth = {
+            type: 'header',
+            headers: mapVals(entry.headers as Record<string, string>),
+          };
         }
         servers[name] = server;
       } else if (typeof entry.url === 'string') {
         const server: ServerConfig = { transport: 'sse', url: entry.url, tags: [] };
         if (entry.headers && typeof entry.headers === 'object') {
-          server.auth = { type: 'header', headers: entry.headers as Record<string, string> };
+          server.auth = {
+            type: 'header',
+            headers: mapVals(entry.headers as Record<string, string>),
+          };
         }
         servers[name] = server;
       }

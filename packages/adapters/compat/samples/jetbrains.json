@@ -2,9 +2,23 @@
   "client": "jetbrains",
   "source": {
     "type": "captured",
-    "capturedAt": "2026-07-08"
+    "capturedAt": "2026-07-09"
   },
-  "rootKeys": ["mcpServers"],
+  "rootKeys": [
+    "mcpServers"
+  ],
   "serverContainer": "mcpServers",
-  "entryKeys": ["args", "command", "env", "url"]
+  "entryKeys": [
+    "args",
+    "command",
+    "env",
+    "url"
+  ],
+  "remoteEntryKeys": [
+    "url"
+  ],
+  "paths": {
+    "user": "/home/dev/.junie/mcp/mcp.json",
+    "project": "/home/dev/repo/.junie/mcp/mcp.json"
+  }
 }

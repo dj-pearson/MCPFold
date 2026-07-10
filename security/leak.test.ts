@@ -9,8 +9,13 @@ import {
   claudeDesktopAdapter,
   vscodeAdapter,
   windsurfAdapter,
+  warpAdapter,
+  copilotCliAdapter,
+  geminiCliAdapter,
+  opencodeAdapter,
   zedAdapter,
   createMcpServersAdapter,
+  type ClientAdapter,
   type OsContext,
 } from '@mcpfold/adapters';
 import { runSync, runRun, renderWithStrategy, type Spawner, type TrustGate } from 'mcpfold';
@@ -100,6 +105,47 @@ describe('S9.1 — the sentinel appears in ZERO artifacts for shim + native-inpu
           s.map((x) => ({ ...x, auth: { type: 'bearer' as const, token: SENTINEL } })),
       });
       expect(file.contents).not.toContain(SENTINEL);
+    }
+  });
+});
+
+describe('S9.1 + S19.4 — native-env writes the placeholder NAME, never the value', () => {
+  // Every adapter that declares an env-interpolation dialect must, under the native-env strategy,
+  // render only the client's own placeholder — the resolved SENTINEL value must appear nowhere.
+  const nativeEnvAdapters: ClientAdapter[] = [
+    cursorAdapter,
+    claudeCodeAdapter,
+    windsurfAdapter,
+    warpAdapter,
+    copilotCliAdapter,
+    geminiCliAdapter,
+    opencodeAdapter,
+  ];
+
+  it('renders the env placeholder without the value across every supporting adapter', async () => {
+    // A stdio server whose env value is a `${env:SENTINEL}` ref; a resolver that WOULD leak the value.
+    const server: ResolvedServer = {
+      name: 'srv',
+      transport: 'stdio',
+      command: 'run-srv',
+      env: { API_TOKEN: '${env:SENTINEL}' },
+      tags: [],
+      client: 'cursor',
+      scope: 'user',
+    };
+    for (const adapter of nativeEnvAdapters) {
+      expect(adapter.envInterpolation, `${adapter.id} declares a dialect`).toBeTypeOf('function');
+      const file = await renderWithStrategy(adapter, [{ ...server, client: adapter.id }], {
+        osContext: ctx,
+        strategyOverride: 'native-env',
+        // A resolver that returns the raw value — native-env must ignore it entirely.
+        resolve: async (s) => s.map((x) => ({ ...x, env: { API_TOKEN: SENTINEL } })),
+      });
+      // The placeholder name (SENTINEL) is fine; the resolved VALUE must never appear.
+      expect(file.contents, `${adapter.id} leaked the value`).not.toContain(SENTINEL);
+      expect(file.contents, `${adapter.id} shimmed instead of interpolating`).toContain(
+        adapter.envInterpolation!('SENTINEL'),
+      );
     }
   });
 });

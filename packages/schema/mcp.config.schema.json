@@ -106,6 +106,13 @@
                 ],
                 "additionalProperties": false
               },
+              "secretStrategy": {
+                "type": "string",
+                "enum": [
+                  "shim",
+                  "native-env"
+                ]
+              },
               "tags": {
                 "type": "array",
                 "items": {
@@ -165,6 +172,13 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "secretStrategy": {
+                "type": "string",
+                "enum": [
+                  "shim",
+                  "native-env"
+                ]
               }
             },
             "required": [

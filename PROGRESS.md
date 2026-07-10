@@ -1023,3 +1023,128 @@ docs:build; demo unchanged). CLI 263 tests pass. Same pre-existing Windows-only 
 **Follow-ups:** full OS-trust-store chain validation for "signed" (we classify self-signed vs
 CA-issued and surface the signer; we don't execute the bundle, so we don't gate on a trusted chain);
 `user_config` `multiple:true` array expansion into repeated args (single-value substitution ships).
+## S19.3 — Project-scope expansion & installed-app detection
+
+Started/done: 2026-07-09. Two audit gaps closed: (1) clients that support a project-scoped MCP
+config now fold to it, and (2) `detect-clients` sees clients that are **installed but not yet
+configured**, not just already-configured ones. Both parts verified against current primary docs
+(two parallel research passes; sources in `docs/coverage.md`). Stacked on S19.2 (needs the 18-client
+matrix).
+
+**Project scope.** Re-verified all scope-throwing adapters against July-2026 docs:
+
+- **Zed** and **Gemini CLI** DO support project scope → implemented (`<project>/.zed/settings.json`
+  with `context_servers`; `<project>/.gemini/settings.json` with `mcpServers`). Gemini's `render`
+  no longer hard-codes the user path — it honors `servers[0].scope/projectPath` like the others.
+- **Claude Desktop, Windsurf, Cline** confirmed **global-only** → they (and the wave-2 user-only
+  clients LM Studio / Goose / Codex CLI / Copilot CLI) now **throw** on a project/workspace profile
+  instead of silently misdirecting it to the shared user file (Windsurf/Zed previously ignored scope
+  entirely). The "throws on project" list shrinks by Zed + Gemini; the rest is now honest + verified.
+
+**Installed-app detection.** New injectable `install-probes.ts` gives per-client, per-OS presence
+signals — a CLI on PATH, an app bundle / install dir, a VS Code-family extension folder
+(`<host>/extensions/<publisher.id>-*`), or the durable dot-dir a client writes on first run.
+`detect-clients` now returns a three-way `state` (`configured` / `installed-only` / `not-found`)
+plus `appPresent`, keeping the legacy `installed` field (== `configured`) so `--json` consumers are
+unbroken (strictly additive). `DetectProbe` is injected, so every state is unit-tested per platform
+with zero real I/O.
+
+- `init --guided` lists installed-only clients and offers them as fold targets.
+- `init` and `doctor` print "installed but not configured"; `status` adds an `installedUnconfigured`
+  field + a hint line for installed clients with no profile yet.
+
+Tests: `detect-clients.test.ts` (three states via fake probes: bin-on-PATH, extension-dir,
+config-file, configured-wins-over-installed); project-scope resolve + render for Zed and Gemini CLI;
+throw-on-project for the user-only clients (Goose, LM Studio); a guided test that surfaces an
+installed-only client (`~/.gemini` present, no config); `status` `--json` shape updated for the
+additive field.
+
+`verify_all` green (eslint + core-purity, typecheck ×10, `pnpm -r test`, `pnpm -r build`, Prettier,
+docs:build). adapters 142 / core 92 / cli 257. Same pre-existing Windows-only red as S19.2
+(`e2e/deploy-env.test.ts` — Git-Bash path mangling; passes on CI ubuntu).
+
+**Follow-ups:** the install-probe locations are a living table (like the format matrix) — refresh as
+apps move; JetBrains/Visual Studio presence is detected at the family level (any JetBrains IDE / any
+VS install), not per-product.
+
+---
+
+## S19.4 — Native-interpolation secret strategy (`native-env`)
+
+Started/done: 2026-07-09. For a plain `${env:NAME}` ref, the `mcpfold run` shim adds a wrapper
+process for nothing — many clients expand env placeholders in their own config. `native-env` writes
+the client's OWN dialect instead, so the client resolves the var at launch and mcpfold stays out of
+the path. The value is never written — only the placeholder name — so the leak harness stays green by
+construction. Stacked on S19.3. Per-client dialects verified against primary docs (one research pass;
+sources in `docs/coverage.md`/`docs/secrets.md`).
+
+- **Capability**: adapters declare an `envInterpolation(name)` dialect; 7 clients support it (verified
+  July 2026): Cursor/Windsurf `${env:NAME}`, Claude Code/Gemini/Warp/Copilot CLI `${NAME}`, opencode
+  single-brace `{env:NAME}`. VS Code keeps `native-input`; Claude Desktop/Zed/JetBrains/Cline/Codex
+  CLI/LM Studio/Goose(stdio) have no env interpolation → stay shim.
+- **Opt-in, no silent change**: the default stays each adapter's own strategy (shim). A profile or
+  server opts in via a new `secretStrategy: "shim" | "native-env"` field (server override wins over
+  profile). Core `SECRET_STRATEGIES`/`STRATEGY_OVERRIDES` + `ResolvedServer.secretStrategy`;
+  `resolveProfile` threads server→profile precedence; `renderWithStrategy` applies it per server.
+- **Automatic shim fallback**: a native-env server with a NON-env scheme (infisical/keychain/op/
+  dotenv) can't be resolved by the client, so it folds via the shim — `doctor` emits an `info`
+  finding (`checkNativeEnvFallback`) explaining which server and why.
+- **Round-trip**: `envRefCanonicalizer` derives each dialect's inverse from the dialect itself and
+  reverses it on parse (factory adapters + the two bespoke ones), so `import`/drift reconstructs the
+  canonical `${env:NAME}`.
+- **Leak proof**: the S9.1 harness gains a native-env pass asserting the resolved SENTINEL value
+  reaches ZERO artifacts across all 7 supporting adapters (only the placeholder name is written).
+
+Tests: per-dialect render + round-trip (7), bearer→native Authorization header, non-env shim fallback,
+per-server override, no-silent-change default, the doctor `info` finding, and the leak-harness
+extension. JSON schema regenerated for the two `secretStrategy` fields.
+
+`verify_all` green (eslint + core-purity, typecheck ×10, `pnpm -r test`, `pnpm -r build`, Prettier,
+docs:build; demo unchanged). adapters 24 files / core 13 / cli 36 / security 1. Same pre-existing
+Windows-only red (`e2e/deploy-env.test.ts`; passes on CI ubuntu).
+
+**Follow-ups:** field-scoped dialects (Roo Code `${env:VAR}` in `args` only; Goose `${VAR}` in remote
+headers/uri only) were conservatively left on the shim — revisit if users ask. Version-sensitivity
+smoke tests (Copilot CLI `${VAR}` regressed in v0.0.407; Gemini env substitution has lagged docs)
+would harden the guarantee.
+
+---
+
+## S19.5 — Adapter-compat harness v2: deep signatures, live evidence, public matrix
+
+Started/done: 2026-07-09. The weekly compat harness compared only top-level/entry KEY shapes against
+hand-captured samples — blind to the exact drifts that hit in 2025-26: a value-position change
+(Windsurf `serverUrl`, Gemini `httpUrl`) or a path move (Windsurf→Devin). This upgrades it on four
+axes. Stacked on S19.4.
+
+- **Deeper signature**: `shapeOf` now collects **remote-entry field keys** separately from stdio
+  keys (a URL-shaped entry is classified remote), so `url→serverUrl` / keeping `httpUrl` is
+  detectable on its own axis; samples also carry the **resolved path pattern per scope**, so a
+  silent path move is flagged. Regression fixtures for the Windsurf/Gemini/path cases. All 18 samples
+  recaptured with the deep signature.
+- **Live upstream checks**: samples for the four clients with fetchable primary docs (VS Code,
+  Cursor, Claude Code, Gemini) carry a `liveUrl`. The scheduled `--live` run confirms those docs
+  still document the keys the adapter renders — catching upstream drift, not just our stale samples.
+  It never parses HTML into a schema (brittle); a missing key token ⇒ divergent, an unreachable doc
+  ⇒ **skipped, never a false pass**. The captured check always runs regardless.
+- **Public compat matrix**: `compat/matrix.ts` + `gen-matrix.ts` generate a dated
+  **[docs/compat-matrix.md](docs/compat-matrix.md)** (also served on the site under /docs) and
+  **apps/site/public/compat-matrix.json** — client × format × scopes × transport × secret-strategy ×
+  **last-verified date** (straight from the harness samples, so it's evidence, not hand-edited). CI
+  gate (`docs` job) fails if the committed matrix drifts from a re-capture.
+- **Richer issue-filing**: the weekly `adapter-compat.yml` runs `--live` and its report now names the
+  exact axis (root/entry key, **remote-entry field**, **path move**, or **upstream doc** token), so
+  drift triage points at the field, not just "something changed."
+
+Tests: deep-signature regression fixtures (remote-entry split, httpUrl→url, url→serverUrl, path
+move), live-check ok/divergent/skipped-never-false-pass, and the matrix module (row derivation +
+Markdown render). Generated `compat-matrix.md`/`.json` and the recaptured `samples/` are
+prettier-ignored (harness-owned, like fixtures) — fixes the recurring capture-vs-prettier friction.
+
+`verify_all` green (eslint + core-purity, typecheck ×10, `pnpm -r test`, `pnpm -r build`, Prettier,
+docs:build + matrix-drift + demo). adapters 25 files / 151 tests. Same pre-existing Windows-only red
+(`e2e/deploy-env.test.ts`; passes on CI ubuntu).
+
+**Follow-ups:** a dedicated styled site page (vs the on-site docs page + JSON asset) for the E13/E15
+marketing tie-in; the live-doc heuristic is token-presence — a schema-parse path could sharpen it for
+clients that publish machine-readable schemas.

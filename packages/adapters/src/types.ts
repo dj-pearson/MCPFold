@@ -1,4 +1,4 @@
-import type { ClientId, Config, ResolvedServer, Scope } from '@mcpfold/core';
+import type { ClientId, Config, ResolvedServer, Scope, SecretStrategy } from '@mcpfold/core';
 
 /**
  * The adapter interface (S2.1, spec §5) — the heart of mcpfold's client portability.
@@ -8,8 +8,19 @@ import type { ClientId, Config, ResolvedServer, Scope } from '@mcpfold/core';
  * semantics, secret strategy) is quarantined here.
  */
 
-/** How a client wants secrets handled (spec §6). */
-export type SecretStrategy = 'inline' | 'native-input' | 'shim';
+/**
+ * How a client wants secrets handled (spec §6; `native-env` added S19.4). Defined in `@mcpfold/core`
+ * (the schema owner) and re-exported here for adapter authors:
+ *   - `shim`         — rewrite the launch to `mcpfold run <name>`; the value stays off disk and
+ *                      mcpfold resolves + injects it at launch. Works for every secret scheme.
+ *   - `native-input` — the client's own secret indirection (VS Code `${input:}` + an `inputs` array).
+ *   - `inline`       — last resort: resolve the value and write it, ONLY to a gitignored target.
+ *   - `native-env`   — for a plain `${env:NAME}` ref, write the client's OWN env-var placeholder
+ *                      (Cursor `${env:NAME}`, Claude Code `${NAME}`, opencode `{env:NAME}`, …) so the
+ *                      client resolves it natively — no wrapper process. Non-`env` schemes
+ *                      (infisical/keychain/op/dotenv) fall back to the shim per server.
+ */
+export type { SecretStrategy };
 
 /**
  * How a client names the remote-endpoint field in its native config, or `shim` when it can't
@@ -69,6 +80,14 @@ export interface ClientAdapter {
   readonly needsRestart: boolean;
   /** Remote-transport capability (S17.2) — drives native-entry vs `mcp-remote` shim folding. */
   readonly remote: RemoteCapability;
+
+  /**
+   * The client's native env-var interpolation dialect (S19.4), or `undefined` if it doesn't resolve
+   * env placeholders in its MCP config. Given an env-var NAME, returns the exact placeholder the
+   * client expands — e.g. Cursor `NAME → ${env:NAME}`, Claude Code `NAME → ${NAME}`, opencode
+   * `NAME → {env:NAME}`. Presence of this is what makes the `native-env` strategy possible.
+   */
+  readonly envInterpolation?: (envVarName: string) => string;
 
   /** Resolve the on-disk config path for a scope/project on a given OS. */
   resolvePath(scope: Scope, projectPath?: string, ctx?: OsContext): string;
