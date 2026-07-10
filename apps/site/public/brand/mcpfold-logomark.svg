@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="mcpfold logomark">
+  <rect width="128" height="128" rx="28" fill="#4c6ef5"/>
+  <!-- A folded sheet: one square folded to another, echoing "fold one config out to many". -->
+  <path d="M40 34h34a4 4 0 0 1 4 4v18H44a4 4 0 0 1-4-4V34Z" fill="#ffffff" opacity="0.95"/>
+  <path d="M50 60h38a4 4 0 0 1 4 4v26a4 4 0 0 1-4 4H54a4 4 0 0 1-4-4V60Z" fill="#ffffff" opacity="0.72"/>
+  <path d="M50 60l28-8v8H50Z" fill="#ffffff" opacity="0.4"/>
+</svg>

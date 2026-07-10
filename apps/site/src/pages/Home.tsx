@@ -8,6 +8,7 @@ import { Credibility } from '../home/Credibility';
 import { FinalCta } from '../home/FinalCta';
 import { FaqSection } from '../seo/FaqSection';
 import { Subscribe } from '../subscribe/Subscribe';
+import { GUIDE_CLIENTS } from '../guides/guides.data';
 
 /**
  * Homepage (S13.2; on-page SEO S15.3; full narrative S13.8). Hero + benchmark proof, then the full
@@ -122,36 +123,38 @@ function SeoBlock({
   );
 }
 
-// The supported clients, linked to the adapter-coverage docs (per-client guides land in S15.5).
-const CLIENTS = [
-  'Claude Desktop',
-  'Claude Code',
-  'Cursor',
-  'VS Code',
-  'Windsurf',
-  'Zed',
-  'Cline',
-  'Gemini CLI',
-  'JetBrains',
-  'Visual Studio',
-  'Continue',
-  'Roo Code',
-  'Goose',
-  'Codex CLI',
-  'LM Studio',
-  'Warp',
-  'opencode',
-  'Copilot CLI',
-].map((name) => ({ name, href: '/docs/coverage.html' }));
+// The supported clients, each linked to its per-client setup guide (S15.5), derived from the same
+// adapter-backed data the guides use so the list can never drift from what mcpfold actually folds to.
+const CLIENTS = GUIDE_CLIENTS.map((c) => ({ name: c.label, href: `/guides/${c.id}` }));
 
 // Internal-link graph out of the homepage (existing pages; guides/glossary link in with S15.5/S15.6).
 const EXPLORE = [
   { href: '/install', text: 'Install', desc: 'npx, npm, Homebrew, or Scoop — no account needed.' },
   {
+    href: '/features',
+    text: 'Features',
+    desc: 'deep dives on the four pillars, with examples and proof.',
+  },
+  {
     href: '/directory',
     text: 'MCP server directory',
     desc: 'browse and add community MCP servers.',
   },
+  {
+    href: '/guides',
+    text: 'Client setup guides',
+    desc: 'add MCP servers to Claude Code, Cursor, VS Code, and more.',
+  },
+  {
+    href: '/glossary',
+    text: 'MCP glossary',
+    desc: 'what an MCP server, client, and the protocol actually are.',
+  },
   { href: '/docs', text: 'Documentation', desc: 'config format, secrets, adapters, CLI contract.' },
+  {
+    href: '/compare',
+    text: 'How mcpfold compares',
+    desc: 'by hand vs a hosted gateway vs mcpfold — honestly.',
+  },
   { href: '/pricing', text: 'Pricing', desc: 'free CLI (MIT); optional paid cloud for teams.' },
 ];

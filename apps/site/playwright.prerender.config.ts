@@ -5,7 +5,21 @@ import { defineConfig, devices } from '@playwright/test';
 // the actual prerendered pages. Run after `pnpm --filter @mcpfold/site build`.
 export default defineConfig({
   testDir: './test',
-  testMatch: '**/prerender.e2e.ts',
+  // Every no-JS/built-dist suite: the generic SSG proof plus each pSEO / E13 page type.
+  testMatch: [
+    '**/prerender.e2e.ts',
+    '**/guides.e2e.ts',
+    '**/glossary.e2e.ts',
+    '**/compare.e2e.ts',
+    '**/seo.e2e.ts',
+    '**/features.e2e.ts',
+    '**/use-cases.e2e.ts',
+    '**/about.e2e.ts',
+    '**/legal.e2e.ts',
+    '**/community.e2e.ts',
+    '**/roadmap.e2e.ts',
+    '**/notfound.e2e.ts',
+  ],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

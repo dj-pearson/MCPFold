@@ -26,12 +26,12 @@ export function isLive(l: NavLink): boolean {
   return Boolean(l.external) || (l.status ?? 'live') === 'live';
 }
 
-/** Primary header navigation (top level). `Features`/`Guides` activate when S13.10 / S15.5 ship. */
+/** Primary header navigation (top level). */
 export const PRIMARY_NAV: NavLink[] = [
-  { label: 'Features', href: '/features', status: 'planned', description: 'The four pillars' },
+  { label: 'Features', href: '/features', description: 'The four pillars' },
   { label: 'Docs', href: '/docs', description: 'Config format, secrets, adapters, CLI' },
   { label: 'Directory', href: '/directory', description: 'Browse MCP servers' },
-  { label: 'Guides', href: '/guides', status: 'planned', description: 'Per-client setup' },
+  { label: 'Guides', href: '/guides', description: 'Per-client setup' },
   { label: 'Pricing', href: '/pricing', description: 'Free CLI, optional cloud' },
   { label: 'Blog', href: '/blog', description: 'Launches and deep-dives' },
 ];
@@ -51,8 +51,10 @@ export const FOOTER_GROUPS: NavGroup[] = [
     links: [
       { label: 'Install', href: '/install' },
       { label: 'Directory', href: '/directory' },
+      { label: 'Compare', href: '/compare' },
+      { label: 'Use cases', href: '/use-cases' },
       { label: 'Pricing', href: '/pricing' },
-      { label: 'Features', href: '/features', status: 'planned' },
+      { label: 'Features', href: '/features' },
       { label: 'Changelog', href: '/changelog' },
     ],
   },
@@ -62,13 +64,16 @@ export const FOOTER_GROUPS: NavGroup[] = [
       { label: 'Documentation', href: '/docs' },
       { label: 'Config format', href: '/docs/config-format.html' },
       { label: 'Secrets', href: '/docs/secrets.html' },
-      { label: 'Guides', href: '/guides', status: 'planned' },
+      { label: 'Guides', href: '/guides' },
+      { label: 'Glossary', href: '/glossary' },
+      { label: 'Roadmap', href: '/roadmap' },
       { label: 'Blog', href: '/blog' },
     ],
   },
   {
     title: 'Community',
     links: [
+      { label: 'Community & support', href: '/community' },
       { label: 'GitHub', href: GITHUB, external: true },
       { label: 'Discussions', href: `${GITHUB}/discussions`, external: true },
       { label: 'Sponsor', href: 'https://github.com/sponsors/dj-pearson', external: true },
@@ -77,7 +82,12 @@ export const FOOTER_GROUPS: NavGroup[] = [
   {
     title: 'Company',
     links: [
+      { label: 'About', href: '/about' },
       { label: 'Security & trust', href: '/security' },
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'Terms', href: '/terms' },
+      { label: 'Analytics & cookies', href: '/analytics' },
+      { label: 'Brand & press kit', href: '/brand' },
       { label: 'MIT license', href: `${GITHUB}/blob/main/LICENSE`, external: true },
     ],
   },

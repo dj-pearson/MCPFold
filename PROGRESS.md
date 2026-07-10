@@ -626,3 +626,367 @@ green. Site typecheck, build (prerender 9/9 with the form on the homepage), `den
 **E13 (marketing site) is now complete** — S13.10, S13.11, S13.12, S13.14, S13.15, S13.16, S13.17,
 S13.18 all shipped this run (each on its own branch off `main`), alongside the E15 SEO epic
 (S15.5–S15.8).
+
+## S15.5 — Per-client "add MCP servers to <client>" setup guides (pSEO + HowTo)
+
+**Started** 2026-07-10 · branch `story/S15.5-per-client-guides` · priority p2, deps: S15.1, S13.4.
+
+**Done** 2026-07-10.
+
+Shipped a `/guides` hub plus one `/guides/<client>` setup guide for every supported client (18),
+each targeting the highest-intent query cluster ("add MCP servers to Cursor", "claude code mcp", …)
+with a copy-paste `mcpfold` walkthrough and HowTo structured data.
+
+Config truth is **generated from the real adapters, never hand-duplicated**. A Node-only codegen
+(`apps/site/scripts/gen-guides.mjs`) imports `ALL_ADAPTERS` from the built package and, using
+synthetic per-OS `OsContext`s, resolves each client's user-scope config path (macOS/Windows/Linux)
+plus its `secretStrategy`, `needsRestart`, and `remote` capability, emitting a committed, browser-safe
+plain-data module `apps/site/src/guides/guides.data.ts`. This keeps `node:os`/`node:path` out of the
+client bundle (the SEO modules that import the data are bundled for the browser) while the guide can
+never drift from what `mcpfold sync` actually writes. A CI drift check (`guides:gen` + `git diff
+--exit-code`, wired into the docs job) enforces it — the same pattern as demo/matrix drift.
+
+- **`src/guides/guides.data.ts`** (generated) — the 18-client fact table (label, config root key,
+  per-OS path, secret strategy, restart, remote), prettier-ignored as a generated artifact.
+- **`src/guides/steps.ts`** — the canonical setup steps + neutral secret/remote notes, consumed by
+  BOTH the visible page and the HowTo JSON-LD so the structured data mirrors the steps exactly.
+- **`src/guides/ClientGuide.tsx`** — `GuidesIndex` (hub) + `GuidePage` (per-client): targeted H1,
+  numbered steps with copy-paste command blocks, an adapter-derived "what mcpfold writes" facts panel,
+  links to the directory + install, and explicit no-implied-endorsement copy per client.
+- **Wiring** — routes in `App.tsx` (`/guides`, `/guides/:client`); `resolveMeta` + `allRoutes` +
+  `jsonLdForPath` branches in `seo/meta.ts` / `seo/jsonld.ts` (HowTo + BreadcrumbList per guide,
+  ItemList on the hub); `site-structure.ts` flips Guides from `planned` to live in nav + footer;
+  homepage client list + Explore graph now link to the guides (list derived from the same data).
+
+Guides land in the sitemap automatically (`allRoutes()` feeds both the prerender loop and
+`sitemap.xml`). Build prerenders 111 routes (18 guides). New `test/guides.e2e.ts` (built-dist/no-JS
+suite, added to the prerender Playwright config and ignored by the dev-server config) asserts the hub
+ItemList, per-guide HowTo + breadcrumb, adapter-derived paths, the restart note, and sitemap
+membership — 13/13 prerender tests pass. Site typecheck, repo-wide `format:check`, and the guides
+drift check all green.
+
+## S15.6 — Glossary / concept hub for topical authority
+
+**Started** 2026-07-10 · branch `story/S15.6-glossary-concept-hub` · priority p2, deps: S15.1.
+
+**Done** 2026-07-10.
+
+Shipped a `/glossary` hub plus a concept page for each core term — MCP server, Model Context
+Protocol, MCP client, MCP tools, context window, secret reference, and "MCP config manager" (the
+category term to own). These are the informational head queries assistants answer from, so the pages
+build topical authority and feed GEO citations while linking down into the product/directory/docs.
+
+- **`src/glossary/terms.ts`** — the concept content as typed plain data: each term leads with a
+  one-to-two-sentence **extractable** definition (`short`), a natural-language H1 question
+  (`heading`), an expanded `body`, and internal `related` links. Neutral by construction — the
+  Model Context Protocol is described factually with an explicit no-affiliation/endorsement note.
+- **`src/glossary/Glossary.tsx`** — `GlossaryIndex` (definition-list hub) + `TermPage` (lifted
+  definition blockquote, expanded body, related links, disclaimer).
+- **Wiring** — routes in `App.tsx` (`/glossary`, `/glossary/:term`); `resolveMeta` + `allRoutes` +
+  `jsonLdForPath` branches in `seo/meta.ts` / `seo/jsonld.ts` (a **DefinedTermSet** on the hub, a
+  **DefinedTerm** + BreadcrumbList per concept page); `site-structure.ts` adds Glossary to the footer
+  Resources group; the homepage Explore link graph now points at the glossary.
+
+Chose a typed data module over `content/glossary/*` markdown (the files_hint) so the extractable
+definition and schema stay first-class and browser-safe, mirroring how the directory ships as plain
+`DIRECTORY` data. Concept pages land in the sitemap automatically via `allRoutes()`. Build prerenders
+100 routes (7 glossary). New `test/glossary.e2e.ts` (built-dist/no-JS suite, added to the prerender
+Playwright config and ignored by the dev-server config) asserts the hub DefinedTermSet, per-term
+leading definition + DefinedTerm + breadcrumb, the category-term page, and sitemap membership —
+13/13 prerender tests pass. Site typecheck and repo-wide `format:check` are green.
+
+## S15.7 — Comparison / alternatives pages
+
+**Started** 2026-07-10 · branch `story/S15.7-comparison-pages` · priority p2, deps: S15.1.
+
+**Done** 2026-07-10.
+
+Shipped a `/compare` hub plus two consideration-stage comparison pages: **"Managing MCP servers by
+hand vs mcpfold"** (a 2-column head-to-head) and **"MCP config manager: where mcpfold fits"** (a
+3-way By-hand / Hosted-gateway / mcpfold positioning table). These rank for modifier queries
+("MCP config manager", "manually vs …") and give assistants a balanced source to cite.
+
+Framing was written and reviewed against the PRD `meta.non_goals`:
+
+- mcpfold is positioned as a **local-first CLI + curation tool, NOT a hosted enterprise gateway** —
+  the pages state plainly that there is no server-side RBAC / org audit / hosted servers (that is the
+  Composio/MintMCP space), and that those are complementary tools for a different job.
+- Secret non-goal is explicit: only config with **references** is synced, **values are never synced**.
+- Other tools are named only as a category with factual examples — no disparaging or unverifiable
+  claims — and every page carries a no-affiliation/no-endorsement note.
+
+- **`src/compare/comparisons.ts`** — the comparison content as typed plain data (N-column tables:
+  columns + per-dimension cells, extractable intro, honest trade-off body, related links).
+- **`src/compare/Compare.tsx`** — `CompareIndex` (hub) + `ComparePage` (semantic `<table>` with a
+  row-header per dimension, intro, trade-off prose, related links, disclaimer).
+- **Wiring** — routes in `App.tsx` (`/compare`, `/compare/:id`); `resolveMeta` + `allRoutes` +
+  `jsonLdForPath` branches (an ItemList on the hub, a **TechArticle** + BreadcrumbList per page);
+  `site-structure.ts` adds Compare to the footer Product group; the homepage Explore link graph
+  points at `/compare`.
+
+Pages land in the sitemap via `allRoutes()`; build prerenders 95 routes (2 compare). New
+`test/compare.e2e.ts` (built-dist/no-JS suite, added to the prerender Playwright config and ignored
+by the dev-server config) asserts the hub ItemList, the comparison table + TechArticle + breadcrumb,
+the honest-positioning copy (local-first / "not a hosted gateway" / "values never synced"), and
+sitemap membership — 13/13 prerender tests pass. Site typecheck and repo-wide `format:check` green.
+
+## S15.8 — Technical SEO at scale + submission + rank/GEO measurement
+
+**Started** 2026-07-10 · branch `story/S15.8-technical-seo-scale` · priority p2, deps: S15.1, S15.4.
+
+**Done** 2026-07-10.
+
+Turned the growing pSEO surface into something technically sound, submittable, and measured. All the
+machinery operates generically over `allRoutes()`, so guides/glossary/compare (on their own branches)
+flow through automatically once merged — no per-page-type wiring.
+
+- **Sitemap at scale** — `gen-seo.mjs` now emits a **sitemap _index_** (`/sitemap.xml`) referencing
+  typed child sitemaps (`sitemap-core/directory/categories/blog.xml`, and guides/glossary/compare when
+  present), each with `<lastmod>`. Routes are bucketed by prefix. `robots.txt` points at the index.
+- **Per-page OG images** — `gen-og.mjs` renders a templated 1200×630 SVG card per route from its own
+  `<title>` (dependency-free), written to `dist/og/<route>.svg` and wired into that page's
+  `og:image`/`twitter:image` — replacing the single shared `og.png`. (PNG rasterization at the edge is
+  the one documented follow-up.)
+- **Index-bloat + hygiene guard** — `seo-audit.mjs` (pure, `--self-test`ed) runs inside the build and
+  **fails it** on any route missing a page-specific title/description/canonical, on duplicate
+  canonicals, or on a keyword→page target that isn't a real route. Thin pages are already excluded by
+  construction (allRoutes threshold).
+- **Rank/GEO source of truth** — repurposed `src/seo/keyword-map.ts` into a typed keyword→page map
+  (volume, intent, `geo` flag), validated against real routes at build time via the SSR bundle.
+- **IndexNow** — `indexnow.mjs` walks the sitemap index → child sitemaps → page URLs, writes the
+  key-ownership file, and POSTs to IndexNow on deploy; safe no-op without `INDEXNOW_KEY`, `--dry-run`
+  previews the payload. Pure helpers (`locsFromXml`/`collectUrls`/`buildPayload`) are unit-exercised.
+- **Docs** — `docs/seo-measurement.md`: the operating manual (build guards, sitemap, OG, IndexNow
+  deploy wiring, GSC + Bing verification steps, weekly rank + GEO-citation cadence tied to S15.2).
+
+Build prerenders 92 routes + 92 OG cards + a 4-typed-sitemap index. New `test/seo.e2e.ts`
+(built-dist/no-JS, in the prerender Playwright config, ignored by the dev config) asserts the sitemap
+index structure + typed children with lastmod, no duplicate URLs across sitemaps, per-page OG cards
+wired into og:image, robots→index, and the IndexNow payload built from the real sitemap (mocked, no
+network); an existing category-sitemap assertion was updated for the index structure — 14/14 prerender
+tests pass. `seo:audit` self-test, `docs:build` (30 docs, links valid), site typecheck, and repo-wide
+`format:check` all green.
+
+## S13.10 — Feature deep-dive pages (the four pillars)
+
+**Started** 2026-07-10 · branch `story/S13.10-feature-deep-dives` · priority p2, deps: S13.1, S13.8.
+
+**Done** 2026-07-10.
+
+Shipped a `/features` index plus a deep-dive page for each of the four pillars: **one config for
+every client**, **tool curation** (cut the context tax), **secrets as references**, and
+**sync/diff/drift control**. Each page has benefit-led copy, a concrete config/CLI example, links to
+the deep docs, and cross-links to related features; the `Features` nav/footer link (previously
+`planned`) is now live.
+
+Every NUMBER comes from a committed source so the copy can't drift: the client count is
+`CLIENT_IDS.length`, and the tool-curation figures (45 tools → 9, ~80% fewer tokens, 7,476 → 1,497)
+are computed live from the same `benchmark/model` the homepage calculator uses. Format-trap prose
+(`servers` vs `context_servers` vs `mcpServers` vs `extensions`) and secret-provider names state facts
+already in docs/coverage.md and docs/secrets.md.
+
+- **`src/features/features.ts`** — the four-pillar content as typed data; imports `compute` +
+  `CLIENT_IDS` and bakes the committed numbers into the copy at load.
+- **`src/features/FeaturePages.tsx`** — `FeaturesIndex` (card grid) + `FeaturePage` (tagline, body,
+  example code block, deep-doc links, related-feature cross-links, install CTA). Named `FeaturePages`
+  to avoid a case-collision with `features.ts` on case-insensitive filesystems.
+- **Wiring** — routes in `App.tsx` (`/features`, `/features/:id`); `resolveMeta` + `allRoutes` +
+  `jsonLdForPath` branches (an ItemList on the index, a **TechArticle** + BreadcrumbList per page);
+  `site-structure.ts` flips Features to live in nav + footer Product; the homepage Explore graph links
+  to `/features`.
+
+Pages land in the sitemap via `allRoutes()`; build prerenders 97 routes (4 features). New
+`test/features.e2e.ts` (built-dist/no-JS suite, in the prerender Playwright config, ignored by the
+dev-server config) asserts the index ItemList, per-page H1 + example + doc/cross links + TechArticle +
+breadcrumb, and — importantly — that the tool-curation numbers equal `compute(FIXTURE_SERVERS, 3)`
+from the committed model (no drift), plus sitemap membership — 13/13 prerender tests pass. Site
+
+## S13.11 — Use-case / persona pages
+
+**Started** 2026-07-10 · branch `story/S13.11-persona-pages` · priority p2, deps: S13.1, S13.8.
+
+**Done** 2026-07-10.
+
+Shipped a `/use-cases` index plus a dedicated persona page for each of the three homepage teasers —
+**solo developers**, **teams**, and **power users** — each reframing the same product around that
+visitor's problem and routing to the right CTA: solo → install, teams → pricing, power users →
+directory. The homepage persona teaser (`home/personas.ts`) now repoints each card to its
+`/use-cases/<id>` page (the S13.8 comment predicted this).
+
+The **teams** page carries the E12 team-without-cloud wedge — commit one reviewed `mcp.config.jsonc`,
+everyone runs `mcpfold sync`, `mcpfold diff --check` as a CI drift gate — then the optional,
+self-hostable cloud on top. Positioning stays within the PRD non-goals: it states plainly that
+mcpfold is **not a hosted enterprise MCP gateway** and that the cloud syncs config with references but
+**never secret values**.
+
+- **`src/use-cases/use-cases.ts`** — the three personas as typed data (tagline, body, benefit
+  highlights, primary/secondary CTA, cross-links). Ids match the homepage persona ids.
+- **`src/use-cases/UseCasePages.tsx`** — `UseCasesIndex` (cards) + `UseCasePage` (tagline, body,
+  highlight list, CTA button row, related-persona links). Named `UseCasePages` to avoid a
+  case-collision with `use-cases.ts`.
+- **Wiring** — routes in `App.tsx` (`/use-cases`, `/use-cases/:id`); `resolveMeta` + `allRoutes` +
+  `jsonLdForPath` branches (an ItemList on the index, a BreadcrumbList per page); `site-structure.ts`
+  adds Use cases to the footer Product group; the homepage teaser links in. On this branch only pages
+  present on `main` are linked (no `/features` — that's on the S13.10 branch).
+
+Build prerenders 96 routes (3 use-cases). New `test/use-cases.e2e.ts` (built-dist/no-JS suite, in the
+prerender Playwright config, ignored by the dev-server config) asserts the index ItemList, per-persona
+tailored copy + the correct CTA routing (solo→install, teams→pricing, power-users→directory), the team
+non-goal copy ("not a hosted enterprise MCP gateway" / "never secret values"), that the homepage
+teaser links resolve to the persona pages, and sitemap membership — 15/15 prerender tests pass. Site
+typecheck and repo-wide `format:check` green.
+
+## S13.12 — About / open-source project page
+
+**Started** 2026-07-10 · branch `story/S13.12-about-page` · priority p2, deps: S13.1.
+
+**Done** 2026-07-10.
+
+Shipped `/about`: the mission (own one neutral `mcp.config.jsonc` format for every client; cut the
+context tax; secrets as references), the open-source model with a clear license boundary (MIT
+CLI/core free forever; the only commercial surface is the optional, self-hostable team cloud — which
+syncs config with references, never secret values), and a "get involved" section linking GitHub,
+CONTRIBUTING, governance, roadmap, and the adapter on-ramp (`mcpfold scaffold-adapter`). Restates the
+no-implied-MCP-endorsement note.
+
+- **`src/about/About.tsx`** — the page plus a `useGitHubSignals()` hook. **Live signals degrade
+  gracefully**: the latest release comes from the build (`__APP_VERSION__`, the committed CLI
+  version) so it is always in the prerendered HTML; the GitHub star and contributor counts are
+  fetched client-side and simply omitted if the API is unavailable — no error, no layout shift
+  (contributors count derives from the GitHub `Link` header's `rel="last"` page). Reuses the S13.8
+  Credibility signal pattern.
+- **Wiring** — route in `App.tsx`; `resolveMeta` + `allRoutes` branches; a JSON-LD **Organization**
+  (with `sameAs` GitHub/npm) + BreadcrumbList on `/about`; `site-structure.ts` adds About to the
+  footer Company group (server-rendered on every page).
+
+Build prerenders /about into the SSG output. New `test/about.e2e.ts` (built-dist/no-JS suite, in the
+prerender Playwright config, ignored by the dev-server config) asserts the mission + license boundary
+
+- no-endorsement copy + the build-time release version + working GitHub/CONTRIBUTING/governance/
+  roadmap/adapters links + Organization/breadcrumb schema in the no-JS HTML, sitemap + footer
+  membership, and — with the GitHub API blocked via route interception — that the page still renders,
+  the optional star/contributor signals are absent, and no app error is thrown. 12/12 prerender tests
+  pass. Site typecheck and repo-wide `format:check` green.
+
+## S13.14 — Legal & policy pages (privacy, terms, analytics disclosure)
+
+**Started** 2026-07-10 · branch `story/S13.14-legal-policy-pages` · priority p2, deps: S13.1.
+
+**Done** 2026-07-10.
+
+Shipped `/privacy`, `/terms`, and `/analytics` (the analytics & cookie disclosure), each prerendered,
+dated + versioned, and footer-linked from the Company group. All three live in ONE typed content
+source (`src/legal/legal-content.ts`) so they are easy to update together.
+
+The copy was written to match the **actual** implementation, not boilerplate — verified against
+`src/analytics.ts`, `docs/telemetry.md`, and the secret-reference invariant:
+
+- **Analytics**: cookieless, PII-free (Plausible/Umami-style), off unless built with the
+  `VITE_ANALYTICS_*` env vars, and **no cookie wall** (stated as a deliberate choice).
+- **CLI telemetry**: collects nothing by default; strictly opt-in (`MCPFOLD_TELEMETRY=1`), forced off
+  by `DO_NOT_TRACK=1`; a fixed allow-list of non-identifying fields that passes the secret redactor.
+- **Secrets**: the cloud syncs config with references — **never the secret values**, which stay local.
+- **Terms**: the software is MIT-licensed (rights defined by the license), the hosted service is
+  as-is, and the no-implied-MCP-endorsement note is restated.
+
+Indexing is a **documented choice**: these are legitimate, low-competition pages with no thin-page
+risk, so they are prerendered and left indexable (in the sitemap) rather than noindex.
+
+- **`src/legal/LegalPage.tsx`** — renders any doc by id (`<LegalPage id="privacy" />`), with the
+  effective date/version header and a cross-link footer.
+- **Wiring** — routes in `App.tsx` (`/privacy`, `/terms`, `/analytics`); `resolveMeta` + `allRoutes`
+  branches driven by `LEGAL_DOCS`; a BreadcrumbList per page in `jsonld.ts`; `site-structure.ts` adds
+  Privacy / Terms / Analytics & cookies to the footer Company group.
+
+Build prerenders the three pages. New `test/legal.e2e.ts` (built-dist/no-JS suite, in the prerender
+Playwright config, ignored by the dev-server config) asserts each page renders dated + versioned, that
+the privacy/analytics copy matches the real behavior (cookieless / `collects nothing by default` /
+`MCPFOLD_TELEMETRY=1` / `DO_NOT_TRACK=1` / never secret values / no cookie wall), the MIT + as-is +
+no-endorsement terms copy, footer links, sitemap membership, and a breadcrumb — 13/13 prerender tests
+
+## S13.15 — Community & support page
+
+**Started** 2026-07-10 · branch `story/S13.15-community-support` · priority p2, deps: S13.1.
+
+**Done** 2026-07-10.
+
+Shipped `/community`: one hub that routes every kind of engagement to the right channel, so support
+friction drops and contributions get funneled.
+
+- **Get help** → GitHub Discussions (the community forum) + search existing issues.
+- **Request or add a client** → the `adapter_request.yml` issue template, the adapter docs, and
+  CONTRIBUTING (adding a client is a one-PR job).
+- **Report a bug** → guidance to run `mcpfold diagnose` (the real command, verified in the CLI) for a
+  redaction-safe bundle with **secrets and personal paths stripped**, then file via the
+  `bug_report.yml` template; cross-links the security page (how redaction works) and the CLI docs.
+- **Stay in the loop** → blog, changelog, governance, sponsor. Restates the no-endorsement note and
+  points to the security page for private vulnerability reports.
+
+- **`src/community/Community.tsx`** — the page (channel cards + bug guidance + links).
+- **Wiring** — route in `App.tsx`; `resolveMeta` + `allRoutes` branches; a BreadcrumbList in
+  `jsonld.ts`; `site-structure.ts` adds Community & support to the footer Community group.
+
+Build prerenders /community. New `test/community.e2e.ts` (built-dist/no-JS suite, in the prerender
+Playwright config, ignored by the dev-server config) asserts the channels + `mcpfold diagnose`
+guidance + all engagement links (Discussions/issues, the adapter-request + bug-report templates,
+CONTRIBUTING, adapter/CLI docs) + no-endorsement copy + breadcrumb in the no-JS HTML, footer + sitemap
+membership, and — via a filesystem check — that the two issue templates the page links to actually
+exist in `.github/ISSUE_TEMPLATE/` (guards against a renamed/removed template). 12/12 prerender tests
+pass. Site typecheck and repo-wide `format:check` green.
+
+## S13.16 — Public roadmap page
+
+**Started** 2026-07-10 · branch `story/S13.16-roadmap-page` · priority p3, deps: S13.1, S14.3.
+
+**Done** 2026-07-10.
+
+Shipped `/roadmap`, rendered from the **single source** `docs/roadmap.md` (S14.3) — no forked copy.
+Following the existing `Changelog.tsx` precedent, the markdown is inlined at build via Vite `?raw` and
+rendered with `marked`, so the page (and its status groups: Shipped / Next / Exploring) reflows
+automatically whenever the one source file is edited — updating the roadmap is a one-file edit.
+
+- **`src/roadmap/Roadmap.tsx`** — imports `../../../../docs/roadmap.md?raw`, parses it, and
+  `rewriteDocLinks()` repoints the source's doc-relative links (`./telemetry.md`,
+  `./coverage.md#…`) to the published docs (`/docs/telemetry.html`, …) so they resolve on the site.
+  Reuses the blog `prose.css`.
+- **Wiring** — route in `App.tsx`; `resolveMeta` + `allRoutes` branches; a BreadcrumbList in
+  `jsonld.ts`; `site-structure.ts` adds Roadmap to the footer Resources group.
+
+Build prerenders /roadmap. New `test/roadmap.e2e.ts` (built-dist/no-JS suite, in the prerender
+Playwright config, ignored by the dev-server config) reads `docs/roadmap.md` from disk, extracts every
+`## ` status-group heading, and asserts each appears in the rendered no-JS HTML — proving the page
+renders the actual single source (a fork or a stale edit would fail) — plus that doc-relative `.md`
+links are rewritten to `/docs/*.html`, the breadcrumb, and footer + sitemap membership. 12/12
+prerender tests pass. Site typecheck and repo-wide `format:check` green.
+
+## S13.17 — 404 / error pages, redirects, and brand/press kit
+
+**Started** 2026-07-10 · branch `story/S13.17-error-brand-pages` · priority p3, deps: S13.1.
+
+**Done** 2026-07-10.
+
+Rounded out the site with a branded 404, a real redirect map, and a press kit.
+
+- **Branded 404** — `src/pages/NotFound.tsx` (a catch-all `*` route) with helpful top links and jumps
+  to the two search-y surfaces (directory + searchable docs). `gen-seo.mjs` renders it to
+  `dist/404.html`, which Cloudflare Pages serves with a real **404 status** for unmatched paths. To
+  enable that, `public/_redirects` drops the old blanket `/* /index.html 200` SPA fallback — every
+  route is prerendered, so unmatched paths now fall through to `404.html` instead of masking bad URLs
+  behind a 200 homepage. `serve-static.mjs` was updated to mirror this (serve `404.html` on a miss)
+  so the behavior is testable.
+- **Redirect map** — `public/_redirects` now carries a documented legacy/renamed-path map (301s:
+  `/servers`→`/directory`, `/server/*`→`/directory/:splat`, `/download`→`/install`, …).
+- **Brand / press kit** — `/brand` (`src/brand/Brand.tsx`, indexable): downloadable logomark +
+  wordmark SVGs (new, in `public/brand/`) plus PNG/social fallbacks, the color tokens (from the design
+  system, e.g. `#4c6ef5`), the product one-liner, and usage + explicit no-endorsement guidance.
+
+- **Wiring** — routes in `App.tsx` (`/brand`, catch-all `*`); `resolveMeta` `/brand` + `/404` branches
+  (`/brand` in `allRoutes`, `/404` deliberately not); a BreadcrumbList for `/brand` in `jsonld.ts`;
+  `site-structure.ts` adds Brand & press kit to the footer Company group.
+
+Build prerenders /brand and writes dist/404.html. New `test/notfound.e2e.ts` (built-dist/no-JS suite,
+in the prerender Playwright config, ignored by the dev-server config) asserts an unknown URL returns
+**404** with the branded page + helpful links, that /brand renders with downloadable assets (which
+actually GET 200 as SVG), colors, one-liner, and no-endorsement copy, that /brand is in the
+sitemap+footer while /404 is not, and that the `_redirects` legacy map ships without the old SPA
+fallback — 13/13 prerender tests pass. Site typecheck and repo-wide `format:check` green.

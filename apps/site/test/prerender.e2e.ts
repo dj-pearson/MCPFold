@@ -87,10 +87,14 @@ test('/directory/category/:cat: prerendered collection with ItemList + in the si
     'breadcrumb',
   ).toBeTruthy();
 
-  // The sitemap lists populated categories but not thin ones (index-bloat guard).
-  const sitemap = await rawHtml(request, '/sitemap.xml');
-  expect(sitemap).toContain('/directory/category/database');
-  expect(sitemap).not.toContain('/directory/category/finance');
+  // The sitemap lists populated categories but not thin ones (index-bloat guard). Since S15.8 the
+  // top-level sitemap.xml is a sitemap INDEX; category URLs live in the typed categories sitemap.
+  const index = await rawHtml(request, '/sitemap.xml');
+  expect(index).toContain('<sitemapindex');
+  expect(index).toContain('/sitemap-categories.xml');
+  const categories = await rawHtml(request, '/sitemap-categories.xml');
+  expect(categories).toContain('/directory/category/database');
+  expect(categories).not.toContain('/directory/category/finance');
 });
 
 test('/directory/:id: entry content + BreadcrumbList JSON-LD in no-JS HTML', async ({

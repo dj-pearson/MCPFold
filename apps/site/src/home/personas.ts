@@ -1,7 +1,6 @@
 /**
- * Use-case / persona teasers (S13.8). A single source shared by the homepage teaser; S13.11 turns
- * each into a dedicated persona page and repoints `href` there. Until then every link points at a
- * live page (no dead links — same precedent as the keyword map's `planned` pages).
+ * Use-case / persona teasers (S13.8). A single source shared by the homepage teaser; each card links
+ * to its dedicated persona page under /use-cases/<id> (S13.11), which routes to the right CTA.
  */
 export interface Persona {
   id: string;
@@ -18,23 +17,23 @@ export const PERSONAS: Persona[] = [
     title: 'Solo developers',
     blurb:
       'Run the same MCP servers in Claude Code, Cursor, and VS Code without hand-editing three config files. Set it up once; every client stays in sync.',
-    href: '/install',
-    cta: 'Install the CLI',
+    href: '/use-cases/solo',
+    cta: 'For solo developers',
   },
   {
     id: 'teams',
     title: 'Teams',
     blurb:
       'Share one reviewed config, keep secrets as references, and see every change in an audit trail. The hosted cloud syncs it across the team.',
-    href: '/pricing',
-    cta: 'See team cloud',
+    href: '/use-cases/teams',
+    cta: 'For teams',
   },
   {
     id: 'power-users',
     title: 'Power users',
     blurb:
       'Curate exactly the tools you want from a large directory of MCP servers, and cut the context-window tax on every model call.',
-    href: '/directory',
-    cta: 'Browse the directory',
+    href: '/use-cases/power-users',
+    cta: 'For power users',
   },
 ];

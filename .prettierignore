@@ -12,6 +12,8 @@ examples/**/.vscode/
 examples/**/.cursor/
 CHANGELOG.md
 prd.json
+# Generated from adapter facts by scripts/gen-guides.mjs (drift-checked via guides:check).
+apps/site/src/guides/guides.data.ts
 mcpfold-spec.md
 packages/schema/mcp.config.schema.json
 packages/schema/mcp.policy.schema.json
