@@ -11,11 +11,37 @@
 import type { DeviceAuthConfig, Sql } from "../../lib/device.ts";
 import { authenticate, json, readJson } from "../../lib/http.ts";
 import { asUser } from "../../lib/rls.ts";
+import { generateDeviceCode, sha256Hex } from "../../lib/codes.ts";
 import {
   type EntitlementChecker,
   EntitlementError,
   requireEntitlement,
 } from "../../lib/entitlements.ts";
+
+/** Pending-invite lifetime: 7 days (S20.3). */
+const INVITE_TTL_MS = 60 * 60 * 24 * 7 * 1000;
+
+/**
+ * Append a team audit event (S20.3) on the privileged connection (service_role bypasses RLS; there
+ * is no authenticated write policy on audit_events by design). Best-effort — a logging failure must
+ * never break the action it records.
+ */
+async function writeAudit(
+  sql: Sql,
+  teamId: string,
+  actorId: string,
+  event: string,
+  detail: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await sql`
+      insert into public.audit_events (team_id, actor_id, event, detail)
+      values (${teamId}, ${actorId}, ${event}, ${JSON.stringify(detail)}::jsonb)
+    `;
+  } catch {
+    // Never let an audit write failure surface as a request error.
+  }
+}
 
 export interface TeamDeps {
   sql: Sql;
@@ -112,9 +138,37 @@ export function createTeamInviteHandler(deps: TeamDeps): (req: Request) => Promi
       }
     }
 
-    // The invited user must already have an account; a pending-invite flow (S9.6 tokens) is future.
+    const now = (deps.now ?? (() => new Date()))();
     const [invitee] = await deps.sql`select id from public.users where email = ${email}`;
-    if (!invitee) return json({ error: "user_not_found" }, 404);
+
+    // S20.3: no account yet → mint a single-use, expiring, 256-bit pending invite (only its hash is
+    // stored). The owner shares the returned token; the invitee redeems it after signing up.
+    if (!invitee) {
+      const token = generateDeviceCode();
+      const tokenHash = await sha256Hex(token);
+      const expiresAt = new Date(now.getTime() + INVITE_TTL_MS);
+      try {
+        // RLS (pi_owner_insert) enforces owner-only; a non-owner's insert returns 0 rows.
+        const [row] = await asUser(deps.sql, userId, (tx) =>
+          tx`
+            insert into public.pending_invites (team_id, email, role, token_hash, invited_by, expires_at)
+            values (${teamId}, ${email}, ${role}, ${tokenHash}, ${userId}, ${expiresAt})
+            returning id
+          `);
+        if (!row) return json({ error: "forbidden" }, 403);
+        await writeAudit(deps.sql, teamId, userId, "invite.created", {
+          email,
+          role,
+          inviteId: row.id,
+        });
+        return json(
+          { ok: true, pending: true, token, expiresAt: Math.floor(expiresAt.getTime() / 1000) },
+          201,
+        );
+      } catch {
+        return json({ error: "forbidden" }, 403);
+      }
+    }
 
     try {
       // RLS (tm_owner_insert) enforces that only the team owner may add members.
@@ -126,10 +180,144 @@ export function createTeamInviteHandler(deps: TeamDeps): (req: Request) => Promi
           returning user_id
         `);
       if (added.length === 0) return json({ error: "forbidden" }, 403);
+      await writeAudit(deps.sql, teamId, userId, "member.added", { userId: invitee.id, role });
       return json({ ok: true, userId: invitee.id, role }, 201);
     } catch {
       return json({ error: "forbidden" }, 403);
     }
+  };
+}
+
+/** GET …/team-invites ?team=<id> — the team's still-pending invites (owner only, RLS-scoped). */
+export function createPendingInvitesHandler(deps: TeamDeps): (req: Request) => Promise<Response> {
+  return async (req) => {
+    if (req.method !== "GET") return json({ error: "method_not_allowed" }, 405);
+    const userId = await auth(req, deps);
+    if (!userId) return json({ error: "unauthorized" }, 401);
+    const teamId = new URL(req.url).searchParams.get("team");
+    if (!teamId) return json({ error: "invalid_request" }, 400);
+
+    const rows = await asUser(deps.sql, userId, (tx) =>
+      tx`
+        select id, email, role, created_at, expires_at
+        from public.pending_invites
+        where team_id = ${teamId} and redeemed_at is null and revoked_at is null
+        order by created_at desc
+      `);
+    return json(
+      rows.map((r) => ({
+        id: r.id,
+        email: r.email,
+        role: r.role,
+        createdAt: r.created_at,
+        expiresAt: r.expires_at,
+      })),
+    );
+  };
+}
+
+/** POST …/team-invite-revoke { team, id } — revoke a still-pending invite (owner only). */
+export function createInviteRevokeHandler(deps: TeamDeps): (req: Request) => Promise<Response> {
+  return async (req) => {
+    if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+    const userId = await auth(req, deps);
+    if (!userId) return json({ error: "unauthorized" }, 401);
+    const body = await readJson(req);
+    const teamId = typeof body.team === "string" ? body.team : "";
+    const id = typeof body.id === "string" ? body.id : "";
+    if (!teamId || !id) return json({ error: "invalid_request" }, 400);
+    const now = (deps.now ?? (() => new Date()))();
+
+    // RLS (pi_owner_update) enforces owner-only; only a still-pending invite is revocable.
+    const revoked = await asUser(deps.sql, userId, (tx) =>
+      tx`
+        update public.pending_invites set revoked_at = ${now}
+        where id = ${id} and team_id = ${teamId} and redeemed_at is null and revoked_at is null
+        returning email
+      `);
+    if (revoked.length > 0) {
+      await writeAudit(deps.sql, teamId, userId, "invite.revoked", {
+        inviteId: id,
+        email: revoked[0].email,
+      });
+    }
+    return json({ revoked: revoked.length });
+  };
+}
+
+/**
+ * POST …/team-invite-redeem { token } — redeem a pending invite (S20.3). Authenticated: the caller
+ * must be signed in (post-signup). The token hash is the authorization; membership is bound to the
+ * caller's **user id**, never the invite email (non-unique) — so a colliding email can't take over.
+ * Atomic single-use claim; idempotent for the same user; expiry-enforced.
+ */
+export function createInviteRedeemHandler(deps: TeamDeps): (req: Request) => Promise<Response> {
+  return async (req) => {
+    if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+    const userId = await auth(req, deps);
+    if (!userId) return json({ error: "unauthorized" }, 401);
+    const body = await readJson(req);
+    const token = typeof body.token === "string" ? body.token : "";
+    if (!token) return json({ error: "invalid_request" }, 400);
+    const now = (deps.now ?? (() => new Date()))();
+    const tokenHash = await sha256Hex(token);
+
+    // Atomic claim on the privileged connection — a token-hash lookup needs no team context. Only an
+    // unredeemed, unrevoked, unexpired invite is claimable, and only once.
+    const [claimed] = await deps.sql`
+      update public.pending_invites
+      set redeemed_at = ${now}, redeemed_by = ${userId}
+      where token_hash = ${tokenHash}
+        and redeemed_at is null and revoked_at is null and expires_at > ${now}
+      returning id, team_id, email, role
+    `;
+    if (!claimed) {
+      // Idempotent: the same user re-presenting a token they already redeemed succeeds; anyone else,
+      // or an expired/revoked/never-existed token, is rejected (single-use, non-transferable).
+      const [mine] = await deps.sql`
+        select team_id, role from public.pending_invites
+        where token_hash = ${tokenHash} and redeemed_by = ${userId}
+      `;
+      if (mine) {
+        return json({ ok: true, teamId: mine.team_id, role: mine.role, alreadyRedeemed: true });
+      }
+      return json({ error: "invalid_or_expired" }, 410);
+    }
+
+    // Bind membership to the AUTHENTICATED user id (service_role insert; the token hash authorized it).
+    await deps.sql`
+      insert into public.team_members (team_id, user_id, role)
+      values (${claimed.team_id}, ${userId}, ${claimed.role})
+      on conflict (team_id, user_id) do update set role = ${claimed.role}
+    `;
+    await writeAudit(deps.sql, claimed.team_id, userId, "invite.redeemed", {
+      inviteId: claimed.id,
+      email: claimed.email,
+    });
+    return json({ ok: true, teamId: claimed.team_id, role: claimed.role });
+  };
+}
+
+/** GET …/team-events ?team=<id> — the team's audit event log (members + owner, RLS-scoped). */
+export function createTeamEventsHandler(deps: TeamDeps): (req: Request) => Promise<Response> {
+  return async (req) => {
+    if (req.method !== "GET") return json({ error: "method_not_allowed" }, 405);
+    const userId = await auth(req, deps);
+    if (!userId) return json({ error: "unauthorized" }, 401);
+    const teamId = new URL(req.url).searchParams.get("team");
+    if (!teamId) return json({ error: "invalid_request" }, 400);
+
+    const rows = await asUser(deps.sql, userId, (tx) =>
+      tx`
+        select ae.event, u.email as actor, ae.detail, ae.created_at as at
+        from public.audit_events ae left join public.users u on u.id = ae.actor_id
+        where ae.team_id = ${teamId}
+        order by ae.created_at desc
+        limit 200
+      `);
+    return json(
+      rows.map((r) => ({ event: r.event, actor: r.actor ?? null, detail: r.detail, at: r.at })),
+    );
   };
 }
 

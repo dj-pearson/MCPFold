@@ -13,7 +13,11 @@ import {
   createRevokeHandler,
 } from "../functions/status/index.ts";
 import {
+  createInviteRedeemHandler,
+  createInviteRevokeHandler,
+  createPendingInvitesHandler,
   createTeamAuditHandler,
+  createTeamEventsHandler,
   createTeamInviteHandler,
   createTeamMembersHandler,
   createTeamRemoveHandler,
@@ -55,6 +59,10 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
   const teamInvite = createTeamInviteHandler({ sql, cfg, entitlements });
   const teamRemove = createTeamRemoveHandler({ sql, cfg });
   const teamAudit = createTeamAuditHandler({ sql, cfg });
+  const pendingInvites = createPendingInvitesHandler({ sql, cfg });
+  const inviteRevoke = createInviteRevokeHandler({ sql, cfg });
+  const inviteRedeem = createInviteRedeemHandler({ sql, cfg });
+  const teamEvents = createTeamEventsHandler({ sql, cfg });
   const billing = createBillingHandler({ sql, cfg, billing: loadBillingConfig() });
   const subscribe = createSubscribeHandler({ sql });
   return (req) => {
@@ -69,6 +77,11 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
     if (path.endsWith("/history")) return history(req);
     if (path.endsWith("/revoke")) return revoke(req);
     if (path.endsWith("/team-members")) return teamMembers(req);
+    // S20.3: the more-specific invite routes are matched before the bare /team-invite.
+    if (path.endsWith("/team-invites")) return pendingInvites(req);
+    if (path.endsWith("/team-invite-revoke")) return inviteRevoke(req);
+    if (path.endsWith("/team-invite-redeem")) return inviteRedeem(req);
+    if (path.endsWith("/team-events")) return teamEvents(req);
     if (path.endsWith("/team-invite")) return teamInvite(req);
     if (path.endsWith("/team-remove")) return teamRemove(req);
     if (path.endsWith("/team-audit")) return teamAudit(req);

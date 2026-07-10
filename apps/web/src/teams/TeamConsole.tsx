@@ -5,6 +5,7 @@ import {
   createTeamsApi,
   isPaidTier,
   type Member,
+  type PendingInvite,
   type Team,
   type Tier,
 } from './teamsApi';
@@ -33,6 +34,8 @@ export function TeamConsole() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [pending, setPending] = useState<PendingInvite[]>([]);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [newTeam, setNewTeam] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
@@ -50,8 +53,10 @@ export function TeamConsole() {
   async function openTeam(id: string): Promise<void> {
     setSelected(id);
     setError(null);
+    setInviteLink(null);
     try {
       setMembers(await api.listMembers(id));
+      setPending(await api.listPendingInvites(id));
       setAudit(await api.audit(id));
       setTier(await api.entitlement(id));
     } catch (e) {
@@ -203,14 +208,49 @@ export function TeamConsole() {
               disabled={!inviteEmail.trim() || !isPaidTier(tier)}
               onClick={() =>
                 void guard(async () => {
-                  await api.invite(selected, inviteEmail.trim(), inviteRole);
+                  const result = await api.invite(selected, inviteEmail.trim(), inviteRole);
                   setInviteEmail('');
                   setMembers(await api.listMembers(selected));
+                  setPending(await api.listPendingInvites(selected));
+                  // A new email gets a one-time token to share; an existing user joins directly.
+                  setInviteLink(result.pending ? (result.token ?? null) : null);
                 })
               }
             >
               Invite
             </button>
+            {inviteLink && (
+              <p className="muted" data-testid="invite-link">
+                Invite sent — share this one-time link with the invitee: <code>{inviteLink}</code>
+              </p>
+            )}
+            {pending.length > 0 && (
+              <>
+                <h4>Pending invites</h4>
+                <ul className="server-list">
+                  {pending.map((p) => (
+                    <li key={p.id} data-testid={`pending-${p.email}`}>
+                      <code>{p.email}</code>{' '}
+                      <span className="muted">
+                        {p.role} · expires {fmt(p.expiresAt)}
+                      </span>
+                      <button
+                        className="link"
+                        data-testid={`revoke-invite-${p.email}`}
+                        onClick={() =>
+                          void guard(async () => {
+                            await api.revokeInvite(selected, p.id);
+                            setPending(await api.listPendingInvites(selected));
+                          })
+                        }
+                      >
+                        revoke
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             {isPaidTier(tier) && (
               <button
                 className="link"

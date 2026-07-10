@@ -4510,7 +4510,7 @@
       "epic": "E20",
       "order": 3,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Pending-invite redemption and enterprise SSO for teams",
       "user_story": "As a team owner, I want to invite teammates who don't have accounts yet and let my org sign in with our identity provider, so team onboarding works the way enterprises expect.",
