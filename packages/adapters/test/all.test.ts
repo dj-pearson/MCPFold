@@ -11,10 +11,13 @@ describe('registerAll (S2.1–S2.7, S14.1, S19.1)', () => {
       'claude-code',
       'claude-desktop',
       'cline',
+      'codex-cli',
       'continue',
       'cursor',
       'gemini-cli',
+      'goose',
       'jetbrains',
+      'lm-studio',
       'roo-code',
       'visual-studio',
       'vscode',
@@ -33,6 +36,6 @@ describe('registerAll (S2.1–S2.7, S14.1, S19.1)', () => {
   it('is idempotent', () => {
     registerAll();
     registerAll();
-    expect(listAdapters()).toHaveLength(12);
+    expect(listAdapters()).toHaveLength(15);
   });
 });

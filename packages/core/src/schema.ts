@@ -7,7 +7,7 @@ import { z } from 'zod';
  * these zod schemas. Never hand-duplicate an interface; infer it (see types.ts).
  */
 
-/** The twelve clients mcpfold folds config out to (keep in sync with CLIENT_IDS.length; tested). */
+/** The fifteen clients mcpfold folds config out to (keep in sync with CLIENT_IDS.length; tested). */
 export const CLIENT_IDS = [
   'claude-desktop',
   'claude-code',
@@ -21,6 +21,10 @@ export const CLIENT_IDS = [
   'visual-studio',
   'continue',
   'roo-code',
+  // S19.2 — wave 2, bespoke formats: Goose (YAML), Codex CLI (TOML), LM Studio (Cursor-compatible JSON).
+  'goose',
+  'codex-cli',
+  'lm-studio',
 ] as const;
 
 /** Secret-provider schemes understood by the resolver (E4). Parsing lives in secret-ref.ts. */

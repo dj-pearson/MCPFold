@@ -51,4 +51,7 @@ export { jetbrainsAdapter } from './jetbrains.js';
 export { visualStudioAdapter } from './visual-studio.js';
 export { continueAdapter } from './continue.js';
 export { rooCodeAdapter } from './roo-code.js';
+export { gooseAdapter } from './goose.js';
+export { codexCliAdapter } from './codex-cli.js';
+export { lmStudioAdapter } from './lm-studio.js';
 export { ALL_ADAPTERS, registerAll } from './all.js';

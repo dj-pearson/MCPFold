@@ -22,7 +22,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mcpfold/core": "workspace:*"
+    "@mcpfold/core": "workspace:*",
+    "smol-toml": "^1.7.0",
+    "yaml": "^2.9.0"
   },
   "publishConfig": {
     "access": "public"

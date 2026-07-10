@@ -73,8 +73,14 @@ export interface ClientAdapter {
   /** Resolve the on-disk config path for a scope/project on a given OS. */
   resolvePath(scope: Scope, projectPath?: string, ctx?: OsContext): string;
 
-  /** Render already-resolved (secret-ref-preserving) servers to a native file. */
-  render(servers: ResolvedServer[], ctx?: OsContext): RenderedFile;
+  /**
+   * Render already-resolved (secret-ref-preserving) servers to a native file. `existing` is the
+   * current on-disk contents when the file exists (S19.2): adapters that write into a SHARED config
+   * file (Goose YAML, Codex TOML — files that also hold non-MCP settings) merge the managed section
+   * into it, preserving unmanaged keys (and comments where the format allows). Adapters that own a
+   * dedicated file ignore it.
+   */
+  render(servers: ResolvedServer[], ctx?: OsContext, existing?: string): RenderedFile;
 
   /** Parse a native file back to a canonical partial. Powers `import` and drift detection. */
   parse(contents: string): Partial<Config>;

@@ -11,6 +11,9 @@ import { jetbrainsAdapter } from './jetbrains.js';
 import { visualStudioAdapter } from './visual-studio.js';
 import { continueAdapter } from './continue.js';
 import { rooCodeAdapter } from './roo-code.js';
+import { gooseAdapter } from './goose.js';
+import { codexCliAdapter } from './codex-cli.js';
+import { lmStudioAdapter } from './lm-studio.js';
 import type { ClientAdapter } from './types.js';
 
 /** Every built-in adapter, in a stable order. */
@@ -27,6 +30,9 @@ export const ALL_ADAPTERS: readonly ClientAdapter[] = [
   visualStudioAdapter,
   continueAdapter,
   rooCodeAdapter,
+  gooseAdapter,
+  codexCliAdapter,
+  lmStudioAdapter,
 ];
 
 /** Register every built-in adapter into the shared registry. Idempotent. */
