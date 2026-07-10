@@ -123,6 +123,48 @@ broken migration is caught before it reaches the deployment.
 The device-code auth + config push/pull API runs either inside the managed Supabase Edge runtime
 or as a standalone container — see [Edge service](coolify-edge-service.md) for the Coolify deploy.
 
+## Enterprise SSO (OIDC — Entra ID / Okta) — S20.3
+
+SSO is an **Enterprise** entitlement. GoTrue runs the OIDC flow; mcpfold trusts the GoTrue-issued
+JWT exactly as it does a password login, so **device-code CLI login keeps working for SSO users**
+unchanged (the `mcpfold login` device flow verifies the JWT `sub`, never how the user authenticated).
+
+**Configure the IdP in GoTrue** (env on the `auth` service — hosted mcpfold.com sets these centrally;
+self-hosted sets them in your Coolify env). GoTrue ships a generic OIDC provider plus first-class
+Azure (Entra) and Okta providers:
+
+```bash
+# Microsoft Entra ID
+GOTRUE_EXTERNAL_AZURE_ENABLED=true
+GOTRUE_EXTERNAL_AZURE_CLIENT_ID=<app registration client id>
+GOTRUE_EXTERNAL_AZURE_SECRET=<client secret>
+GOTRUE_EXTERNAL_AZURE_URL=https://login.microsoftonline.com/<tenant-id>/v2.0
+GOTRUE_EXTERNAL_AZURE_REDIRECT_URI=https://<your-domain>/auth/v1/callback
+
+# Okta (generic OIDC)
+GOTRUE_EXTERNAL_OIDC_ENABLED=true
+GOTRUE_EXTERNAL_OIDC_CLIENT_ID=<okta app client id>
+GOTRUE_EXTERNAL_OIDC_SECRET=<client secret>
+GOTRUE_EXTERNAL_OIDC_URL=https://<org>.okta.com
+GOTRUE_EXTERNAL_OIDC_REDIRECT_URI=https://<your-domain>/auth/v1/callback
+```
+
+**Anti-takeover — the one setting you must get right.** Disable automatic email-based account
+linking so an SSO login can never attach to an existing account merely because it carries the same
+email:
+
+```bash
+GOTRUE_SECURITY_MANUAL_LINKING_ENABLED=false   # never auto-link accounts by email
+```
+
+This mirrors mcpfold's own policy (`services/edge/lib/sso.ts`, `resolveIdentityLink`): an identity is
+the durable **(issuer, subject)** pair, and a matching email — even a "verified" one — never links to
+an existing account (an attacker can register an IdP account bearing a victim's email). New IdP
+subjects always provision a fresh account; team membership is granted only by explicit invite, and
+invite redemption itself binds to the authenticated user id, not the email (pending invites store
+only a hashed token and are single-use, expiring, and revocable). The rule is unit-tested in
+`services/edge/test/sso.test.ts`.
+
 ## Hardening
 
 Before serving real traffic, work through [At-rest hardening](security-at-rest.md): LUKS

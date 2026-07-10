@@ -1148,3 +1148,39 @@ docs:build + matrix-drift + demo). adapters 25 files / 151 tests. Same pre-exist
 **Follow-ups:** a dedicated styled site page (vs the on-site docs page + JSON asset) for the E13/E15
 marketing tie-in; the live-doc heuristic is token-presence — a schema-parse path could sharpen it for
 clients that publish machine-readable schemas.
+## S20.3 — Pending-invite redemption & enterprise SSO
+
+Started/done: 2026-07-09. Two onboarding walls removed: inviting an email with no account used to
+404, and there was no SSO. Verified locally against a real Postgres (Docker) + Deno + Playwright.
+
+**Pending invites (backend).** Migration `0008` adds `pending_invites` + `audit_events`
+(append-only, server-write-only) + an `auth.users → public.users` provisioning trigger (the missing
+signup hook). Inviting an email with no account mints a single-use, expiring, 256-bit token (only its
+SHA-256 hash is stored, reusing `lib/codes.ts`); the invitee redeems it after signup. Redemption is
+an atomic single-use claim (the `pollDeviceAuth` idiom), **idempotent** for the same user, and
+expiry/revoke-enforced. New edge handlers — list / revoke / redeem / events — wired into the router;
+each action writes an audit event. **Anti-takeover**: redemption authorizes by the token hash and
+binds membership to the authenticated `sub`, never the (non-unique) email.
+
+**Web console.** `teamsApi` gains `listPendingInvites`/`revokeInvite`; `invite()` returns the
+one-time token. `TeamConsole` surfaces the shareable invite link + a Pending-invites list with revoke.
+
+**Enterprise SSO.** GoTrue runs the OIDC flow (Entra ID / Okta); mcpfold trusts the GoTrue JWT as
+before, so **device-code CLI login keeps working for SSO users unchanged** (the flow verifies the
+`sub`, not the auth method — covered by the existing `auth.test.ts` device tests). The mcpfold
+linking **policy** (`lib/sso.ts`, `resolveIdentityLink`) makes the identity the durable
+**(issuer, subject)** pair: a colliding email — even "verified" — never links to an existing account,
+which is the anti-takeover invariant. `docs/self-hosting.md` documents the Entra/Okta GoTrue env
+config for hosted + self-hosted, and the critical `GOTRUE_SECURITY_MANUAL_LINKING_ENABLED=false`.
+
+**Audit.** `invite.created` / `invite.redeemed` / `invite.revoked` (+ `member.added`) events, read
+via `team-events` (member-scoped RLS).
+
+Tests: a 10-step Deno invite-lifecycle test (mint → provision-trigger → redeem → join, idempotent,
+expiry, revoke, non-transferable, audited) + SSO anti-takeover unit tests — **full edge suite 35
+passed**; the teams Playwright e2e covers the pending-invite list/link/revoke. Web typecheck + docs
+build clean.
+
+**Follow-ups:** per-team IdP selection (this ships deployment-level OIDC config, not per-team) and a
+web view of the audit-event log (the `team-events` endpoint exists; the console shows config-version
+audit today).

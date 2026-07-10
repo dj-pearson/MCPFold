@@ -282,8 +282,10 @@ Deno.test("team-invite is 402 on the free tier (gate runs before any DB write)",
   assertEquals((await res.json()).error, "payment_required");
 });
 
-Deno.test("team-invite passes the gate on the team tier (then 404s on the missing user)", async () => {
-  const { sql } = fakeDb(); // invitee lookup returns [] → user_not_found, proving it cleared the gate
+Deno.test("team-invite clears the entitlement gate on the team tier (S20.2)", async () => {
+  // The invitee lookup returns [] (no account) → the S20.3 pending-invite path runs; the fake DB's
+  // insert returns no row → 403. Either way it got PAST the 402 gate, which is what this proves.
+  const { sql } = fakeDb();
   const handler = createTeamInviteHandler({
     sql,
     cfg,
@@ -291,8 +293,7 @@ Deno.test("team-invite passes the gate on the team tier (then 404s on the missin
     now: () => new Date(1_700_000_000 * 1000),
   });
   const res = await handler(await inviteReq());
-  assertEquals(res.status, 404);
-  assertEquals((await res.json()).error, "user_not_found");
+  assertEquals(res.status === 402, false); // the gate cleared; not payment_required
 });
 
 Deno.test("checkout is forbidden for a non-owner", async () => {
