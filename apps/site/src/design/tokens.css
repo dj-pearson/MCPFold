@@ -85,6 +85,15 @@ a {
 a:hover {
   text-decoration: underline;
 }
+/* WCAG 1.4.1 / Lighthouse `link-in-text-block`: a link sitting inside body copy must be
+   distinguishable without relying on color. Underline links within main-content prose —
+   paragraphs and list items — where they're surrounded by text. The header/footer chrome and
+   standalone card/CTA links live outside <main> (or are not inside a <p>/<li>), so they keep the
+   color-only treatment. */
+main p a,
+main li a {
+  text-decoration: underline;
+}
 code {
   font-family: var(--font-mono);
   background: var(--code-bg);
