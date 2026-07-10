@@ -30,6 +30,16 @@ const HOME: Faq[] = [
       'mcpfold folds to 18 clients from one config: Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Cline, Gemini CLI, JetBrains AI Assistant, Visual Studio, Continue, Roo Code, Goose, Codex CLI, LM Studio, Warp, opencode, and GitHub Copilot CLI. Each client has its own config format and path — including YAML (Goose) and TOML (Codex CLI) — and mcpfold handles the per-client dialect automatically.',
   },
   {
+    question: 'How does mcpfold reduce MCP token usage?',
+    answer:
+      'mcpfold reduces MCP token usage by curating which tools each client loads, from one canonical config, so only the tools an agent actually needs enter its context window. Every connected MCP server otherwise dumps its full tool schema into context on every turn, used or not. In a reproducible benchmark, trimming a 45-tool setup to the 9 tools actually needed cut tool-schema tokens by about 80% (7,476 to 1,497), with no extra configuration.',
+  },
+  {
+    question: 'Do I still need mcpfold if my client has native tool-search?',
+    answer:
+      'They complement each other. Native tool-search (such as Claude’s Tool Search Tool or OpenAI’s deferred tool loading) lets a model load tools on demand, but it is model-driven, non-deterministic, and only exists on the clients and models that ship it. mcpfold curates deterministically from one config across every MCP client — including Cursor, Windsurf, and Zed, which have no native tool-search — and trims the catalog before any native tool-search runs, so the two layers stack.',
+  },
+  {
     question: 'Is mcpfold free?',
     answer:
       'Yes. The entire mcpfold CLI — every adapter, the canonical config, secret references, sync, diff, doctor, and the config-as-code CI gate — is free and open source under the MIT license, with no account required. Optional paid cloud features add team config sharing, roles, and an audit trail.',

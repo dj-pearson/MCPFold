@@ -130,3 +130,59 @@ For each: submit under **tools / utilities / clients**, not the server catalog.
 | GitHub topics | `mcp`, `mcp-client`, `mcp-server`, `mcp-servers`, `mcp-tools` (already set) |
 | npm keywords  | see each package's `keywords` (mcp, model-context-protocol, cli, proxy, …)  |
 | Directories   | Tools · Utilities · Proxies · Clients                                       |
+
+---
+
+## Token-reduction campaign (own the "cut MCP context" query)
+
+A separate, evidence-first campaign for the token/context intent — strategy in
+[docs/token-query-geo-plan.md](../token-query-geo-plan.md). This crowd is skeptical and the field
+is half-commoditized by native platform features, so **lead with the benchmark and the honest
+comparison, not a product pitch**. Positioning: mcpfold is the _deterministic, cross-client_
+option, and it _composes with_ native tool-search rather than competing.
+
+### Show HN (benchmark-framed — do NOT reuse the generic launch)
+
+- **Title:** `Show HN: I compared every way to cut MCP token usage (tool-search, compression, code mode, curation)`
+- **URL:** https://mcpfold.com/compare/reduce-mcp-token-usage
+- **Body:**
+
+> Connecting MCP servers loads every tool's schema into the model's context on every turn, used or
+> not — a handful of busy servers can spend thousands of tokens before the agent does anything.
+> There are now four broad fixes: native tool-search (the model loads tools on demand),
+> schema/response compression, code execution, and deterministic per-client curation. I wrote up an
+> honest comparison of all four and where each fits, plus a reproducible benchmark (45 tools → the 9
+> needed, ~80% fewer tool-schema tokens; repro command in the repo).
+>
+> I build one of them (mcpfold, an MIT CLI that does the curation approach), so I tried to be fair
+> to the others — native tool-search is genuinely great where a client ships it; mcpfold's niche is
+> being deterministic and working across clients that have none (Cursor, Windsurf, Zed), and it
+> stacks with tool-search rather than replacing it. Happy to be told where the comparison is wrong.
+
+Post Tue–Thu ~8–10am PT. Engage every comment, especially disagreement; never ask for upvotes.
+
+### awesome-list PRs
+
+- **e2b-dev/awesome-mcp-gateways** — add under proxies/curation:
+  > `[mcpfold](https://mcpfold.com) — Local-first CLI that curates which MCP tools each client loads from one config, deterministically cutting tool-schema tokens. Complements native tool-search; works on clients that have none (Cursor, Windsurf, Zed). MIT.`
+- **punkpeye/awesome-mcp-servers** (tools/utilities section) — same one-liner.
+- Any "MCP optimization" / "MCP token" list — same blurb.
+
+### Outreach to existing "approaches compared" posts
+
+Several posts already rank for this query and enumerate approaches (StackOne's "MCP Token
+Optimization: 4 Approaches Compared", The New Stack's "10 strategies to reduce MCP token bloat").
+A factual, non-pushy note lands best:
+
+> Enjoyed the roundup. One option you don't cover is **deterministic per-client curation** —
+> declaring the exact tool set each client loads (vs. the model searching for tools). It's the only
+> approach that's reproducible/auditable and that works on clients without native tool-search
+> (Cursor, Windsurf, Zed). Open-source writeup + benchmark if useful:
+> https://mcpfold.com/compare/reduce-mcp-token-usage — no ask, just thought it rounded out the list.
+
+### Reddit / GitHub (answer, don't spam)
+
+- **r/mcp, r/ClaudeAI, r/cursor** — reply to live "too many tools / context" threads with the
+  four-approach summary; mention mcpfold as one option; follow each sub's self-promo rules.
+- **GitHub tool-cap threads** (microsoft/vscode #290356, #253539; anthropics/claude-code #12836) —
+  a helpful comment linking the comparison, only where it genuinely answers the thread.

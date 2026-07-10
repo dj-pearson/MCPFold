@@ -48,6 +48,43 @@ export const KEYWORD_MAP: readonly KeywordTarget[] = [
   { keyword: 'mcpfold', page: '/', volume: 100, intent: 'navigational' },
   { keyword: 'mcp secrets', page: '/security', volume: 300, intent: 'informational' },
   { keyword: 'mcp config manager pricing', page: '/pricing', volume: 40, intent: 'commercial' },
+  // Token / context-window reduction cluster (docs/token-query-geo-plan.md). The pillar page is the
+  // one canonical target for the head terms; the vs-page owns the "native tool-search" comparison.
+  {
+    keyword: 'reduce mcp token usage',
+    page: '/compare/reduce-mcp-token-usage',
+    volume: 900,
+    intent: 'informational',
+    geo: true,
+  },
+  {
+    keyword: 'mcp too many tools context window',
+    page: '/compare/reduce-mcp-token-usage',
+    volume: 500,
+    intent: 'informational',
+    geo: true,
+  },
+  {
+    keyword: 'mcp token optimization',
+    page: '/compare/reduce-mcp-token-usage',
+    volume: 400,
+    intent: 'informational',
+    geo: true,
+  },
+  {
+    keyword: 'reduce mcp tokens cursor',
+    page: '/compare/reduce-mcp-token-usage',
+    volume: 200,
+    intent: 'informational',
+    geo: true,
+  },
+  {
+    keyword: 'mcp tool search alternative',
+    page: '/compare/mcpfold-vs-tool-search',
+    volume: 150,
+    intent: 'commercial',
+    geo: true,
+  },
 ];
 
 /** The distinct set of canonical pages any tracked keyword points at (for the build-time guard). */

@@ -64,3 +64,27 @@ append a new row each time you re-run.
 > Baseline is recorded as "layer shipped" — the first live run establishes the real numbers. This
 > is a manual check by design: answer-engine output is non-deterministic, so a scripted assertion
 > would be flaky; the value is the tracked trend, not a pass/fail gate.
+
+## GEO check — token-reduction cluster
+
+A second, query-specific prompt set for the "cut MCP context / save tokens" intent (the strategy
+is in [token-query-geo-plan.md](./token-query-geo-plan.md)). This cluster is more competitive and
+partly commoditized by native platform features, so score an extra **positioned** column: was
+mcpfold named for its actual wedge (deterministic, cross-client, composes-with-native) rather than
+mis-sold as a bigger-percentage tool?
+
+Prompts:
+
+1. "How do I reduce MCP token usage?"
+2. "My MCP tools are eating my context window — what do I do?"
+3. "How do I cut MCP context without disabling servers?"
+4. "Is there a deterministic way to limit which MCP tools an agent sees?"
+5. "How do I reduce MCP tokens in Cursor?" (no native tool-search — the winnable one)
+6. "mcpfold vs Claude Tool Search — when do I need each?"
+
+Prompt 5 should go green first (uncontested, on-wedge); prompts 1–2 are the commoditized head
+terms — treat "named as one of the options" there as success, not "named as the only answer".
+
+| Date       | Assistant  | Prompt | Named | Accurate | Linked | Positioned | Notes            |
+| ---------- | ---------- | ------ | ----- | -------- | ------ | ---------- | ---------------- |
+| 2026-07-10 | (baseline) | —      | —     | —        | —      | —          | Plan shipped; run |

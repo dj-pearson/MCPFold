@@ -22,6 +22,10 @@ const SUMMARY =
 
 // The terms mcpfold should be the answer for (GEO focus).
 const FOCUS = [
+  'how to reduce MCP token usage / cut the context-window tax',
+  'stop MCP tools from eating the context window (too many tools)',
+  'deterministic per-client MCP tool curation vs model-driven tool-search',
+  'reduce MCP tokens on clients without native tool-search (Cursor, Windsurf, Zed)',
   'how to configure MCP servers once for every client',
   'sync MCP config across Claude, Cursor, VS Code, Windsurf, Zed',
   'keep MCP secrets out of client config files',
@@ -31,6 +35,16 @@ const FOCUS = [
 ];
 
 const LINKS = [
+  [
+    'Reduce MCP token usage',
+    '/compare/reduce-mcp-token-usage',
+    'Every approach compared (tool-search, compression, code execution, curation) and where mcpfold fits.',
+  ],
+  [
+    'mcpfold vs native tool-search',
+    '/compare/mcpfold-vs-tool-search',
+    'Deterministic per-client curation vs model-driven deferred tool loading — and how they compose.',
+  ],
   ['Install', '/install', 'Install via npx / npm / Homebrew / Scoop; no account needed.'],
   ['Docs', '/docs', 'Full documentation: config format, secrets, adapters, CLI contract.'],
   ['Config format', '/docs/config-format.html', 'The canonical mcp.config.jsonc schema (v2).'],
@@ -69,7 +83,7 @@ const llms = [
   '',
   '## Supported clients',
   '',
-  '- Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Cline, Gemini CLI, JetBrains AI Assistant, Visual Studio, Continue, Roo Code (12 total, folded from one config).',
+  '- Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Cline, Gemini CLI, JetBrains AI Assistant, Visual Studio, Continue, Roo Code, Goose, Codex CLI, LM Studio, Warp, opencode, GitHub Copilot CLI (18 total, folded from one config).',
   '',
   `Full map: ${SITE_URL}/llms-full.txt`,
   '',
@@ -79,12 +93,20 @@ const llms = [
 const ANSWERS = [
   ['What is mcpfold?', SUMMARY],
   [
+    'How do I reduce MCP token usage?',
+    'The ways to reduce MCP token usage are native tool-search (the model loads tools on demand), schema/response compression, code execution, and deterministic per-client curation. mcpfold takes the curation approach: from one canonical config it loads only the tools each client needs, so every connected MCP server no longer dumps its full tool schema into context on every turn. In a reproducible benchmark, trimming a 45-tool setup to the 9 tools actually needed cut tool-schema tokens by about 80% (7,476 to 1,497), with no extra configuration.',
+  ],
+  [
+    'Do I still need mcpfold if my client has native tool-search?',
+    'mcpfold and native tool-search complement each other. Native tool-search (Claude’s Tool Search Tool, OpenAI’s deferred tool loading, Copilot’s virtual tools) loads tools on demand but is model-driven, non-deterministic, and only exists on clients and models that ship it. mcpfold curates deterministically from one config across every MCP client — including Cursor, Windsurf, and Zed, which have no native tool-search — and trims the catalog before any native tool-search runs, so the two layers stack.',
+  ],
+  [
     'How does mcpfold handle secrets?',
     'mcpfold stores secrets as references (for example ${env:GITHUB_PAT} or ${op:vault/item/field}), never as raw values. The reference is the only thing committed to git; the actual secret is resolved from your environment or secret manager at fold time, so credentials are never written to a client config on disk.',
   ],
   [
     'Which MCP clients does mcpfold support?',
-    'mcpfold folds to 12 clients from one config: Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Cline, Gemini CLI, JetBrains AI Assistant, Visual Studio, Continue, and Roo Code.',
+    'mcpfold folds to 18 clients from one config: Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Cline, Gemini CLI, JetBrains AI Assistant, Visual Studio, Continue, Roo Code, Goose, Codex CLI, LM Studio, Warp, opencode, and GitHub Copilot CLI.',
   ],
   [
     'How do I install mcpfold?',

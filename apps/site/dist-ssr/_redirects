@@ -1,3 +1,14 @@
-# Cloudflare Pages routing (S13.1). Static files (including the docs build mounted at /docs) win
-# over this rule, so only unmatched marketing routes fall back to the SPA entry.
-/*    /index.html    200
+# Cloudflare Pages routing (S13.1, S13.17).
+#
+# Every marketing route is prerendered to its own static file (S15.1) and the docs build is mounted
+# at /docs, so Cloudflare serves those static files directly. There is deliberately NO catch-all SPA
+# fallback: an unmatched path falls through to the branded 404.html (dist/404.html, written by
+# gen-seo.mjs) with a real 404 status, instead of masking bad URLs behind a 200 homepage.
+
+# --- Legacy / renamed path redirects (301) -------------------------------------------------------
+/home             /                  301
+/index.html       /                  301
+/servers          /directory         301
+/server/*         /directory/:splat  301
+/download         /install           301
+/docs.html        /docs              301
