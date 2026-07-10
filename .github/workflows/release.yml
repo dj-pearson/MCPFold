@@ -75,6 +75,11 @@ jobs:
           cache: pnpm
           # No registry-url on purpose: it writes an .npmrc with a token authToken, which makes npm
           # use token auth and skip OIDC. Publishing goes through npm Trusted Publishers (OIDC).
+      # npm OIDC Trusted Publishing requires npm >= 11.5.1. Node 20 bundles npm 10.x, which can't
+      # perform the OIDC token exchange and fails with ENEEDAUTH even when trusted publishers are
+      # configured. `changeset publish` shells out to this global npm, so upgrade it here.
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm i -g npm@11
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
       - name: Create Release PR or publish
