@@ -13,14 +13,14 @@ utility → the token/context problem → mcpfold as the deterministic, cross-cl
 
 These curate exactly this audience and most makers never bother submitting.
 
-| Newsletter | How to submit | Angle to use |
-| --- | --- | --- |
-| **Console.dev** | console.dev "submit a tool" form | "Free CLI + token calculator for MCP" — they love OSS dev tools |
-| **TLDR** (Web Dev / AI) | tldr.tech sponsor/submit | The benchmark data + calculator |
-| **Bytes** (JS) | submit via their site | The cross-client "one config" angle |
-| **Pointer.io** | editor submission | Founder essay: "the MCP context-window tax" |
-| **Cooperpress** (Node Weekly / JavaScript Weekly) | cooperpress.com suggestion form | npm CLI release + calculator |
-| **Changelog News** | changelog.com/submit | OSS + the data story |
+| Newsletter                                        | How to submit                    | Angle to use                                                    |
+| ------------------------------------------------- | -------------------------------- | --------------------------------------------------------------- |
+| **Console.dev**                                   | console.dev "submit a tool" form | "Free CLI + token calculator for MCP" — they love OSS dev tools |
+| **TLDR** (Web Dev / AI)                           | tldr.tech sponsor/submit         | The benchmark data + calculator                                 |
+| **Bytes** (JS)                                    | submit via their site            | The cross-client "one config" angle                             |
+| **Pointer.io**                                    | editor submission                | Founder essay: "the MCP context-window tax"                     |
+| **Cooperpress** (Node Weekly / JavaScript Weekly) | cooperpress.com suggestion form  | npm CLI release + calculator                                    |
+| **Changelog News**                                | changelog.com/submit             | OSS + the data story                                            |
 
 **Submission blurb (paste-ready):**
 
@@ -85,7 +85,7 @@ Revenue is the team cloud, and that buyer isn't on r/mcp. Post the **config-as-c
 
 ## Reddit — answer, never spam
 
-Subs: **r/mcp, r/ClaudeAI, r/cursor, r/LocalLLaMA**. Don't post launches; *reply* to live "too many
+Subs: **r/mcp, r/ClaudeAI, r/cursor, r/LocalLLaMA**. Don't post launches; _reply_ to live "too many
 tools / context / slow" threads with the four-approach summary and the calculator link, disclose
 you're the author, and follow each sub's self-promo rule. One genuinely useful comment > ten posts.
 

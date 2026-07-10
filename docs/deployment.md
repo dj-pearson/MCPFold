@@ -349,7 +349,7 @@ step 403s. The workflow requests provenance via OIDC, so no secret is stored.
 
 ---
 
-## Step 9 — Standalone binaries, Homebrew & Scoop
+## Step 9 — Standalone binaries, Homebrew, Scoop & WinGet
 
 Some users install without npm — a raw binary, `brew install`, or `scoop install`. These all download
 from the binaries attached to the **GitHub Release**, which the Version Packages merge cuts for you
@@ -372,6 +372,15 @@ your tap/bucket repos. You only do the **one-time setup**:
    push** (it won't fail the release).
 3. That's it — the next release (or a re-run of the release job) pushes `mcpfold.rb` / `mcpfold.json`
    with that release's version and checksums.
+
+**WinGet (automatic once set up):** the same job renders the WinGet manifests (`dist-packaging/winget`)
+and submits them to `microsoft/winget-pkgs`. You only do the **one-time setup**:
+
+1. Make the **first-ever** submission of `PearsonMedia.mcpfold` manually (see
+   `packaging/winget/README.md`) — Microsoft reviews the initial package by hand.
+2. Create a **PAT that can fork repos + open PRs** and add it as the repo secret **`WINGET_TOKEN`**.
+   Until it's set, the release renders the WinGet manifests but **skips the winget-pkgs submission**
+   (it won't fail the release). Once set, every release opens the update PR automatically.
 
 After that, `brew install dj-pearson/tap/mcpfold` and `scoop install mcpfold` track every release.
 Version parity is kept green automatically: `scripts/sync-packaging-version.mjs` runs during the
@@ -421,7 +430,8 @@ If you want browser sign-in via GitHub for device-code login:
 - [ ] Pages project names are exactly `mcpfold-site` and `mcpfold-web`.
 - [ ] `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` are set as GitHub secrets; npm Trusted
       Publishers are configured for every published package (no `NPM_TOKEN`); `HOMEBREW_TAP_TOKEN` is
-      set if you want Homebrew/Scoop to auto-update.
+      set if you want Homebrew/Scoop to auto-update, and `WINGET_TOKEN` if you want WinGet to
+      auto-update.
 - [ ] Migrations applied to the **production** database (not just locally/CI).
 - [ ] At-rest hardening done and `verify-hardening.sh` passes.
 - [ ] `ADDITIONAL_REDIRECT_URLS` / OAuth callbacks include every host that starts a sign-in.

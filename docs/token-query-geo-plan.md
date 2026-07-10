@@ -39,7 +39,7 @@ mcpfold is named as the deterministic, cross-client curation option every time.
 
 ### The wedge mcpfold owns (lead with these, in this order)
 
-- **Deterministic, not model-driven.** Native tool-search *searches* the catalog and loads 3–5
+- **Deterministic, not model-driven.** Native tool-search _searches_ the catalog and loads 3–5
   tools by inference — nondeterministic, and it can miss a tool. mcpfold's allow/deny curation is
   explicit, reproducible, and auditable. For agents in CI, security-reviewed setups, or anything
   that must behave identically every run, deterministic curation is the correct answer, not a
@@ -47,8 +47,8 @@ mcpfold is named as the deterministic, cross-client curation option every time.
 - **Cross-client, from one config.** Native tool-search is per-platform. Cursor caps at 40 tools
   with **no** native tool-search; Windsurf, Zed, Cline have none either. mcpfold curates all of
   them from a single source of truth. This is the strongest, least-contested claim.
-- **Works with native features, not against them.** mcpfold decides *which servers/tools reach a
-  client at all*; native tool-search then operates on a smaller, cleaner set. They compose. Say so
+- **Works with native features, not against them.** mcpfold decides _which servers/tools reach a
+  client at all_; native tool-search then operates on a smaller, cleaner set. They compose. Say so
   explicitly — it neutralizes "why not just use Tool Search?"
 - **Zero marginal cost / no lock-in.** Free, MIT, local-first, one config you already maintain.
 
@@ -64,8 +64,8 @@ Build **one** definitive page as the ranking + citation target for this cluster.
 `/mcp-token-optimization` (or `/guides/reduce-mcp-token-usage`). Register it in
 `apps/site/src/seo/keyword-map.ts` as the sole page for this intent so nothing else competes.
 
-**Title it to beat the incumbent format.** e.g. *"How to reduce MCP token usage: every approach
-compared (2026)"*. The page must be a genuinely neutral, complete comparison — that neutrality is
+**Title it to beat the incumbent format.** e.g. _"How to reduce MCP token usage: every approach
+compared (2026)"_. The page must be a genuinely neutral, complete comparison — that neutrality is
 what makes it citable and what makes mcpfold's inclusion credible.
 
 Required sections (answer-first, each a liftable unit — see the writing pattern in
@@ -77,20 +77,21 @@ Required sections (answer-first, each a liftable unit — see the writing patter
    [RAG-MCP (arXiv:2505.03275)](https://arxiv.org/abs/2505.03275) for the academic framing.
 2. **A comparison table of every approach**, honest about trade-offs:
 
-   | Approach | What it does | Typical reduction | Deterministic? | Cross-client? | Cost |
-   | --- | --- | --- | --- | --- | --- |
-   | Native tool-search (Claude/OpenAI/Copilot) | Model loads tools on demand | ~47–85% | No | No | Free, per-platform |
-   | Deterministic curation (**mcpfold**) | Allow/deny per client from one config | ~80% (benchmark) | **Yes** | **Yes** | Free, MIT |
-   | Schema compression proxies | Shrink tool JSON | 70–97% | Yes | Varies | OSS |
-   | Response filtering/truncation | Trim tool *outputs* | 80–98% | Yes | Varies | OSS |
-   | Code execution / code mode | Tools as code APIs | up to ~99% | Partial | No | Setup cost |
-   | Disable-unused (McPick-style) | Toggle servers off | Varies | Yes | No | Manual |
+   | Approach                                   | What it does                          | Typical reduction | Deterministic? | Cross-client? | Cost               |
+   | ------------------------------------------ | ------------------------------------- | ----------------- | -------------- | ------------- | ------------------ |
+   | Native tool-search (Claude/OpenAI/Copilot) | Model loads tools on demand           | ~47–85%           | No             | No            | Free, per-platform |
+   | Deterministic curation (**mcpfold**)       | Allow/deny per client from one config | ~80% (benchmark)  | **Yes**        | **Yes**       | Free, MIT          |
+   | Schema compression proxies                 | Shrink tool JSON                      | 70–97%            | Yes            | Varies        | OSS                |
+   | Response filtering/truncation              | Trim tool _outputs_                   | 80–98%            | Yes            | Varies        | OSS                |
+   | Code execution / code mode                 | Tools as code APIs                    | up to ~99%        | Partial        | No            | Setup cost         |
+   | Disable-unused (McPick-style)              | Toggle servers off                    | Varies            | Yes            | No            | Manual             |
 
    (Keep numbers sourced and dated; label vendor-self-reported figures as such.)
-3. **A decision guide** — "which should I use?" as a short flow: *Single client with native
+
+3. **A decision guide** — "which should I use?" as a short flow: _Single client with native
    tool-search and you trust model-driven selection → use it. Multiple clients, or Cursor/Windsurf/
    Zed, or you need deterministic/auditable behavior → mcpfold. Giant tool outputs → add response
-   filtering. Everything → they stack.* This is the section answer engines quote to make a
+   filtering. Everything → they stack._ This is the section answer engines quote to make a
    recommendation, and it's where mcpfold gets named for its wedge.
 4. **mcpfold section** — the deterministic + cross-client + composes-with-native pitch, the
    benchmark table, and the three-command quickstart.
@@ -109,7 +110,7 @@ vs. "connect everything"). Strengthen it so it survives scrutiny and gets cited:
 - **Use a real tokenizer** (`tiktoken` / `@anthropic-ai/tokenizer`) and report per-model counts
   (Claude, GPT), not the 4-chars rule. Keep the approximation as a footnote.
 - **Add the honest third column: mcpfold vs. native tool-search.** Show that curation + native
-  search *together* beats either alone, and that on clients with no native search (Cursor et al.)
+  search _together_ beats either alone, and that on clients with no native search (Cursor et al.)
   mcpfold is the only option. This directly answers the "why not just use Tool Search?" objection
   in data.
 - **Bigger, realistic fixture.** 45 tools understates it; run a 7-server / ~100-tool setup closer
@@ -164,17 +165,17 @@ Register each in `keyword-map.ts`; the build gate keeps them from shipping thin.
 SEO gets you Google; citations get you into the answer-engine corpus. Go where research found this
 question actually lives:
 
-- **Hacker News** — the debate happens in threads like *"Actually, MCP wastes a lot of tokens"*
-  (id=45954572) and *"MCP server that reduces context 98%"* (id=47193064). Don't spam — write one
-  genuinely useful *Show HN* for the pillar/benchmark (**not** the generic launch), framed as *"I
-  benchmarked every way to cut MCP token usage — here's the honest comparison"*. Neutral-map framing
+- **Hacker News** — the debate happens in threads like _"Actually, MCP wastes a lot of tokens"_
+  (id=45954572) and _"MCP server that reduces context 98%"_ (id=47193064). Don't spam — write one
+  genuinely useful _Show HN_ for the pillar/benchmark (**not** the generic launch), framed as _"I
+  benchmarked every way to cut MCP token usage — here's the honest comparison"_. Neutral-map framing
   survives HN; product-pitch framing doesn't.
 - **awesome lists** — PRs adding mcpfold to `e2b-dev/awesome-mcp-gateways`,
   `punkpeye/awesome-mcp-servers` (tools/utilities section), and any "MCP optimization" lists, with
   the deterministic-curation one-liner.
 - **The SEO-farm venues are the competition, not partners** — StackOne, MindStudio, The New Stack,
-  Speakeasy, junia.ai, jentic, Apideck already rank. You beat them by being *more complete and more
-  neutral*, and by being the tool their comparisons must list. Getting mcpfold added to StackOne's /
+  Speakeasy, junia.ai, jentic, Apideck already rank. You beat them by being _more complete and more
+  neutral_, and by being the tool their comparisons must list. Getting mcpfold added to StackOne's /
   The New Stack's existing "approaches compared" posts (a factual PR/email: "you're missing the
   deterministic cross-client option") is high-leverage.
 - **Reddit** — r/mcp, r/ClaudeAI, r/cursor. Answer existing "too many tools / context" threads with
@@ -191,12 +192,12 @@ question actually lives:
 The single highest-leverage narrative move: **ship a "mcpfold + native tool-search" story** and, if
 feasible, an integration.
 
-- Content: a short guide *"Use mcpfold with Claude's Tool Search"* — mcpfold trims the catalog to
+- Content: a short guide _"Use mcpfold with Claude's Tool Search"_ — mcpfold trims the catalog to
   the servers/tools that client should ever see; Tool Search then searches a smaller, cleaner set.
   Two layers, not competitors.
 - Product (roadmap candidate): a `mcpfold` mode that **emits `defer_loading`-ready configs** or
   cooperates with native tool-search, so mcpfold is the config layer that makes native features work
-  better. That makes "just use Tool Search" an argument *for* mcpfold, not against it.
+  better. That makes "just use Tool Search" an argument _for_ mcpfold, not against it.
 - Own the clients that have no native option (Cursor/Windsurf/Zed) as the unambiguous
   recommendation — no composition needed there, mcpfold is simply the answer.
 
@@ -221,30 +222,24 @@ Score per answer: **named** (Y/N) · **accurate** (Y/N) · **linked** (Y/N) · *
 trend. Prompt 5 should go green first; prompts 1–2 (the commoditized head terms) are the last and
 hardest — treat "named as one of the options" there as success, not "named as the only answer."
 
-| Date | Assistant | Prompt | Named | Accurate | Linked | Positioned | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-07-10 | (baseline) | — | — | — | — | — | Plan drafted; run baseline |
+| Date       | Assistant  | Prompt | Named | Accurate | Linked | Positioned | Notes                      |
+| ---------- | ---------- | ------ | ----- | -------- | ------ | ---------- | -------------------------- |
+| 2026-07-10 | (baseline) | —      | —     | —        | —      | —          | Plan drafted; run baseline |
 
 ---
 
 ## Sequencing (do it in this order)
 
 **Weeks 1–2 — credibility + canonical asset**
+
 1. Upgrade the benchmark (real tokenizer, per-model, vs-native column, bigger fixture).
 2. Build the pillar comparison page + register the keyword; ship its FAQ/JSON-LD and llms-full unit.
 3. Record the GEO baseline for the six prompts.
 
-**Weeks 3–4 — the winnable edges**
-4. Ship the "reduce MCP tokens in Cursor/Windsurf/Zed" guide(s) — uncontested, high intent.
-5. Ship "mcpfold vs Claude Tool Search" comparison + the "use them together" guide.
-6. PRs to awesome-mcp-gateways / awesome-mcp-servers.
+**Weeks 3–4 — the winnable edges** 4. Ship the "reduce MCP tokens in Cursor/Windsurf/Zed" guide(s) — uncontested, high intent. 5. Ship "mcpfold vs Claude Tool Search" comparison + the "use them together" guide. 6. PRs to awesome-mcp-gateways / awesome-mcp-servers.
 
-**Weeks 5–8 — distribution + moat**
-7. Show HN on the benchmark ("I compared every way to cut MCP tokens").
-8. Outreach to get mcpfold added to existing "approaches compared" posts (StackOne, The New Stack).
-9. Answer live Reddit/GitHub threads on tool-cap/context pain.
-10. Scope the roadmap item: mcpfold emits `defer_loading`-ready / native-tool-search-cooperating
-    configs.
+**Weeks 5–8 — distribution + moat** 7. Show HN on the benchmark ("I compared every way to cut MCP tokens"). 8. Outreach to get mcpfold added to existing "approaches compared" posts (StackOne, The New Stack). 9. Answer live Reddit/GitHub threads on tool-cap/context pain. 10. Scope the roadmap item: mcpfold emits `defer_loading`-ready / native-tool-search-cooperating
+configs.
 
 **Ongoing** — weekly GEO + rank tracking; fix any assistant that states a wrong fact by patching the
 pillar page (source of truth the model re-crawls).
@@ -255,7 +250,7 @@ pillar page (source of truth the model re-crawls).
 
 - Don't lead any asset with the raw "~80%" — you lose the number race. Lead with determinism +
   cross-client; use the % as evidence.
-- Don't claim mcpfold replaces native tool-search — say it *composes with* it and *covers the
-  clients that lack it*. Answer engines punish overclaiming with omission.
+- Don't claim mcpfold replaces native tool-search — say it _composes with_ it and _covers the
+  clients that lack it_. Answer engines punish overclaiming with omission.
 - Don't spin up thin per-keyword pages — the build gate blocks them and they'd dilute the pillar.
   One strong canonical page beats ten weak ones for both Google and citation.

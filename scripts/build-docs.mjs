@@ -99,10 +99,13 @@ for (const [file, md] of source) {
     }
     if (target.endsWith('.md')) {
       const name = basename(target);
-      if (!source.has(name)) {
+      if (source.has(name)) {
+        // A top-level (rendered) doc — validate its in-doc anchors too.
+        if (anchor && !anchors.get(name).has(anchor))
+          errors.push(`docs/${file}: link to missing anchor "${target}#${anchor}"`);
+      } else if (!existsSync(join(DOCS, target))) {
+        // A subdirectory doc (e.g. launch/…) not part of the flat site — validate on disk.
         errors.push(`docs/${file}: link to missing doc "${target}"`);
-      } else if (anchor && !anchors.get(name).has(anchor)) {
-        errors.push(`docs/${file}: link to missing anchor "${target}#${anchor}"`);
       }
       continue;
     }
