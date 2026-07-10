@@ -1,5 +1,6 @@
 import { DIRECTORY, categoriesWithPages, categoryMeta, entriesForCategory } from '@mcpfold/core';
 import { POSTS } from '../blog/posts';
+import { FEATURES, featureById } from '../features/features';
 
 /**
  * Single source of truth for per-route <title>/description/canonical (S15.1).
@@ -72,6 +73,20 @@ export function resolveMeta(path: string): RouteMeta {
     }
     return meta('Server not found — mcpfold directory', 'No such server.', p);
   }
+  if (p === '/features') {
+    return meta(
+      'Features — what mcpfold does · one config, curation, secrets, drift',
+      'Go deep on each mcpfold pillar: one config folded to every client, per-server tool curation to cut context tokens, secrets as references, and sync/diff/drift control.',
+      '/features',
+    );
+  }
+  if (p.startsWith('/features/')) {
+    const feature = featureById(p.slice('/features/'.length));
+    if (feature) {
+      return meta(`${feature.metaTitle}`, feature.tagline, `/features/${feature.id}`);
+    }
+    return meta('Feature not found — mcpfold', 'No such feature.', p);
+  }
   if (p === '/pricing') {
     return meta(
       'Pricing — mcpfold',
@@ -123,6 +138,8 @@ export function allRoutes(): string[] {
     '/security',
     '/blog',
     '/changelog',
+    '/features',
+    ...FEATURES.map((f) => `/features/${f.id}`),
     ...categoriesWithPages().map((c) => `/directory/category/${c.id}`),
     ...DIRECTORY.map((e) => `/directory/${e.id}`),
     ...POSTS.map((p) => `/blog/${p.slug}`),

@@ -108,6 +108,7 @@ writeFileSync(
   join(dist, 'sitemap.xml'),
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
 );
+const featureCount = routes.filter((r) => r.startsWith('/features/')).length;
 console.log(
-  `✓ prerendered ${routes.length} routes (${DIRECTORY.length} directory, ${posts.length} blog) + feed.xml + sitemap.xml`,
+  `✓ prerendered ${routes.length} routes (${DIRECTORY.length} directory, ${featureCount} features, ${posts.length} blog) + feed.xml + sitemap.xml`,
 );

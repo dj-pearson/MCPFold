@@ -2,6 +2,7 @@ import { DIRECTORY, categoryMeta, entriesForCategory } from '@mcpfold/core';
 import { POSTS } from '../blog/posts';
 import { SITE_URL } from './meta';
 import { faqPageJsonLd, faqsForPath } from './faq';
+import { FEATURES, featureById, type Feature } from '../features/features';
 
 /**
  * Per-page-type JSON-LD structured data (S15.1). Emitted into the initial HTML by the prerender and
@@ -67,6 +68,36 @@ function categoryItemList(cat: string): JsonLd {
   };
 }
 
+/** ItemList of the four feature pillars (S13.10), for the /features index. */
+function featuresItemList(): JsonLd {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'mcpfold features',
+    description: 'The four capabilities mcpfold provides.',
+    numberOfItems: FEATURES.length,
+    itemListElement: FEATURES.map((f, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: f.h1,
+      url: `${SITE_URL}/features/${f.id}`,
+    })),
+  };
+}
+
+/** TechArticle structured data for a feature deep-dive page (S13.10). */
+function featureArticle(feature: Feature): JsonLd {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: feature.h1,
+    description: feature.tagline,
+    about: 'mcpfold — MCP configuration management',
+    url: `${SITE_URL}/features/${feature.id}`,
+    isPartOf: `${SITE_URL}/features`,
+  };
+}
+
 function breadcrumb(trail: Array<{ name: string; path: string }>): JsonLd {
   return {
     '@context': 'https://schema.org',
@@ -89,6 +120,19 @@ export function jsonLdForPath(path: string): JsonLd[] {
 
   if (p === '/') return [softwareApplication(), ...faqNode];
   if (p === '/directory') return [directoryItemList(), ...faqNode];
+  if (p === '/features') return [featuresItemList(), ...faqNode];
+
+  if (p.startsWith('/features/')) {
+    const feature = featureById(p.slice('/features/'.length));
+    if (!feature) return [];
+    return [
+      featureArticle(feature),
+      breadcrumb([
+        { name: 'Features', path: '/features' },
+        { name: feature.nav, path: `/features/${feature.id}` },
+      ]),
+    ];
+  }
 
   if (p.startsWith('/directory/category/')) {
     const cat = p.slice('/directory/category/'.length);

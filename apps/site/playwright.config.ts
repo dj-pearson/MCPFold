@@ -7,7 +7,7 @@ export default defineConfig({
   testMatch: '**/*.e2e.ts',
   // The prerender suite runs against the built static output (vite preview), not the dev server —
   // it has its own config (playwright.prerender.config.ts).
-  testIgnore: '**/prerender.e2e.ts',
+  testIgnore: ['**/prerender.e2e.ts', '**/features.e2e.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

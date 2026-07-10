@@ -5,7 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
 // the actual prerendered pages. Run after `pnpm --filter @mcpfold/site build`.
 export default defineConfig({
   testDir: './test',
-  testMatch: '**/prerender.e2e.ts',
+  // The no-JS/built-dist suites: the generic SSG proof plus the feature deep-dives (S13.10).
+  testMatch: ['**/prerender.e2e.ts', '**/features.e2e.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

@@ -10,6 +10,7 @@ import { SecurityPage } from './security/SecurityPage';
 import { BlogIndex } from './blog/BlogIndex';
 import { BlogPost } from './blog/BlogPost';
 import { Changelog } from './blog/Changelog';
+import { FeaturesIndex, FeaturePage } from './features/FeaturePages';
 
 /** Marketing-site routes (S13.1). The full E13 surface mounts under the shared Layout. */
 export function App() {
@@ -21,6 +22,8 @@ export function App() {
         <Route path="/directory" element={<DirectoryList />} />
         <Route path="/directory/category/:cat" element={<CategoryPage />} />
         <Route path="/directory/:id" element={<ServerPage />} />
+        <Route path="/features" element={<FeaturesIndex />} />
+        <Route path="/features/:id" element={<FeaturePage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/security" element={<SecurityPage />} />
         <Route path="/blog" element={<BlogIndex />} />

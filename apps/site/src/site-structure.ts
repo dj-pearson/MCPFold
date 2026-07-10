@@ -26,9 +26,9 @@ export function isLive(l: NavLink): boolean {
   return Boolean(l.external) || (l.status ?? 'live') === 'live';
 }
 
-/** Primary header navigation (top level). `Features`/`Guides` activate when S13.10 / S15.5 ship. */
+/** Primary header navigation (top level). `Guides` activates when S15.5 ships. */
 export const PRIMARY_NAV: NavLink[] = [
-  { label: 'Features', href: '/features', status: 'planned', description: 'The four pillars' },
+  { label: 'Features', href: '/features', description: 'The four pillars' },
   { label: 'Docs', href: '/docs', description: 'Config format, secrets, adapters, CLI' },
   { label: 'Directory', href: '/directory', description: 'Browse MCP servers' },
   { label: 'Guides', href: '/guides', status: 'planned', description: 'Per-client setup' },
@@ -52,7 +52,7 @@ export const FOOTER_GROUPS: NavGroup[] = [
       { label: 'Install', href: '/install' },
       { label: 'Directory', href: '/directory' },
       { label: 'Pricing', href: '/pricing' },
-      { label: 'Features', href: '/features', status: 'planned' },
+      { label: 'Features', href: '/features' },
       { label: 'Changelog', href: '/changelog' },
     ],
   },

@@ -586,3 +586,40 @@ a clean tree, passes on CI ubuntu).
 **Follow-ups:** S19.4 (native-interpolation secrets) can replace the `shim` default for Goose
 (`env_keys`), Continue (`${{ secrets }}`), and opencode variable substitution; S19.5 (compat harness
 v2) can add live evidence + a public compat matrix for the YAML/TOML clients.
+
+---
+
+## S13.10 — Feature deep-dive pages (the four pillars)
+
+**Started** 2026-07-10 · branch `story/S13.10-feature-deep-dives` · priority p2, deps: S13.1, S13.8.
+
+**Done** 2026-07-10.
+
+Shipped a `/features` index plus a deep-dive page for each of the four pillars: **one config for
+every client**, **tool curation** (cut the context tax), **secrets as references**, and
+**sync/diff/drift control**. Each page has benefit-led copy, a concrete config/CLI example, links to
+the deep docs, and cross-links to related features; the `Features` nav/footer link (previously
+`planned`) is now live.
+
+Every NUMBER comes from a committed source so the copy can't drift: the client count is
+`CLIENT_IDS.length`, and the tool-curation figures (45 tools → 9, ~80% fewer tokens, 7,476 → 1,497)
+are computed live from the same `benchmark/model` the homepage calculator uses. Format-trap prose
+(`servers` vs `context_servers` vs `mcpServers` vs `extensions`) and secret-provider names state facts
+already in docs/coverage.md and docs/secrets.md.
+
+- **`src/features/features.ts`** — the four-pillar content as typed data; imports `compute` +
+  `CLIENT_IDS` and bakes the committed numbers into the copy at load.
+- **`src/features/FeaturePages.tsx`** — `FeaturesIndex` (card grid) + `FeaturePage` (tagline, body,
+  example code block, deep-doc links, related-feature cross-links, install CTA). Named `FeaturePages`
+  to avoid a case-collision with `features.ts` on case-insensitive filesystems.
+- **Wiring** — routes in `App.tsx` (`/features`, `/features/:id`); `resolveMeta` + `allRoutes` +
+  `jsonLdForPath` branches (an ItemList on the index, a **TechArticle** + BreadcrumbList per page);
+  `site-structure.ts` flips Features to live in nav + footer Product; the homepage Explore graph links
+  to `/features`.
+
+Pages land in the sitemap via `allRoutes()`; build prerenders 97 routes (4 features). New
+`test/features.e2e.ts` (built-dist/no-JS suite, in the prerender Playwright config, ignored by the
+dev-server config) asserts the index ItemList, per-page H1 + example + doc/cross links + TechArticle +
+breadcrumb, and — importantly — that the tool-curation numbers equal `compute(FIXTURE_SERVERS, 3)`
+from the committed model (no drift), plus sitemap membership — 13/13 prerender tests pass. Site
+typecheck and repo-wide `format:check` green.

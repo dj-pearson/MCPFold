@@ -143,6 +143,11 @@ const CLIENTS = [
 const EXPLORE = [
   { href: '/install', text: 'Install', desc: 'npx, npm, Homebrew, or Scoop — no account needed.' },
   {
+    href: '/features',
+    text: 'Features',
+    desc: 'deep dives on the four pillars, with examples and proof.',
+  },
+  {
     href: '/directory',
     text: 'MCP server directory',
     desc: 'browse and add community MCP servers.',
