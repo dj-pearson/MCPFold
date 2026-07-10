@@ -1698,10 +1698,10 @@ const COMPARISONS = [
       "mcpfold composes with native tool-search rather than replacing it: mcpfold decides which servers and tools reach a client at all, and any native tool-search then operates on a smaller, cleaner set. It is deliberately not a schema-compression proxy or a code-execution runtime — for those jobs, the tools built for them fit better, and mcpfold sits happily in front of them."
     ],
     related: [
+      { href: "/mcp-token-calculator", text: "MCP token calculator — size your own setup" },
       { href: "/compare/mcpfold-vs-tool-search", text: "mcpfold vs native tool-search" },
       { href: "/features/tool-curation", text: "Per-server tool curation" },
-      { href: "/install", text: "Install mcpfold" },
-      { href: "/directory", text: "Browse the MCP server directory" }
+      { href: "/install", text: "Install mcpfold" }
     ]
   },
   {
@@ -1757,6 +1757,73 @@ const COMPARISONS = [
       { href: "/compare/reduce-mcp-token-usage", text: "How to reduce MCP token usage" },
       { href: "/features/tool-curation", text: "Per-server tool curation" },
       { href: "/guides/cursor", text: "Add MCP servers to Cursor" },
+      { href: "/install", text: "Install mcpfold" }
+    ]
+  },
+  {
+    id: "open-source-mcp-gateway",
+    navLabel: "Open-source alternative",
+    metaTitle: "Open-source MCP gateway alternative — local-first, no server",
+    h1: "An open-source, local-first alternative to an MCP gateway",
+    intro: "MCP gateways centralize your MCP servers behind a service — useful for teams, but it means running (or paying for) a server. mcpfold is an open-source, local-first alternative: it manages your MCP config on your own machine and folds it out to every client, with per-server tool curation and secret references, and no gateway to operate. If you want the benefits of one source of truth without standing up infrastructure, mcpfold is the lighter-weight option.",
+    table: {
+      columns: ["Hosted SaaS gateway", "Self-hosted gateway", "mcpfold"],
+      rows: [
+        {
+          dimension: "Runs where",
+          cells: ["A vendor’s servers", "A server you operate", "Locally, as a CLI — no server"]
+        },
+        {
+          dimension: "Infrastructure to run",
+          cells: ["None (theirs)", "Yes — you host it", "None — it’s in the launch path"]
+        },
+        {
+          dimension: "One source for many clients",
+          cells: ["Varies by tool", "Varies by tool", "Yes — folds to each client’s native format"]
+        },
+        {
+          dimension: "Open source",
+          cells: ["Varies", "Yes", "Yes — MIT, free CLI"]
+        },
+        {
+          dimension: "Secret handling",
+          cells: [
+            "Stored by the service",
+            "Stored by your instance",
+            "References resolved locally; values never synced"
+          ]
+        },
+        {
+          dimension: "Per-server tool curation",
+          cells: ["Varies by tool", "Varies by tool", "Allow / deny lists, deterministic"]
+        },
+        {
+          dimension: "Team RBAC / org audit",
+          cells: [
+            "Yes — their focus",
+            "Yes",
+            "Not a goal — local-first (optional cloud for sharing)"
+          ]
+        },
+        {
+          dimension: "Best for",
+          cells: [
+            "Teams wanting a managed gateway",
+            "Teams that must self-host a gateway",
+            "Anyone wanting one config across their own clients, no server"
+          ]
+        }
+      ]
+    },
+    body: [
+      "A gateway is the right shape when an organization wants to run MCP servers centrally, behind access control and an audit trail — that is a real, different job, and tools built for it fit teams that need it. The trade-off is operational: a SaaS gateway is another vendor in your stack, and a self-hosted one is another service to run and secure.",
+      "mcpfold takes the opposite, local-first approach. It keeps one canonical config on your machine and folds it out to every client in that client’s native format, curates which tools each client loads to cut context tokens, and stores secrets as references that are resolved at launch — never written to disk. There is nothing to host: the curation happens in a shim already in the launch path.",
+      "mcpfold is deliberately not a hosted, multi-tenant gateway: there is no server-side RBAC or org audit, and it does not run servers for you. If you opt into the optional cloud to share config across a team, only the config with secret references is synced — never secret values. For an individual or a small team that wants one honest source of truth without standing up infrastructure, that is exactly the point."
+    ],
+    related: [
+      { href: "/compare/mcp-config-manager", text: "Where mcpfold fits vs a gateway" },
+      { href: "/compare/reduce-mcp-token-usage", text: "How to reduce MCP token usage" },
+      { href: "/security", text: "How mcpfold handles secrets" },
       { href: "/install", text: "Install mcpfold" }
     ]
   }
@@ -2261,6 +2328,13 @@ function resolveMeta(path) {
     }
     return meta("Comparison not found — mcpfold", "No such comparison.", p);
   }
+  if (p === "/mcp-token-calculator") {
+    return meta(
+      "MCP token calculator — how many tokens do your MCP servers cost?",
+      "Estimate how many tokens your MCP servers spend on tool definitions every turn, and how much per-client curation saves. Free, runs in your browser, nothing uploaded.",
+      "/mcp-token-calculator"
+    );
+  }
   if (p === "/features") {
     return meta(
       "Features — what mcpfold does · one config, curation, secrets, drift",
@@ -2389,6 +2463,7 @@ function allRoutes() {
     "/roadmap",
     "/glossary",
     "/compare",
+    "/mcp-token-calculator",
     ...categoriesWithPages().map((c) => `/directory/category/${c.id}`),
     ...DIRECTORY$1.map((e) => `/directory/${e.id}`),
     ...GUIDE_CLIENTS.map((c) => `/guides/${c.id}`),
@@ -2461,12 +2536,27 @@ const PRICING = [
     answer: "The mcpfold cloud stores only your canonical config with secret references (${provider:path}) — never secret values. Everything sensitive stays on your machine and is resolved at launch time."
   }
 ];
+const CALCULATOR = [
+  {
+    question: "How many tokens do MCP servers use?",
+    answer: "Each MCP server loads its full tool schema into the model’s context on every turn, whether the agent uses those tools or not. A single busy server’s tool definitions can run to thousands of tokens, and a handful of servers can consume a large share of the context window before the agent does any work. The exact cost depends on each tool’s JSON schema; the mcpfold token calculator estimates it from a representative schema so you can size your own setup."
+  },
+  {
+    question: "How do I reduce the tokens my MCP tools use?",
+    answer: "Load only the tools each agent needs. mcpfold curates the toolset per client from one canonical config, so unused tool schemas never enter the context window. In a reproducible benchmark, trimming a 45-tool setup to the 9 tools actually needed cut tool-schema tokens by about 80%. This works on every client, including Cursor, Windsurf, and Zed, which have no native tool-search."
+  },
+  {
+    question: "Is the MCP token calculator accurate?",
+    answer: "The mcpfold token calculator gives a representative estimate using the common 1-token-≈-4-characters rule on a typical tool schema — the same method as the published benchmark. Real cost varies with each tool’s actual schema, so tool counts are editable; the relative reduction from curation is stable regardless of the tokenizer."
+  }
+];
 function faqsForPath(path) {
   const p = path !== "/" && path.endsWith("/") ? path.slice(0, -1) : path;
   if (p === "/") return HOME;
   if (p === "/install") return INSTALL;
   if (p === "/directory") return DIRECTORY;
   if (p === "/pricing") return PRICING;
+  if (p === "/mcp-token-calculator") return CALCULATOR;
   return [];
 }
 function faqPageJsonLd(faqs, path) {
@@ -2542,6 +2632,19 @@ function softwareApplication() {
     downloadUrl: `${SITE_URL}/install`,
     softwareHelp: `${SITE_URL}/docs`,
     license: "https://opensource.org/licenses/MIT",
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }
+  };
+}
+function tokenCalculatorApp() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "MCP token calculator",
+    applicationCategory: "DeveloperApplication",
+    operatingSystem: "Any (runs in the browser)",
+    description: "Estimate how many tokens your MCP servers spend on tool definitions every turn, and how much per-client curation saves. Free and client-side — nothing is uploaded.",
+    url: `${SITE_URL}/mcp-token-calculator`,
+    isPartOf: SITE_URL,
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }
   };
 }
@@ -2727,6 +2830,7 @@ function jsonLdForPath(path) {
   const faqs = faqsForPath(p);
   const faqNode = faqs.length > 0 ? [faqPageJsonLd(faqs, p)] : [];
   if (p === "/") return [softwareApplication(), ...faqNode];
+  if (p === "/mcp-token-calculator") return [tokenCalculatorApp(), ...faqNode];
   if (p === "/directory") return [directoryItemList(), ...faqNode];
   if (p === "/guides") return [guidesItemList(), ...faqNode];
   if (p === "/glossary") return [glossaryTermSet(), ...faqNode];
@@ -3000,6 +3104,7 @@ const FOOTER_GROUPS = [
     links: [
       { label: "Install", href: "/install" },
       { label: "Directory", href: "/directory" },
+      { label: "Token calculator", href: "/mcp-token-calculator" },
       { label: "Compare", href: "/compare" },
       { label: "Use cases", href: "/use-cases" },
       { label: "Pricing", href: "/pricing" },
@@ -5282,7 +5387,7 @@ function TermPage() {
     /* @__PURE__ */ jsx("p", { style: { color: "var(--fg-muted)", fontSize: "0.85rem", marginTop: "var(--space-8)" }, children: "mcpfold is an independent, open-source project. The Model Context Protocol is an open standard; mcpfold is not affiliated with or endorsed by the MCP project." })
   ] });
 }
-const cell = {
+const cell$1 = {
   border: "1px solid var(--border)",
   padding: "var(--space-3)",
   textAlign: "left",
@@ -5337,19 +5442,19 @@ function ComparePage() {
         style: { borderCollapse: "collapse", width: "100%", minWidth: 520 },
         children: [
           /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { children: [
-            /* @__PURE__ */ jsx("th", { style: { ...cell, background: "var(--bg-elevated)" } }),
+            /* @__PURE__ */ jsx("th", { style: { ...cell$1, background: "var(--bg-elevated)" } }),
             entry.table.columns.map((col) => /* @__PURE__ */ jsx(
               "th",
               {
-                style: { ...cell, background: "var(--bg-elevated)", fontWeight: 700 },
+                style: { ...cell$1, background: "var(--bg-elevated)", fontWeight: 700 },
                 children: col
               },
               col
             ))
           ] }) }),
           /* @__PURE__ */ jsx("tbody", { children: entry.table.rows.map((row) => /* @__PURE__ */ jsxs("tr", { children: [
-            /* @__PURE__ */ jsx("th", { scope: "row", style: { ...cell, fontWeight: 600 }, children: row.dimension }),
-            row.cells.map((c, i) => /* @__PURE__ */ jsx("td", { style: cell, children: c }, i))
+            /* @__PURE__ */ jsx("th", { scope: "row", style: { ...cell$1, fontWeight: 600 }, children: row.dimension }),
+            row.cells.map((c, i) => /* @__PURE__ */ jsx("td", { style: cell$1, children: c }, i))
           ] }, row.dimension)) })
         ]
       }
@@ -5358,6 +5463,410 @@ function ComparePage() {
     /* @__PURE__ */ jsx("h2", { style: { marginTop: "var(--space-8)" }, children: "Related" }),
     /* @__PURE__ */ jsx("ul", { "data-testid": "compare-related", children: entry.related.map((l) => /* @__PURE__ */ jsx("li", { style: { marginBottom: "var(--space-2)" }, children: l.href.startsWith("/docs/") || l.href.startsWith("http") ? /* @__PURE__ */ jsx("a", { href: l.href, children: l.text }) : /* @__PURE__ */ jsx(Link, { to: l.href, children: l.text }) }, l.href)) }),
     /* @__PURE__ */ jsx("p", { style: { color: "var(--fg-muted)", fontSize: "0.85rem", marginTop: "var(--space-8)" }, children: "mcpfold is an independent, open-source project and is not affiliated with or endorsed by the MCP project or any other tool named here. Comparisons describe categories factually." })
+  ] });
+}
+const PRESETS = [
+  { name: "filesystem", toolCount: 11 },
+  { name: "github", toolCount: 20 },
+  { name: "supabase", toolCount: 15 },
+  { name: "playwright", toolCount: 10 },
+  { name: "slack", toolCount: 8 },
+  { name: "notion", toolCount: 15 },
+  { name: "postgres", toolCount: 6 },
+  { name: "puppeteer", toolCount: 7 }
+];
+const CONFIG_ROOTS = [
+  "mcpServers",
+  "servers",
+  "context_servers",
+  "mcp_servers",
+  "extensions",
+  "mcp"
+];
+const CONTEXT_WINDOW = 2e5;
+function parseConfigServers(text) {
+  const stripped = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  let data;
+  try {
+    data = JSON.parse(stripped);
+  } catch {
+    return { error: "Could not parse that as JSON. Paste a client MCP config (JSON or JSONC)." };
+  }
+  if (!data || typeof data !== "object") return { error: "No MCP servers found in that config." };
+  const obj = data;
+  for (const root of CONFIG_ROOTS) {
+    const section = obj[root];
+    if (section && typeof section === "object" && !Array.isArray(section)) {
+      const names = Object.keys(section);
+      if (names.length > 0) return names.map((name) => ({ name, toolCount: 15 }));
+    }
+  }
+  return {
+    error: 'No MCP servers found — expected a "mcpServers" (or servers/context_servers) block.'
+  };
+}
+const cell = {
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius)",
+  background: "var(--bg-elevated)",
+  padding: "var(--space-4)"
+};
+function TokenCalculatorPage() {
+  const [servers, setServers] = useState(() => PRESETS.slice(0, 4));
+  const [keep, setKeep] = useState(4);
+  const [paste, setPaste] = useState("");
+  const [pasteMsg, setPasteMsg] = useState(null);
+  const result = useMemo(() => compute(servers, keep), [servers, keep]);
+  const savedPerTurn = result.tokensBefore - result.tokensAfter;
+  const shareBefore = (result.tokensBefore / CONTEXT_WINDOW * 100).toFixed(1);
+  const shareAfter = (result.tokensAfter / CONTEXT_WINDOW * 100).toFixed(1);
+  const setCount = (i, toolCount) => setServers((prev) => prev.map((s, j) => j === i ? { ...s, toolCount } : s));
+  const setName = (i, name) => setServers((prev) => prev.map((s, j) => j === i ? { ...s, name } : s));
+  const remove = (i) => setServers((prev) => prev.filter((_, j) => j !== i));
+  const addServer = (s) => setServers((prev) => prev.some((p) => p.name === s.name) ? prev : [...prev, { ...s }]);
+  const loadPaste = () => {
+    const parsed = parseConfigServers(paste);
+    if ("error" in parsed) {
+      setPasteMsg(parsed.error);
+      return;
+    }
+    setServers(parsed);
+    setPasteMsg(
+      `Loaded ${parsed.length} server${parsed.length === 1 ? "" : "s"}. Tool counts are estimates — edit them to match yours.`
+    );
+  };
+  const faqs = faqsForPath("/mcp-token-calculator");
+  return /* @__PURE__ */ jsxs(Container, { style: { padding: "var(--space-16) var(--space-6)" }, children: [
+    /* @__PURE__ */ jsx("h1", { children: "MCP token calculator" }),
+    /* @__PURE__ */ jsxs("p", { style: { fontSize: "1.1rem", lineHeight: 1.55, maxWidth: 720, color: "var(--fg)" }, children: [
+      "The MCP token calculator estimates how many tokens your connected MCP servers spend on tool definitions every turn — and how much per-client curation with ",
+      /* @__PURE__ */ jsx("strong", { children: "mcpfold" }),
+      " saves. Every server you connect loads its full tool schema into the model’s context on each turn, whether the agent uses those tools or not. Everything runs in your browser; nothing is uploaded."
+    ] }),
+    /* @__PURE__ */ jsxs(
+      "section",
+      {
+        "aria-labelledby": "paste-heading",
+        style: { ...cell, marginTop: "var(--space-8)", background: "var(--bg)" },
+        children: [
+          /* @__PURE__ */ jsx("h2", { id: "paste-heading", style: { marginTop: 0, fontSize: "1.1rem" }, children: "Load your own config (optional)" }),
+          /* @__PURE__ */ jsxs("p", { style: { color: "var(--fg-muted)", marginTop: 0 }, children: [
+            "Paste a client’s MCP config (the ",
+            /* @__PURE__ */ jsx("code", { children: "mcpServers" }),
+            " block from Claude, Cursor, VS Code, …). It’s parsed locally to read your server names; set each tool count below."
+          ] }),
+          /* @__PURE__ */ jsx(
+            "textarea",
+            {
+              value: paste,
+              onChange: (e) => setPaste(e.target.value),
+              "data-testid": "config-paste",
+              "aria-label": "Paste MCP config JSON",
+              spellCheck: false,
+              rows: 5,
+              placeholder: '{\n  "mcpServers": {\n    "github": { "command": "npx", "args": ["…"] }\n  }\n}',
+              style: {
+                width: "100%",
+                fontFamily: "var(--font-mono, monospace)",
+                fontSize: "0.85rem",
+                padding: "var(--space-3)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius)",
+                background: "var(--bg-elevated)",
+                color: "var(--fg)",
+                resize: "vertical"
+              }
+            }
+          ),
+          /* @__PURE__ */ jsxs(
+            "div",
+            {
+              style: {
+                display: "flex",
+                gap: "var(--space-3)",
+                alignItems: "center",
+                marginTop: "var(--space-2)",
+                flexWrap: "wrap"
+              },
+              children: [
+                /* @__PURE__ */ jsx(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: loadPaste,
+                    disabled: paste.trim().length === 0,
+                    "data-testid": "config-load",
+                    style: {
+                      padding: "var(--space-2) var(--space-4)",
+                      borderRadius: "var(--radius)",
+                      border: "1px solid var(--border)",
+                      background: "var(--accent)",
+                      color: "var(--accent-fg)",
+                      cursor: paste.trim().length === 0 ? "not-allowed" : "pointer",
+                      fontWeight: 600
+                    },
+                    children: "Load servers"
+                  }
+                ),
+                pasteMsg && /* @__PURE__ */ jsx("span", { role: "status", style: { color: "var(--fg-muted)", fontSize: "0.85rem" }, children: pasteMsg })
+              ]
+            }
+          )
+        ]
+      }
+    ),
+    /* @__PURE__ */ jsxs("section", { "aria-labelledby": "servers-heading", style: { marginTop: "var(--space-8)" }, children: [
+      /* @__PURE__ */ jsx("h2", { id: "servers-heading", style: { fontSize: "1.1rem" }, children: "Your servers" }),
+      /* @__PURE__ */ jsxs("div", { style: { display: "grid", gap: "var(--space-2)", maxWidth: 520 }, children: [
+        servers.map((s, i) => /* @__PURE__ */ jsxs(
+          "div",
+          {
+            style: { display: "flex", gap: "var(--space-2)", alignItems: "center" },
+            "data-testid": `row-${i}`,
+            children: [
+              /* @__PURE__ */ jsx(
+                "input",
+                {
+                  "aria-label": `Server ${i + 1} name`,
+                  value: s.name,
+                  onChange: (e) => setName(i, e.target.value),
+                  style: {
+                    flex: 1,
+                    padding: "var(--space-2)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius)",
+                    background: "var(--bg-elevated)",
+                    color: "var(--fg)"
+                  }
+                }
+              ),
+              /* @__PURE__ */ jsx(
+                "input",
+                {
+                  "aria-label": `${s.name} tool count`,
+                  type: "number",
+                  min: 0,
+                  max: 200,
+                  value: s.toolCount,
+                  onChange: (e) => setCount(i, Math.max(0, Number(e.target.value))),
+                  "data-testid": `count-${i}`,
+                  style: {
+                    width: 76,
+                    padding: "var(--space-2)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius)",
+                    background: "var(--bg-elevated)",
+                    color: "var(--fg)"
+                  }
+                }
+              ),
+              /* @__PURE__ */ jsx("span", { style: { color: "var(--fg-muted)", fontSize: "0.85rem" }, children: "tools" }),
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => remove(i),
+                  "aria-label": `Remove ${s.name}`,
+                  style: {
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius)",
+                    background: "var(--bg-elevated)",
+                    color: "var(--fg-muted)",
+                    cursor: "pointer",
+                    padding: "var(--space-2) var(--space-3)"
+                  },
+                  children: "×"
+                }
+              )
+            ]
+          },
+          i
+        )),
+        servers.length === 0 && /* @__PURE__ */ jsx("p", { style: { color: "var(--fg-muted)" }, children: "Add a server below to start." })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { style: { marginTop: "var(--space-4)" }, children: [
+        /* @__PURE__ */ jsx(
+          "span",
+          {
+            style: { fontSize: "0.85rem", color: "var(--fg-muted)", marginRight: "var(--space-2)" },
+            children: "Quick-add:"
+          }
+        ),
+        PRESETS.map((p) => /* @__PURE__ */ jsxs(
+          "button",
+          {
+            type: "button",
+            onClick: () => addServer(p),
+            style: {
+              margin: "0 var(--space-2) var(--space-2) 0",
+              padding: "var(--space-1) var(--space-3)",
+              borderRadius: "999px",
+              border: "1px solid var(--border)",
+              background: "var(--bg-elevated)",
+              color: "var(--fg)",
+              cursor: "pointer",
+              fontSize: "0.85rem"
+            },
+            children: [
+              "+ ",
+              p.name
+            ]
+          },
+          p.name
+        )),
+        /* @__PURE__ */ jsx(
+          "button",
+          {
+            type: "button",
+            onClick: () => addServer({ name: `server-${servers.length + 1}`, toolCount: 12 }),
+            style: {
+              margin: "0 var(--space-2) var(--space-2) 0",
+              padding: "var(--space-1) var(--space-3)",
+              borderRadius: "999px",
+              border: "1px dashed var(--border)",
+              background: "transparent",
+              color: "var(--fg-muted)",
+              cursor: "pointer",
+              fontSize: "0.85rem"
+            },
+            children: "+ custom"
+          }
+        )
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("section", { style: { marginTop: "var(--space-8)", maxWidth: 520 }, children: [
+      /* @__PURE__ */ jsxs("label", { htmlFor: "keep", style: { fontWeight: 600 }, children: [
+        "Tools each agent actually needs (kept per server):",
+        " ",
+        /* @__PURE__ */ jsx("span", { "data-testid": "keep-value", children: keep })
+      ] }),
+      /* @__PURE__ */ jsx(
+        "input",
+        {
+          id: "keep",
+          type: "range",
+          min: 0,
+          max: 20,
+          value: keep,
+          onChange: (e) => setKeep(Number(e.target.value)),
+          "data-testid": "keep-slider",
+          style: { width: "100%", marginTop: "var(--space-2)" }
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsxs(
+      "div",
+      {
+        "aria-live": "polite",
+        style: {
+          display: "grid",
+          gap: "var(--space-4)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          marginTop: "var(--space-8)"
+        },
+        children: [
+          /* @__PURE__ */ jsxs("div", { style: cell, children: [
+            /* @__PURE__ */ jsx("div", { style: { color: "var(--fg-muted)", fontSize: "0.85rem" }, children: "Tools loaded" }),
+            /* @__PURE__ */ jsxs("div", { style: { fontSize: "1.4rem", fontWeight: 700 }, "data-testid": "tools-out", children: [
+              result.toolsBefore,
+              " → ",
+              result.toolsAfter
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { style: cell, children: [
+            /* @__PURE__ */ jsx("div", { style: { color: "var(--fg-muted)", fontSize: "0.85rem" }, children: "Tool-schema tokens" }),
+            /* @__PURE__ */ jsxs("div", { style: { fontSize: "1.4rem", fontWeight: 700 }, "data-testid": "tokens-out", children: [
+              result.tokensBefore.toLocaleString(),
+              " → ",
+              result.tokensAfter.toLocaleString()
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { style: cell, children: [
+            /* @__PURE__ */ jsx("div", { style: { color: "var(--fg-muted)", fontSize: "0.85rem" }, children: "Share of a 200K window" }),
+            /* @__PURE__ */ jsxs("div", { style: { fontSize: "1.4rem", fontWeight: 700 }, "data-testid": "share-out", children: [
+              shareBefore,
+              "% → ",
+              shareAfter,
+              "%"
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { style: { ...cell, background: "var(--accent)", color: "var(--accent-fg)" }, children: [
+            /* @__PURE__ */ jsx("div", { style: { fontSize: "0.85rem", opacity: 0.9 }, children: "Context cut" }),
+            /* @__PURE__ */ jsxs("div", { style: { fontSize: "1.8rem", fontWeight: 800 }, "data-testid": "reduction-out", children: [
+              result.reductionPct,
+              "%"
+            ] }),
+            /* @__PURE__ */ jsxs("div", { style: { fontSize: "0.8rem", opacity: 0.9 }, children: [
+              savedPerTurn.toLocaleString(),
+              " tokens / turn"
+            ] })
+          ] })
+        ]
+      }
+    ),
+    /* @__PURE__ */ jsxs(
+      "div",
+      {
+        style: {
+          ...cell,
+          marginTop: "var(--space-8)",
+          display: "flex",
+          gap: "var(--space-4)",
+          alignItems: "center",
+          flexWrap: "wrap"
+        },
+        children: [
+          /* @__PURE__ */ jsxs("div", { style: { flex: 1, minWidth: 240 }, children: [
+            /* @__PURE__ */ jsx("strong", { children: "Stop paying that tax." }),
+            " mcpfold curates the toolset per client from one canonical config — deterministically, on every client, with no extra config."
+          ] }),
+          /* @__PURE__ */ jsx(
+            Link,
+            {
+              to: "/install",
+              style: {
+                padding: "var(--space-3) var(--space-5)",
+                borderRadius: "var(--radius)",
+                background: "var(--accent)",
+                color: "var(--accent-fg)",
+                fontWeight: 700,
+                textDecoration: "none",
+                whiteSpace: "nowrap"
+              },
+              children: "Install mcpfold"
+            }
+          )
+        ]
+      }
+    ),
+    /* @__PURE__ */ jsxs(
+      "p",
+      {
+        style: {
+          color: "var(--fg-muted)",
+          fontSize: "0.85rem",
+          marginTop: "var(--space-6)",
+          maxWidth: 720
+        },
+        children: [
+          /* @__PURE__ */ jsx("strong", { children: "How this is estimated:" }),
+          " tokens are computed from a representative tool schema (~1 token ≈ 4 characters of JSON, the common rule of thumb), the same method as mcpfold’s",
+          " ",
+          /* @__PURE__ */ jsx("a", { href: "https://github.com/dj-pearson/MCPFold/blob/main/docs/benchmark.md", children: "reproducible benchmark" }),
+          ". Real cost depends on each tool’s actual schema, so treat the tool counts as editable estimates. The relative reduction is stable regardless of tokenizer. See",
+          " ",
+          /* @__PURE__ */ jsx(Link, { to: "/compare/reduce-mcp-token-usage", children: "how to reduce MCP token usage" }),
+          " for every approach compared."
+        ]
+      }
+    ),
+    faqs.length > 0 && /* @__PURE__ */ jsxs("section", { style: { marginTop: "var(--space-12)", maxWidth: 720 }, children: [
+      /* @__PURE__ */ jsx("h2", { children: "Frequently asked" }),
+      faqs.map((f) => /* @__PURE__ */ jsxs("div", { style: { marginBottom: "var(--space-4)" }, children: [
+        /* @__PURE__ */ jsx("h3", { style: { marginBottom: "var(--space-1)" }, children: f.question }),
+        /* @__PURE__ */ jsx("p", { style: { marginTop: 0, color: "var(--fg-muted)" }, children: f.answer })
+      ] }, f.question))
+    ] })
   ] });
 }
 const codeBlock = {
@@ -6024,6 +6533,7 @@ function App() {
     /* @__PURE__ */ jsx(Route, { path: "/glossary/:term", element: /* @__PURE__ */ jsx(TermPage, {}) }),
     /* @__PURE__ */ jsx(Route, { path: "/compare", element: /* @__PURE__ */ jsx(CompareIndex, {}) }),
     /* @__PURE__ */ jsx(Route, { path: "/compare/:id", element: /* @__PURE__ */ jsx(ComparePage, {}) }),
+    /* @__PURE__ */ jsx(Route, { path: "/mcp-token-calculator", element: /* @__PURE__ */ jsx(TokenCalculatorPage, {}) }),
     /* @__PURE__ */ jsx(Route, { path: "/features", element: /* @__PURE__ */ jsx(FeaturesIndex, {}) }),
     /* @__PURE__ */ jsx(Route, { path: "/features/:id", element: /* @__PURE__ */ jsx(FeaturePage, {}) }),
     /* @__PURE__ */ jsx(Route, { path: "/use-cases", element: /* @__PURE__ */ jsx(UseCasesIndex, {}) }),
@@ -6101,6 +6611,32 @@ const KEYWORD_MAP = [
     volume: 150,
     intent: "commercial",
     geo: true
+  },
+  {
+    keyword: "mcp token calculator",
+    page: "/mcp-token-calculator",
+    volume: 300,
+    intent: "informational",
+    geo: true
+  },
+  {
+    keyword: "mcp context window calculator",
+    page: "/mcp-token-calculator",
+    volume: 100,
+    intent: "informational"
+  },
+  {
+    keyword: "open source mcp gateway",
+    page: "/compare/open-source-mcp-gateway",
+    volume: 350,
+    intent: "commercial",
+    geo: true
+  },
+  {
+    keyword: "self hosted mcp gateway",
+    page: "/compare/open-source-mcp-gateway",
+    volume: 200,
+    intent: "commercial"
   }
 ];
 function mappedPaths() {

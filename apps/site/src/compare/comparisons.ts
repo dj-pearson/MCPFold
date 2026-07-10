@@ -235,10 +235,10 @@ export const COMPARISONS: readonly Comparison[] = [
       'mcpfold composes with native tool-search rather than replacing it: mcpfold decides which servers and tools reach a client at all, and any native tool-search then operates on a smaller, cleaner set. It is deliberately not a schema-compression proxy or a code-execution runtime — for those jobs, the tools built for them fit better, and mcpfold sits happily in front of them.',
     ],
     related: [
+      { href: '/mcp-token-calculator', text: 'MCP token calculator — size your own setup' },
       { href: '/compare/mcpfold-vs-tool-search', text: 'mcpfold vs native tool-search' },
       { href: '/features/tool-curation', text: 'Per-server tool curation' },
       { href: '/install', text: 'Install mcpfold' },
-      { href: '/directory', text: 'Browse the MCP server directory' },
     ],
   },
   {
@@ -295,6 +295,74 @@ export const COMPARISONS: readonly Comparison[] = [
       { href: '/compare/reduce-mcp-token-usage', text: 'How to reduce MCP token usage' },
       { href: '/features/tool-curation', text: 'Per-server tool curation' },
       { href: '/guides/cursor', text: 'Add MCP servers to Cursor' },
+      { href: '/install', text: 'Install mcpfold' },
+    ],
+  },
+  {
+    id: 'open-source-mcp-gateway',
+    navLabel: 'Open-source alternative',
+    metaTitle: 'Open-source MCP gateway alternative — local-first, no server',
+    h1: 'An open-source, local-first alternative to an MCP gateway',
+    intro:
+      'MCP gateways centralize your MCP servers behind a service — useful for teams, but it means running (or paying for) a server. mcpfold is an open-source, local-first alternative: it manages your MCP config on your own machine and folds it out to every client, with per-server tool curation and secret references, and no gateway to operate. If you want the benefits of one source of truth without standing up infrastructure, mcpfold is the lighter-weight option.',
+    table: {
+      columns: ['Hosted SaaS gateway', 'Self-hosted gateway', 'mcpfold'],
+      rows: [
+        {
+          dimension: 'Runs where',
+          cells: ['A vendor’s servers', 'A server you operate', 'Locally, as a CLI — no server'],
+        },
+        {
+          dimension: 'Infrastructure to run',
+          cells: ['None (theirs)', 'Yes — you host it', 'None — it’s in the launch path'],
+        },
+        {
+          dimension: 'One source for many clients',
+          cells: ['Varies by tool', 'Varies by tool', 'Yes — folds to each client’s native format'],
+        },
+        {
+          dimension: 'Open source',
+          cells: ['Varies', 'Yes', 'Yes — MIT, free CLI'],
+        },
+        {
+          dimension: 'Secret handling',
+          cells: [
+            'Stored by the service',
+            'Stored by your instance',
+            'References resolved locally; values never synced',
+          ],
+        },
+        {
+          dimension: 'Per-server tool curation',
+          cells: ['Varies by tool', 'Varies by tool', 'Allow / deny lists, deterministic'],
+        },
+        {
+          dimension: 'Team RBAC / org audit',
+          cells: [
+            'Yes — their focus',
+            'Yes',
+            'Not a goal — local-first (optional cloud for sharing)',
+          ],
+        },
+        {
+          dimension: 'Best for',
+          cells: [
+            'Teams wanting a managed gateway',
+            'Teams that must self-host a gateway',
+            'Anyone wanting one config across their own clients, no server',
+          ],
+        },
+      ],
+    },
+    body: [
+      'A gateway is the right shape when an organization wants to run MCP servers centrally, behind access control and an audit trail — that is a real, different job, and tools built for it fit teams that need it. The trade-off is operational: a SaaS gateway is another vendor in your stack, and a self-hosted one is another service to run and secure.',
+      'mcpfold takes the opposite, local-first approach. It keeps one canonical config on your machine and folds it out to every client in that client’s native format, curates which tools each client loads to cut context tokens, and stores secrets as references that are resolved at launch — never written to disk. There is nothing to host: the curation happens in a shim already in the launch path.',
+      'mcpfold is deliberately not a hosted, multi-tenant gateway: there is no server-side RBAC or org audit, and it does not run servers for you. If you opt into the optional cloud to share config across a team, only the config with secret references is synced — never secret values. For an individual or a small team that wants one honest source of truth without standing up infrastructure, that is exactly the point.',
+    ],
+    related: [
+      { href: '/compare/mcp-config-manager', text: 'Where mcpfold fits vs a gateway' },
+      { href: '/compare/reduce-mcp-token-usage', text: 'How to reduce MCP token usage' },
+      { href: '/security', text: 'How mcpfold handles secrets' },
       { href: '/install', text: 'Install mcpfold' },
     ],
   },

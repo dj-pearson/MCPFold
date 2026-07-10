@@ -13,6 +13,7 @@ import { Changelog } from './blog/Changelog';
 import { GuidesIndex, GuidePage } from './guides/ClientGuide';
 import { GlossaryIndex, TermPage } from './glossary/Glossary';
 import { CompareIndex, ComparePage } from './compare/Compare';
+import { TokenCalculatorPage } from './calculator/TokenCalculatorPage';
 import { FeaturesIndex, FeaturePage } from './features/FeaturePages';
 import { UseCasesIndex, UseCasePage } from './use-cases/UseCasePages';
 import { About } from './about/About';
@@ -38,6 +39,7 @@ export function App() {
         <Route path="/glossary/:term" element={<TermPage />} />
         <Route path="/compare" element={<CompareIndex />} />
         <Route path="/compare/:id" element={<ComparePage />} />
+        <Route path="/mcp-token-calculator" element={<TokenCalculatorPage />} />
         <Route path="/features" element={<FeaturesIndex />} />
         <Route path="/features/:id" element={<FeaturePage />} />
         <Route path="/use-cases" element={<UseCasesIndex />} />

@@ -1,0 +1,124 @@
+{
+  "name": "mcpfold-vscode",
+  "displayName": "mcpfold — MCP config manager",
+  "description": "Manage your MCP servers from one config and fold it out to every client — sync, diff, doctor, and a live drift indicator, right in VS Code.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "PearsonMedia",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "mcp",
+    "model context protocol",
+    "mcp config",
+    "claude",
+    "cursor",
+    "ai agents",
+    "context window",
+    "tokens"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dj-pearson/MCPFold.git",
+    "directory": "apps/vscode-extension"
+  },
+  "homepage": "https://mcpfold.com",
+  "bugs": {
+    "url": "https://github.com/dj-pearson/MCPFold/issues"
+  },
+  "author": "Dan Pearson (Pearson Media)",
+  "galleryBanner": {
+    "color": "#0B1020",
+    "theme": "dark"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/mcp.config.jsonc",
+    "workspaceContains:**/mcp.config.json"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "mcpfold.sync",
+        "title": "Sync to all clients",
+        "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.diff",
+        "title": "Preview changes (diff)",
+        "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.import",
+        "title": "Import servers from clients",
+        "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.doctor",
+        "title": "Doctor (health check)",
+        "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.init",
+        "title": "Init a config file",
+        "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.checkDrift",
+        "title": "Check sync status",
+        "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.showMenu",
+        "title": "Show actions",
+        "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.openCalculator",
+        "title": "Open the MCP token calculator",
+        "category": "mcpfold"
+      }
+    ],
+    "configuration": {
+      "title": "mcpfold",
+      "properties": {
+        "mcpfold.path": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the `mcpfold` binary. Leave empty to auto-detect: a global install is used if present, otherwise `npx mcpfold@latest`."
+        },
+        "mcpfold.useNpx": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Always run mcpfold via `npx mcpfold@latest` instead of a global install."
+        },
+        "mcpfold.checkDriftOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-check whether your MCP clients are in sync when a config file is saved."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "vscode:prepublish": "node esbuild.mjs --minify",
+    "package": "npx --yes @vscode/vsce package --no-dependencies",
+    "publish": "npx --yes @vscode/vsce publish --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.7.2"
+  }
+}

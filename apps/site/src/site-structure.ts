@@ -51,6 +51,7 @@ export const FOOTER_GROUPS: NavGroup[] = [
     links: [
       { label: 'Install', href: '/install' },
       { label: 'Directory', href: '/directory' },
+      { label: 'Token calculator', href: '/mcp-token-calculator' },
       { label: 'Compare', href: '/compare' },
       { label: 'Use cases', href: '/use-cases' },
       { label: 'Pricing', href: '/pricing' },

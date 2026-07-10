@@ -37,6 +37,22 @@ function softwareApplication(): JsonLd {
   };
 }
 
+/** WebApplication node for the free MCP token calculator (/mcp-token-calculator). */
+function tokenCalculatorApp(): JsonLd {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'MCP token calculator',
+    applicationCategory: 'DeveloperApplication',
+    operatingSystem: 'Any (runs in the browser)',
+    description:
+      'Estimate how many tokens your MCP servers spend on tool definitions every turn, and how much per-client curation saves. Free and client-side — nothing is uploaded.',
+    url: `${SITE_URL}/mcp-token-calculator`,
+    isPartOf: SITE_URL,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  };
+}
+
 function directoryItemList(): JsonLd {
   return {
     '@context': 'https://schema.org',
@@ -247,6 +263,7 @@ export function jsonLdForPath(path: string): JsonLd[] {
   const faqNode = faqs.length > 0 ? [faqPageJsonLd(faqs, p)] : [];
 
   if (p === '/') return [softwareApplication(), ...faqNode];
+  if (p === '/mcp-token-calculator') return [tokenCalculatorApp(), ...faqNode];
   if (p === '/directory') return [directoryItemList(), ...faqNode];
   if (p === '/guides') return [guidesItemList(), ...faqNode];
   if (p === '/glossary') return [glossaryTermSet(), ...faqNode];

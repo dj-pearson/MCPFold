@@ -85,6 +85,32 @@ export const KEYWORD_MAP: readonly KeywordTarget[] = [
     intent: 'commercial',
     geo: true,
   },
+  {
+    keyword: 'mcp token calculator',
+    page: '/mcp-token-calculator',
+    volume: 300,
+    intent: 'informational',
+    geo: true,
+  },
+  {
+    keyword: 'mcp context window calculator',
+    page: '/mcp-token-calculator',
+    volume: 100,
+    intent: 'informational',
+  },
+  {
+    keyword: 'open source mcp gateway',
+    page: '/compare/open-source-mcp-gateway',
+    volume: 350,
+    intent: 'commercial',
+    geo: true,
+  },
+  {
+    keyword: 'self hosted mcp gateway',
+    page: '/compare/open-source-mcp-gateway',
+    volume: 200,
+    intent: 'commercial',
+  },
 ];
 
 /** The distinct set of canonical pages any tracked keyword points at (for the build-time guard). */

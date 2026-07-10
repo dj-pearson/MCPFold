@@ -95,6 +95,24 @@ const PRICING: Faq[] = [
   },
 ];
 
+const CALCULATOR: Faq[] = [
+  {
+    question: 'How many tokens do MCP servers use?',
+    answer:
+      'Each MCP server loads its full tool schema into the model’s context on every turn, whether the agent uses those tools or not. A single busy server’s tool definitions can run to thousands of tokens, and a handful of servers can consume a large share of the context window before the agent does any work. The exact cost depends on each tool’s JSON schema; the mcpfold token calculator estimates it from a representative schema so you can size your own setup.',
+  },
+  {
+    question: 'How do I reduce the tokens my MCP tools use?',
+    answer:
+      'Load only the tools each agent needs. mcpfold curates the toolset per client from one canonical config, so unused tool schemas never enter the context window. In a reproducible benchmark, trimming a 45-tool setup to the 9 tools actually needed cut tool-schema tokens by about 80%. This works on every client, including Cursor, Windsurf, and Zed, which have no native tool-search.',
+  },
+  {
+    question: 'Is the MCP token calculator accurate?',
+    answer:
+      'The mcpfold token calculator gives a representative estimate using the common 1-token-≈-4-characters rule on a typical tool schema — the same method as the published benchmark. Real cost varies with each tool’s actual schema, so tool counts are editable; the relative reduction from curation is stable regardless of the tokenizer.',
+  },
+];
+
 /** The FAQs for a pathname (empty when the page has none). */
 export function faqsForPath(path: string): Faq[] {
   const p = path !== '/' && path.endsWith('/') ? path.slice(0, -1) : path;
@@ -102,6 +120,7 @@ export function faqsForPath(path: string): Faq[] {
   if (p === '/install') return INSTALL;
   if (p === '/directory') return DIRECTORY;
   if (p === '/pricing') return PRICING;
+  if (p === '/mcp-token-calculator') return CALCULATOR;
   return [];
 }
 

@@ -227,6 +227,11 @@
       "id": "E20",
       "title": "Format stewardship & commercial completion",
       "goal": "Resolve the strategic `.mcp.json` question (the ecosystem is converging on that filename via Claude Code and Visual Studio, and on cross-reading rather than a standard key) so mcpfold stewards the emerging standard instead of fighting it, and finish the commercial layer: Stripe wiring for the entitlements stub that currently grants everyone team tier, pending-invite token redemption, enterprise SSO, and operational polish (secret-provider child-process abort, cross-OS web e2e)."
+    },
+    {
+      "id": "E21",
+      "title": "Editor-native surface & exposure expansion",
+      "goal": "Grow exposure through surfaces developers already live in, plus the growth loops around them: a VS Code extension (MVP shipped in apps/vscode-extension), a free MCP token calculator, the token/context-reduction GEO cluster (pillar + comparison pages), and the instrumentation to know which channels convert. Captures the follow-ups from the July 2026 exposure sweep - see docs/exposure-plan.md, docs/token-query-geo-plan.md, and docs/launch/growth-channels.md."
     }
   ],
   "stories": [
@@ -4567,6 +4572,236 @@
       "definition_of_done": [
         "Timeouts terminate, not orphan; the web e2e story is cross-OS with explicit coverage boundaries."
       ]
+    },
+    {
+      "id": "S21.1",
+      "epic": "E21",
+      "order": 1,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "VS Code extension: dev harness, runtime smoke test, and Marketplace publish",
+      "user_story": "As a developer who lives in VS Code, I want mcpfold's commands and a live sync-status indicator inside my editor, published to the Marketplace, so I can manage MCP config without a terminal - and so mcpfold gains a high-intent discovery surface.",
+      "context": "MVP built in apps/vscode-extension: a thin CLI wrapper (sync/diff/import/doctor/init commands, a status-bar drift indicator driven by `sync --check` exit codes, an npx fallback, and an 'open token calculator' command). It typechecks, bundles via esbuild, and packages to a valid .vsix, but has NOT been run in a live Extension Development Host and is not yet published. This story: add .vscode/launch.json + tasks.json so F5 launches the extension host with a watch build; smoke-test every command and all status-bar states (in-sync / drift / error / CLI-missing) against a real mcp.config.jsonc on macOS + Windows; downsize media/icon.png to ~128px; create the 'PearsonMedia' Marketplace publisher (Azure DevOps PAT) matching the winget id; document the publish runbook and optionally a CI job for `vsce publish`.",
+      "acceptance_criteria": [
+        ".vscode/launch.json + tasks.json launch the extension in an Extension Development Host with F5 (watch build).",
+        "Smoke-test checklist recorded: each command runs the CLI and streams to the mcpfold output channel; the status bar shows in-sync, drift, error, and CLI-missing states correctly, on macOS and Windows.",
+        "Marketplace publisher 'PearsonMedia' exists; the extension is published and installable; the listing renders icon, README, and categories.",
+        "Publish runbook documented (PAT scope, `vsce publish --no-dependencies`, versioning)."
+      ],
+      "files_hint": [
+        "apps/vscode-extension/.vscode/launch.json",
+        "apps/vscode-extension/.vscode/tasks.json",
+        "apps/vscode-extension/media/icon.png",
+        "apps/vscode-extension/README.md",
+        "apps/vscode-extension/package.json"
+      ],
+      "tests": [
+        "Manual: smoke-test checklist in the extension host across commands + status states (macOS + Windows).",
+        "Build: `pnpm --filter mcpfold-vscode build` and `vsce package` stay green."
+      ],
+      "definition_of_done": [
+        "The extension is installable from the Marketplace and verified working in a real editor, with an F5 dev loop and a documented publish path."
+      ]
+    },
+    {
+      "id": "S21.2",
+      "epic": "E21",
+      "order": 2,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": ["S21.1"],
+      "title": "VS Code extension: inline tool-token-budget on the config file",
+      "user_story": "As a developer editing mcp.config.jsonc, I want to see the estimated tool-schema token cost of each server (and the file total) inline, so the context-window tax is visible where I make config decisions.",
+      "context": "Ties the extension to the calculator narrative. Add a CodeLens (or inline decoration) above each server entry in mcp.config.jsonc showing an estimated tool-schema token cost, plus a file-level total, reusing the benchmark estimator (the port in apps/site/src/benchmark/model.ts, itself from packages/proxy/bench). Where actual tool counts are unknown, use the representative estimate and label it approximate; a CodeLens action opens the full web token calculator. Becomes exact once S21.4 provides real tools/list data.",
+      "acceptance_criteria": [
+        "A CodeLens per server in mcp.config.jsonc shows an estimated tool-schema token cost; a file-level total is shown.",
+        "A CodeLens command opens https://mcpfold.com/mcp-token-calculator.",
+        "Estimation reuses the committed benchmark method and is clearly labeled as approximate.",
+        "No CodeLens on non-MCP files; togglable via a setting."
+      ],
+      "files_hint": [
+        "apps/vscode-extension/src/extension.ts",
+        "apps/vscode-extension/src/tokenBudget.ts",
+        "apps/vscode-extension/package.json"
+      ],
+      "tests": [
+        "Unit: token-budget estimate for a sample config matches the benchmark model.",
+        "Manual: CodeLens renders on mcp.config.jsonc and not elsewhere."
+      ],
+      "definition_of_done": [
+        "Editing an MCP config shows its token cost inline, linking to the calculator."
+      ]
+    },
+    {
+      "id": "S21.3",
+      "epic": "E21",
+      "order": 3,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Real-tokenizer benchmark: exact per-model counts alongside the approximation",
+      "user_story": "As a skeptical reader evaluating the token savings, I want exact per-model token counts (not just a 4-chars-per-token approximation), so the headline benchmark survives scrutiny and is citable.",
+      "context": "packages/proxy/bench, docs/benchmark.md, and apps/site/src/benchmark/model.ts use 1 token ~= 4 chars. That number is load-bearing: home.e2e.ts, features.e2e.ts, and homepage.e2e.ts assert ~80% and 7476->1497, and the site calculator reproduces it. This story adds EXACT per-model counts (tiktoken and/or @anthropic-ai/tokenizer) as an additional reported column and updates the site calculator + e2e assertions in lockstep, plus a larger realistic fixture (~7 servers / ~100 tools) so absolute savings look material. Coordinated change: the site, docs, and tests must never disagree.",
+      "acceptance_criteria": [
+        "Benchmark reports exact token counts for at least one Claude and one GPT tokenizer, alongside the approximation, with a reproducible command.",
+        "A larger realistic fixture (~100 tools) is added; the published headline numbers and all e2e assertions are updated together and pass on every OS.",
+        "docs/benchmark.md and the site calculator agree (no drift); the tokenizer note is updated."
+      ],
+      "files_hint": [
+        "packages/proxy/bench/context-benchmark.ts",
+        "packages/proxy/test/benchmark.test.ts",
+        "apps/site/src/benchmark/model.ts",
+        "apps/site/test/home.e2e.ts",
+        "docs/benchmark.md"
+      ],
+      "tests": [
+        "Unit: exact-tokenizer counts are deterministic and match a committed snapshot.",
+        "e2e: updated site assertions green cross-OS."
+      ],
+      "definition_of_done": [
+        "The benchmark reports exact per-model tokens without the site, docs, and tests ever disagreeing."
+      ]
+    },
+    {
+      "id": "S21.4",
+      "epic": "E21",
+      "order": 4,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": ["S21.3"],
+      "title": "MCP server token-cost leaderboard: real tools/list data + page",
+      "user_story": "As someone choosing MCP servers, I want a maintained table of what popular servers actually cost in tool-schema tokens, so I can budget my context - and so mcpfold owns a citable data asset.",
+      "context": "The directory (packages/core/src/directory.ts) has server metadata but NO tool counts or schemas, so leaderboard numbers must be COLLECTED, not estimated, or the asset loses credibility. Add a script that launches each directory server via the proxy, captures tools/list, and records tool count + serialized-schema token cost (reuse packages/proxy + the S21.3 tokenizer). Store as committed, dated JSON. Render /mcp-server-token-costs (sortable, meta + JSON-LD) and feed the calculator presets (apps/site/src/calculator) with the real numbers so they stop being estimates. Servers needing credentials are skipped and logged - no silent gaps.",
+      "acceptance_criteria": [
+        "A collection script produces dated JSON of {server, toolCount, schemaTokens} for the collectable directory servers; uncollectable ones are listed with a reason.",
+        "/mcp-server-token-costs renders a sortable table with meta + JSON-LD, registered in keyword-map.ts.",
+        "The token calculator presets use real collected numbers where available, labeled with the capture date."
+      ],
+      "files_hint": [
+        "scripts/collect-tool-costs.mjs",
+        "packages/core/src/directory-toolcost.json",
+        "apps/site/src/calculator/TokenCalculatorPage.tsx",
+        "apps/site/src/seo/keyword-map.ts",
+        "apps/site/src/App.tsx"
+      ],
+      "tests": [
+        "Script: dry-run against a known server yields a stable tool count.",
+        "e2e: leaderboard page renders and sorts; calculator presets load real data."
+      ],
+      "definition_of_done": [
+        "A maintained, evidence-backed leaderboard exists and powers the calculator presets."
+      ]
+    },
+    {
+      "id": "S21.5",
+      "epic": "E21",
+      "order": 5,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Web funnel instrumentation and channel attribution",
+      "user_story": "As the maintainer, I want to see which growth channels drive installs and where the funnel leaks, so I invest in what converts instead of guessing.",
+      "context": "Exposure is wasted on a leaky, unmeasured funnel (docs/exposure-plan.md). Respect the local-first/privacy posture: measure the WEB funnel only, with no CLI telemetry. Define landing -> /install -> install-command copy -> outbound-to-npm/GitHub as events in the existing privacy-respecting analytics; add copy-to-clipboard events on install commands; add UTM/ref params to every growth-channel link (docs/launch/growth-channels.md) and segment the funnel by ref; track calculator engagement (config pasted, install clicked from the calculator).",
+      "acceptance_criteria": [
+        "Install-command copy and outbound clicks are tracked; the funnel is viewable segmented by ref/UTM.",
+        "Growth-channel links carry consistent UTM/ref tags; calculator 'config pasted' and 'install clicked' events fire.",
+        "No CLI telemetry is added; the privacy posture is documented."
+      ],
+      "files_hint": [
+        "apps/site/src/install/InstallPage.tsx",
+        "apps/site/src/calculator/TokenCalculatorPage.tsx",
+        "apps/site/src/analytics.ts",
+        "docs/launch/growth-channels.md"
+      ],
+      "tests": [
+        "e2e: copy + outbound events fire with the expected payload (mock analytics sink)."
+      ],
+      "definition_of_done": [
+        "Channel-to-install conversion is measurable, so the next channel bet is data-driven."
+      ]
+    },
+    {
+      "id": "S21.6",
+      "epic": "E21",
+      "order": 6,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "e2e coverage for the token calculator and new comparison pages",
+      "user_story": "As CI, I want the new /mcp-token-calculator and the new /compare token pages covered by tests, so their behavior and structured data can't silently regress.",
+      "context": "The new calculator (apps/site/src/calculator, has data-testids) and the three new comparison pages (reduce-mcp-token-usage, mcpfold-vs-tool-search, open-source-mcp-gateway) shipped without e2e, unlike home/features. Add Playwright coverage mirroring home.e2e.ts and features.e2e.ts: calculator compute correctness (tools/tokens/reduction outputs), config-paste parsing, keep-slider, and preset add/remove; comparison pages render intro/table/related and emit the expected TechArticle / FAQPage / WebApplication JSON-LD.",
+      "acceptance_criteria": [
+        "Calculator e2e asserts compute outputs, config-paste parsing, the slider, and add/remove behavior.",
+        "Comparison + calculator pages assert the presence of their JSON-LD nodes and core content.",
+        "The suite runs in the existing cross-OS Playwright matrix and is green."
+      ],
+      "files_hint": [
+        "apps/site/test/calculator.e2e.ts",
+        "apps/site/test/compare.e2e.ts",
+        "apps/site/src/calculator/TokenCalculatorPage.tsx"
+      ],
+      "tests": [
+        "e2e: calculator + comparison specs green cross-OS."
+      ],
+      "definition_of_done": [
+        "The new exposure pages are regression-protected like the rest of the site."
+      ]
+    },
+    {
+      "id": "S21.7",
+      "epic": "E21",
+      "order": 7,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Homepage message test: 'one config for every client' vs the token-tax line",
+      "user_story": "As the maintainer, I want data on whether leading with the broad 'one config for every AI coding tool' message beats the narrower token-tax framing, before I rewrite the H1.",
+      "context": "The token-savings pitch is being commoditized by native tool-search; the broader 'one config for every client' message is more ownable (docs/exposure-plan.md). Do NOT rewrite on a hunch: run the GEO/rank checks (docs/geo-playbook.md, docs/seo-measurement.md) for both message clusters over a defined window and let the data pick the emphasis. Keep the token-tax as the proof point regardless. Outcome is a documented decision plus a minimal, sourced copy change - not a speculative rewrite.",
+      "acceptance_criteria": [
+        "Both message clusters are tracked (rank + GEO citation) over a defined window; results logged in the tracking tables.",
+        "A documented decision on the homepage H1 emphasis, with any copy change kept minimal and sourced."
+      ],
+      "files_hint": [
+        "docs/geo-playbook.md",
+        "docs/seo-measurement.md",
+        "apps/site/src/seo/meta.ts",
+        "apps/site/src/pages/Home.tsx"
+      ],
+      "tests": [
+        "n/a (measurement story); the build stays green if copy changes."
+      ],
+      "definition_of_done": [
+        "The homepage message emphasis is chosen from data, not a guess."
+      ]
+    },
+    {
+      "id": "S21.8",
+      "epic": "E21",
+      "order": 8,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Contributor growth loop: one-PR adapter on-ramp made visible",
+      "user_story": "As a potential contributor, I want an obvious, low-friction way to add my client or fix a gap, so users become contributors, stars, and advocates.",
+      "context": "The 'new adapter = one PR' on-ramp is a growth loop that is currently under-surfaced (docs/exposure-plan.md). Curate good-first-issue labels for the highest-demand missing adapters and secret providers; add an 'add your client in one PR' section to /community linking a template adapter + the test-fixture pattern; acknowledge contributors visibly on the README/site.",
+      "acceptance_criteria": [
+        "A set of scoped good-first-issue adapter/provider issues exists with clear templates.",
+        "/community has an 'add your client in one PR' section linking the template + fixtures.",
+        "Contributors are acknowledged on the site or README."
+      ],
+      "files_hint": [
+        "apps/site/src/community/Community.tsx",
+        "CONTRIBUTING.md",
+        ".github/ISSUE_TEMPLATE/adapter.md",
+        "README.md"
+      ],
+      "tests": [
+        "Build/site checks green with the new community content."
+      ],
+      "definition_of_done": [
+        "Adding a client is a visible, low-friction, one-PR path that turns users into contributors."
+      ]
     }
   ],
   "milestones": [
@@ -4719,6 +4954,19 @@
         "S14.3"
       ],
       "goal": "Keep adapter breadth ahead of the ecosystem (coverage roadmap + live-compat testing) and stand up the business layer (pricing, billing path, sponsorship, roadmap)."
+    },
+    {
+      "name": "editor surface & exposure",
+      "spec_ref": "post-PRD",
+      "stories": [
+        "S21.1",
+        "S21.2",
+        "S21.3",
+        "S21.4",
+        "S21.5",
+        "S21.6"
+      ],
+      "goal": "Publish the VS Code extension and its inline token budget, upgrade the benchmark to exact tokenizers with a real server token-cost leaderboard, and instrument the web funnel so channel-to-install conversion is measured, not guessed."
     }
   ]
 }

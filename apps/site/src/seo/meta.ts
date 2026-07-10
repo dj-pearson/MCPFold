@@ -124,6 +124,13 @@ export function resolveMeta(path: string): RouteMeta {
     }
     return meta('Comparison not found — mcpfold', 'No such comparison.', p);
   }
+  if (p === '/mcp-token-calculator') {
+    return meta(
+      'MCP token calculator — how many tokens do your MCP servers cost?',
+      'Estimate how many tokens your MCP servers spend on tool definitions every turn, and how much per-client curation saves. Free, runs in your browser, nothing uploaded.',
+      '/mcp-token-calculator',
+    );
+  }
   if (p === '/features') {
     return meta(
       'Features — what mcpfold does · one config, curation, secrets, drift',
@@ -257,6 +264,7 @@ export function allRoutes(): string[] {
     '/roadmap',
     '/glossary',
     '/compare',
+    '/mcp-token-calculator',
     ...categoriesWithPages().map((c) => `/directory/category/${c.id}`),
     ...DIRECTORY.map((e) => `/directory/${e.id}`),
     ...GUIDE_CLIENTS.map((c) => `/guides/${c.id}`),
