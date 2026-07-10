@@ -586,3 +586,43 @@ a clean tree, passes on CI ubuntu).
 **Follow-ups:** S19.4 (native-interpolation secrets) can replace the `shim` default for Goose
 (`env_keys`), Continue (`${{ secrets }}`), and opencode variable substitution; S19.5 (compat harness
 v2) can add live evidence + a public compat matrix for the YAML/TOML clients.
+
+---
+
+## S13.18 — Reusable email capture / waitlist component
+
+**Started** 2026-07-10 · branch `story/S13.18-email-capture` · priority p3, deps: S13.1.
+
+**Done** 2026-07-10.
+
+Shipped a reusable, privacy-friendly email-capture form plus one wired sink — the deliverable, not a
+full CRM.
+
+- **`apps/site/src/subscribe/Subscribe.tsx`** — an accessible, reusable component (drop it anywhere
+  with a `source`): labelled email input, consent copy ("we store only your email, unsubscribe
+  anytime" + link to the security page for data handling), a **honeypot** (`website`) that skips the
+  network entirely when filled, `aria-live` success/error states, and graceful degradation — a failed
+  or unreachable sink shows a retry-able error and never throws. Posts to the sink (overridable via
+  `VITE_SUBSCRIBE_URL`). Placed on the homepage; reusable on pricing/blog.
+- **The sink** (`services/edge/functions/subscribe/index.ts`, wired into `src/server.ts`) — a public,
+  unauthenticated edge endpoint that collects **no PII beyond the email**: a pure `parseSubscribe()`
+  does honeypot + validation (unit-testable), the honeypot is silently absorbed (202, stores nothing),
+  invalid emails 400, and valid ones insert into a new `newsletter_subscribers` table (`pending`
+  status for a double-opt-in flow) `on conflict do nothing`. CORS + OPTIONS preflight for the
+  cross-origin form.
+- **Migration** `supabase/migrations/0008_newsletter_subscribers.sql` — the table, RLS-enabled with no
+  policies (only the service connection writes; anon/authenticated get nothing). _(Numbered 0008 off
+  `main`; renumber on merge if another 0008 lands first.)_
+
+Tests: `services/edge/test/subscribe.test.ts` (5 DB-free Deno unit tests: honeypot/validation/
+normalization, insert-on-valid, honeypot-stores-nothing, 400-on-invalid, OPTIONS/405) — all green
+under `deno test`. `apps/site/test/subscribe.e2e.ts` (interactive dev-server Playwright, 4 tests):
+a valid email posts to a **mocked** sink and shows success, an invalid email errors without a network
+call, the form degrades gracefully on a 500, and the honeypot blocks a bot submission (no POST) — all
+green. Site typecheck, build (prerender 9/9 with the form on the homepage), `deno check` + `deno lint`
+
+- `deno fmt`, and repo-wide `format:check` all green.
+
+**E13 (marketing site) is now complete** — S13.10, S13.11, S13.12, S13.14, S13.15, S13.16, S13.17,
+S13.18 all shipped this run (each on its own branch off `main`), alongside the E15 SEO epic
+(S15.5–S15.8).

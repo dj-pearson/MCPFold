@@ -20,6 +20,7 @@ import {
   createTeamsHandler,
 } from "../functions/teams/index.ts";
 import { type BillingConfig, createBillingHandler } from "../functions/billing/index.ts";
+import { createSubscribeHandler } from "../functions/subscribe/index.ts";
 import { dbEntitlementChecker } from "../lib/entitlements.ts";
 import { DEFAULT_CONFIG, type DeviceAuthConfig, type Sql } from "../lib/device.ts";
 import { json } from "../lib/http.ts";
@@ -55,6 +56,7 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
   const teamRemove = createTeamRemoveHandler({ sql, cfg });
   const teamAudit = createTeamAuditHandler({ sql, cfg });
   const billing = createBillingHandler({ sql, cfg, billing: loadBillingConfig() });
+  const subscribe = createSubscribeHandler({ sql });
   return (req) => {
     const path = new URL(req.url).pathname.replace(/\/+$/, "");
     if (path.endsWith("/health") || path === "") {
@@ -71,6 +73,7 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
     if (path.endsWith("/team-remove")) return teamRemove(req);
     if (path.endsWith("/team-audit")) return teamAudit(req);
     if (path.endsWith("/teams")) return teams(req);
+    if (path.endsWith("/subscribe")) return subscribe(req); // public, unauthenticated (S13.18)
     return auth(req);
   };
 }

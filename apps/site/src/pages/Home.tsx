@@ -7,6 +7,7 @@ import { UseCases } from '../home/UseCases';
 import { Credibility } from '../home/Credibility';
 import { FinalCta } from '../home/FinalCta';
 import { FaqSection } from '../seo/FaqSection';
+import { Subscribe } from '../subscribe/Subscribe';
 
 /**
  * Homepage (S13.2; on-page SEO S15.3; full narrative S13.8). Hero + benchmark proof, then the full
@@ -84,6 +85,10 @@ export function Home() {
       </Container>
 
       <FinalCta />
+
+      <Container style={{ paddingBottom: 'var(--space-16)' }}>
+        <Subscribe source="home" />
+      </Container>
 
       <FaqSection path="/" />
     </>
