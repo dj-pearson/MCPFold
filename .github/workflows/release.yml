@@ -43,6 +43,10 @@ jobs:
 
   # Publish on merge to main: Changesets opens/updates a "Version Packages" PR, and when that
   # PR merges (bumped versions, no pending changesets) it publishes to npm with provenance.
+  # When it publishes, `published`/`version` outputs fan the binaries + GitHub Release +
+  # Homebrew/Scoop jobs out IN THIS SAME RUN — so one merge of the Version Packages PR ships
+  # every channel. (We can't lean on the `release: published` event for that cascade: a Release
+  # created with the default GITHUB_TOKEN does NOT emit events, so downstream jobs would never fire.)
   release:
     name: changesets release
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -51,6 +55,13 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write # OIDC: publishes via npm Trusted Publishers (no token) + provenance
+    outputs:
+      # 'true' only when changeset publish actually pushed packages (i.e. the Version Packages PR
+      # merged); 'false' when this push merely opened/updated that PR. Gates the cascade below.
+      published: ${{ steps.changesets.outputs.published }}
+      # The product version just published (from the mcpfold CLI package). Fixed-group versioning
+      # keeps all packages in lockstep, so this is the single version to tag as `v<version>`.
+      version: ${{ steps.product-version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,6 +78,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
       - name: Create Release PR or publish
+        id: changesets
         uses: changesets/action@v1
         with:
           # Runs the `version-packages` script (a shell script, so the && chain works): bump packages,
@@ -74,8 +86,9 @@ jobs:
           # correct and the version-parity gate stays green. All of it lands in the "Version Packages" PR.
           version: pnpm run version-packages
           publish: pnpm changeset publish
-          # Publish to npm only; don't spawn a GitHub Release per package. A single product
-          # release (tag `v*`) is cut separately and carries the standalone binaries.
+          # Publish to npm only; don't spawn a GitHub Release per package. The single product
+          # release (tag `v*`) that carries the standalone binaries is created downstream in
+          # publish-assets, gated on this job's `published` output.
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -83,12 +96,27 @@ jobs:
           # repo + workflow) — no NPM_TOKEN. REQUIRES every published package (mcpfold and all five
           # @mcpfold/* packages) to have a trusted publisher set, or its publish will 403.
           NPM_CONFIG_PROVENANCE: 'true'
+      # Read the just-published version off disk (the merged Version Packages PR already bumped it).
+      # Only meaningful when a publish happened; downstream jobs gate on `published` anyway.
+      - name: Resolve product version
+        id: product-version
+        if: steps.changesets.outputs.published == 'true'
+        run: echo "version=$(node -p "require('./packages/cli/package.json').version")" >> "$GITHUB_OUTPUT"
 
-  # Standalone binaries (S11.1): on a published GitHub Release, build a native binary for every
-  # OS/arch using native runners (cross-compilation from Linux fails for macOS arm64 targets).
+  # Standalone binaries (S11.1): build a native binary for every OS/arch using native runners
+  # (cross-compilation from Linux fails for macOS arm64 targets). Runs when a release is published
+  # manually, on manual dispatch (build-only smoke), or automatically right after `release` publishes
+  # to npm. `always()` lets the `if` evaluate even though `release` is skipped on the release/dispatch
+  # paths; the push path additionally requires `release` to have succeeded and actually published.
   binaries:
     name: standalone binaries (${{ matrix.platform }})
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    needs: release
+    if: >-
+      always() && (
+        github.event_name == 'release' ||
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && needs.release.result == 'success' && needs.release.outputs.published == 'true')
+      )
     strategy:
       matrix:
         include:
@@ -130,36 +158,60 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # Single job (no matrix) that collects all built binaries, attaches them to the release once, and
-  # publishes the Homebrew formula + Scoop manifest. Doing the attach here — not in the parallel
-  # matrix jobs — avoids the concurrent-asset-update race. Homebrew/Scoop push needs a one-time
-  # HOMEBREW_TAP_TOKEN (PAT with write access to dj-pearson/homebrew-tap + scoop-bucket); without it
-  # the manifests are rendered but the push is skipped (the release still succeeds).
+  # Single job (no matrix) that creates/attaches the product GitHub Release once and publishes the
+  # Homebrew formula + Scoop manifest. Doing the attach here — not in the parallel matrix jobs —
+  # avoids the concurrent-asset-update race. Runs on a manually published Release, or automatically
+  # right after `release` publishes to npm (the push path), in which case softprops CREATES the
+  # `v<version>` Release at this commit. NOT on workflow_dispatch (that stays a build-only smoke).
+  # Homebrew/Scoop push needs a one-time HOMEBREW_TAP_TOKEN (PAT with write access to
+  # dj-pearson/homebrew-tap + scoop-bucket); without it the manifests are rendered but the push is
+  # skipped (the release still succeeds).
   publish-assets:
     name: attach binaries + publish homebrew/scoop
-    if: github.event_name == 'release'
-    needs: binaries
+    needs: [release, binaries]
+    if: >-
+      always() && needs.binaries.result == 'success' && (
+        github.event_name == 'release' ||
+        (github.event_name == 'push' && needs.release.result == 'success' && needs.release.outputs.published == 'true')
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
       TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-      TAG: ${{ github.event.release.tag_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # On a manual Release the tag is the event's tag; on the automatic push path there is no
+      # Release yet, so we derive `v<version>` from the release job and let softprops create it.
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="v${{ needs.release.outputs.version }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
       - name: Download all binary artifacts
         uses: actions/download-artifact@v4
         with:
           path: build
           pattern: binaries-*
           merge-multiple: true
-      - name: Attach binaries to the release (once, no race)
+      - name: Create/attach the release (once, no race)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.TAG }}
+          # On the push path this tag doesn't exist yet: softprops creates the tag + Release at the
+          # checked-out commit (main HEAD, which carries the version bump). On the manual path it
+          # updates the existing Release. generate_release_notes only fills notes at creation time,
+          # so it won't clobber a human-authored body on the manual path.
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
           files: |
             build/mcpfold-*-*
             build/mcpfold-*.sha256

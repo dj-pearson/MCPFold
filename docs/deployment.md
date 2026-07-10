@@ -315,17 +315,19 @@ served.
 
 ---
 
-## Step 8 — Publish the CLI to npm
+## Step 8 — Cut a release (one merge ships every channel)
 
-Publishing is automated with [Changesets](https://github.com/changesets/changesets) — you don't run
-`npm publish` by hand.
+Releasing is automated with [Changesets](https://github.com/changesets/changesets) — you don't run
+`npm publish`, tag anything, or create a GitHub Release by hand. **Merging the "Version Packages" PR
+publishes npm, cuts the GitHub Release, builds the standalone binaries, and updates Homebrew + Scoop —
+all in one workflow run.** (See Step 9 for the one-time Homebrew/Scoop token.)
 
-**One-time setup:**
+**One-time setup (npm auth):**
 
-1. Create an **automation** access token at npmjs.com (Account → Access Tokens → Generate → _Automation_).
-   An automation token works in CI without 2FA prompts.
-2. In the GitHub repo: **Settings → Secrets and variables → Actions → New repository secret**, name it
-   `NPM_TOKEN`, paste the token.
+Publishing uses npm **[Trusted Publishers (OIDC)](https://docs.npmjs.com/trusted-publishers)** — there
+is **no `NPM_TOKEN`**. On npmjs.com, for each published package (`mcpfold` and all five `@mcpfold/*`),
+add a trusted publisher pointing at this repo + the `release.yml` workflow. Miss one and its publish
+step 403s. The workflow requests provenance via OIDC, so no secret is stored.
 
 **Cutting a release (every time):**
 
@@ -335,36 +337,41 @@ Publishing is automated with [Changesets](https://github.com/changesets/changese
    ```
    Pick the packages and the bump level (patch/minor/major); commit the generated file.
 2. Merge that to `main`. The `release.yml` workflow opens a **"Version Packages"** pull request that
-   bumps versions and updates changelogs.
-3. **Merge the "Version Packages" PR.** That merge publishes `mcpfold` + `@mcpfold/*` to npm with
-   provenance — automatically.
+   bumps versions and updates changelogs. (Landing more changesets keeps updating that same PR.)
+3. **Merge the "Version Packages" PR.** That single merge, automatically:
+   - publishes `mcpfold` + `@mcpfold/*` to npm with provenance;
+   - creates the `v<version>` **GitHub Release** at that commit;
+   - builds + attaches the standalone binaries for every OS/arch (with checksums);
+   - pushes the updated **Homebrew formula** and **Scoop manifest** (if the tap token is set — Step 9).
 
-✅ **Check:** after the release PR merges, `npx mcpfold@latest --version` prints the new version.
+✅ **Check:** after the release PR merges, `npx mcpfold@latest --version` prints the new version, and a
+`v<version>` Release appears under **Releases** with the binaries attached.
 
 ---
 
 ## Step 9 — Standalone binaries, Homebrew & Scoop
 
 Some users install without npm — a raw binary, `brew install`, or `scoop install`. These all download
-from the binaries attached to a **GitHub Release**.
+from the binaries attached to the **GitHub Release**, which the Version Packages merge cuts for you
+(Step 8) — you never create a Release by hand.
 
-**Binaries (automatic):** when you publish a GitHub Release, the `binaries` job in `release.yml`
-cross-compiles a native `mcpfold` binary for each OS/arch, checksums them, and attaches them to the
-release. Nothing for you to do beyond creating the Release.
+**Binaries (automatic):** right after the npm publish, the `binaries` job in `release.yml`
+builds a native `mcpfold` binary for each OS/arch on its native runner, checksums them, and the
+`publish-assets` job attaches them to the `v<version>` Release. Nothing for you to do.
 
-**Homebrew & Scoop (automatic once set up):** the release pipeline already has a `packaging` job that,
-on each release, renders the concrete formula/manifest (real version + download URLs + SHA-256 from
-the release binaries) and pushes them to your tap/bucket repos. You only do the **one-time setup**:
+**Homebrew & Scoop (automatic once set up):** the same `publish-assets` job renders the concrete
+formula/manifest (real version + download URLs + SHA-256 from the release binaries) and pushes them to
+your tap/bucket repos. You only do the **one-time setup**:
 
 1. Create two public GitHub repos under your account:
    - `dj-pearson/homebrew-tap` — the pipeline writes `Formula/mcpfold.rb` here.
    - `dj-pearson/scoop-bucket` — the pipeline writes `bucket/mcpfold.json` here.
    - (Empty repos are fine — the job creates the files. No manual seeding needed.)
 2. Create a **PAT with write (contents) access to both repos** and add it as the repo secret
-   **`HOMEBREW_TAP_TOKEN`**. Until it's set, the `packaging` job renders the manifests but **skips the
+   **`HOMEBREW_TAP_TOKEN`**. Until it's set, `publish-assets` renders the manifests but **skips the
    push** (it won't fail the release).
-3. Re-run the release (or cut the next one). The job pushes `mcpfold.rb` / `mcpfold.json` with that
-   release's version and checksums.
+3. That's it — the next release (or a re-run of the release job) pushes `mcpfold.rb` / `mcpfold.json`
+   with that release's version and checksums.
 
 After that, `brew install dj-pearson/tap/mcpfold` and `scoop install mcpfold` track every release.
 Version parity is kept green automatically: `scripts/sync-packaging-version.mjs` runs during the
@@ -412,7 +419,9 @@ If you want browser sign-in via GitHub for device-code login:
       values only surface as broken auth at runtime, not as a build failure).
 - [ ] `VITE_E2E` is **not** set on any production Pages project.
 - [ ] Pages project names are exactly `mcpfold-site` and `mcpfold-web`.
-- [ ] `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` + `NPM_TOKEN` are set as GitHub secrets.
+- [ ] `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` are set as GitHub secrets; npm Trusted
+      Publishers are configured for every published package (no `NPM_TOKEN`); `HOMEBREW_TAP_TOKEN` is
+      set if you want Homebrew/Scoop to auto-update.
 - [ ] Migrations applied to the **production** database (not just locally/CI).
 - [ ] At-rest hardening done and `verify-hardening.sh` passes.
 - [ ] `ADDITIONAL_REDIRECT_URLS` / OAuth callbacks include every host that starts a sign-in.
