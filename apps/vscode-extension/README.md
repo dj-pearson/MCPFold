@@ -38,11 +38,11 @@ npm install -g mcpfold
 
 ## Settings
 
-| Setting | Default | What it does |
-| --- | --- | --- |
-| `mcpfold.path` | _(empty)_ | Path to the `mcpfold` binary. Empty = auto-detect (global, else npx). |
-| `mcpfold.useNpx` | `false` | Always run via `npx mcpfold@latest`. |
-| `mcpfold.checkDriftOnSave` | `true` | Re-check sync status when a config file is saved. |
+| Setting                    | Default   | What it does                                                          |
+| -------------------------- | --------- | --------------------------------------------------------------------- |
+| `mcpfold.path`             | _(empty)_ | Path to the `mcpfold` binary. Empty = auto-detect (global, else npx). |
+| `mcpfold.useNpx`           | `false`   | Always run via `npx mcpfold@latest`.                                  |
+| `mcpfold.checkDriftOnSave` | `true`    | Re-check sync status when a config file is saved.                     |
 
 ## Links
 

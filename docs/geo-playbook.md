@@ -85,6 +85,6 @@ Prompts:
 Prompt 5 should go green first (uncontested, on-wedge); prompts 1–2 are the commoditized head
 terms — treat "named as one of the options" there as success, not "named as the only answer".
 
-| Date       | Assistant  | Prompt | Named | Accurate | Linked | Positioned | Notes            |
-| ---------- | ---------- | ------ | ----- | -------- | ------ | ---------- | ---------------- |
+| Date       | Assistant  | Prompt | Named | Accurate | Linked | Positioned | Notes             |
+| ---------- | ---------- | ------ | ----- | -------- | ------ | ---------- | ----------------- |
 | 2026-07-10 | (baseline) | —      | —     | —        | —      | —          | Plan shipped; run |
