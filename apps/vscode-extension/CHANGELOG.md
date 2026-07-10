@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Added an F5 dev loop (`.vscode/launch.json` + `tasks.json`) with an esbuild watch build and a
+  bundled `fixtures/smoke-workspace` so the status bar has real config to check against.
+- Downsized the Marketplace icon to 128px (was a 1024px, ~500 KB asset that `vsce` flagged); the
+  full-resolution source is kept as `media/icon-source-1024.png` and excluded from the `.vsix`.
+- Documented the smoke-test checklist and Marketplace publish runbook in `PUBLISHING.md`.
+
 ## 0.1.0
 
 - Initial release.

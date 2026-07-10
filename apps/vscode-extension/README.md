@@ -50,6 +50,12 @@ npm install -g mcpfold
 - Reduce MCP token usage: <https://mcpfold.com/compare/reduce-mcp-token-usage>
 - Source (MIT): <https://github.com/dj-pearson/MCPFold>
 
+## Contributing
+
+Press **F5** in the `apps/vscode-extension` folder to launch the extension in a development host
+(see [`.vscode/launch.json`](.vscode/launch.json)). The smoke-test checklist and Marketplace
+publish runbook live in [`PUBLISHING.md`](PUBLISHING.md).
+
 ---
 
 mcpfold is an independent, open-source project and is not affiliated with or endorsed by the MCP

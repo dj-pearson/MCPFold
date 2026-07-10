@@ -4578,7 +4578,7 @@
       "epic": "E21",
       "order": 1,
       "priority": "p1",
-      "status": "todo",
+      "status": "in_progress",
       "dependencies": [],
       "title": "VS Code extension: dev harness, runtime smoke test, and Marketplace publish",
       "user_story": "As a developer who lives in VS Code, I want mcpfold's commands and a live sync-status indicator inside my editor, published to the Marketplace, so I can manage MCP config without a terminal - and so mcpfold gains a high-intent discovery surface.",

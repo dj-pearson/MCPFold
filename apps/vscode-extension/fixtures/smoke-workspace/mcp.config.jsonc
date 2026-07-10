@@ -1,0 +1,19 @@
+// Smoke-test fixture for the mcpfold VS Code extension.
+// Open this folder via the "Run mcpfold extension (open a config workspace)" launch config
+// (F5) so the status bar has a real config to check drift against. It is intentionally tiny
+// and uses only public, npx-resolvable servers — no secrets are required to run `sync --check`.
+{
+  "$schema": "https://mcpfold.com/schema/v1.json",
+  "version": 1,
+  "servers": {
+    "playwright": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp"],
+      "tags": ["e2e"],
+    },
+  },
+  "profiles": {
+    "vscode-project": { "client": "vscode", "scope": "project", "path": ".", "include": ["e2e"] },
+  },
+}

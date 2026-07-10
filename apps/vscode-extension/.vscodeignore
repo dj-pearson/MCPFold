@@ -1,9 +1,12 @@
 # Keep the packaged .vsix minimal — ship only the bundle + listing assets.
 .vscode/**
 src/**
+fixtures/**
+PUBLISHING.md
 node_modules/**
 esbuild.mjs
 tsconfig.json
 .gitignore
+media/icon-source-1024.png
 **/*.map
 **/*.ts
