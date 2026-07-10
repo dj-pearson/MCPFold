@@ -1,10 +1,10 @@
 ---
-"mcpfold": patch
-"@mcpfold/core": patch
-"@mcpfold/adapters": patch
-"@mcpfold/proxy": patch
-"@mcpfold/schema": patch
-"@mcpfold/secrets": patch
+'mcpfold': patch
+'@mcpfold/core': patch
+'@mcpfold/adapters': patch
+'@mcpfold/proxy': patch
+'@mcpfold/schema': patch
+'@mcpfold/secrets': patch
 ---
 
 1.0.2 — bundles the work merged since 1.0.1. All published packages are now versioned in lockstep.
