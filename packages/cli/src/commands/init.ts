@@ -100,15 +100,21 @@ function renderHuman(
   detected: DetectedClient[],
   contents: string,
 ): string {
-  const installed = detected.filter((c) => c.installed).map((c) => c.id);
+  const configured = detected.filter((c) => c.state === 'configured').map((c) => c.id);
+  const installedOnly = detected.filter((c) => c.state === 'installed-only').map((c) => c.id);
   const lines: string[] = [];
   if (created) lines.push(`Created ${configPath}`);
   else lines.push(`Would create ${configPath}:`, '', contents);
   lines.push(
     '',
-    installed.length > 0
-      ? `Detected clients: ${installed.join(', ')}.`
-      : 'No installed clients detected (that is fine — add profiles for the clients you use).',
+    configured.length > 0
+      ? `Configured clients: ${configured.join(', ')}.`
+      : 'No configured clients detected (that is fine — add profiles for the clients you use).',
+  );
+  if (installedOnly.length > 0) {
+    lines.push(`Installed but not yet configured: ${installedOnly.join(', ')}.`);
+  }
+  lines.push(
     '',
     'Next: edit the config, then run `mcpfold sync` to fold it out.',
     'Already have a .mcp.json? Run `mcpfold import` to adopt it. Need one for another tool?',

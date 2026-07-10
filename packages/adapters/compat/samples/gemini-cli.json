@@ -2,9 +2,24 @@
   "client": "gemini-cli",
   "source": {
     "type": "captured",
-    "capturedAt": "2026-07-08"
+    "capturedAt": "2026-07-09"
   },
-  "rootKeys": ["mcpServers"],
+  "rootKeys": [
+    "mcpServers"
+  ],
   "serverContainer": "mcpServers",
-  "entryKeys": ["args", "command", "env", "httpUrl", "url"]
+  "entryKeys": [
+    "args",
+    "command",
+    "env",
+    "httpUrl"
+  ],
+  "remoteEntryKeys": [
+    "httpUrl"
+  ],
+  "paths": {
+    "user": "/home/dev/.gemini/settings.json",
+    "project": "/home/dev/repo/.gemini/settings.json"
+  },
+  "liveUrl": "https://google-gemini.github.io/gemini-cli/docs/tools/mcp-server.html"
 }

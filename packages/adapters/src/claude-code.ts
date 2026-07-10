@@ -11,11 +11,14 @@ import type { OsContext } from './types.js';
  */
 export const claudeCodeAdapter = createMcpServersAdapter({
   id: 'claude-code',
+  // Default `shim`; declares the `${VAR}` dialect (Claude Code expands `${VAR}`/`${VAR:-default}`
+  // in .mcp.json) so a profile/server can opt into `native-env` (S19.4).
   secretStrategy: 'shim',
   needsRestart: false,
   includeType: true,
   // Native HTTP remotes with OAuth (verified July 2026); explicit `type` next to `url`.
   remote: { nativeHttp: true, nativeOauth: true, fieldShape: 'type+url' },
+  envInterpolation: (name) => '${' + name + '}',
   resolvePath(scope, projectPath, ctx: OsContext = realOsContext()) {
     if (scope === 'user') return joinFor(ctx, ctx.home, '.claude.json');
     if (!projectPath) throw new Error('Claude Code project scope requires a project path.');

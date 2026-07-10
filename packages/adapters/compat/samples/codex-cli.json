@@ -5,7 +5,20 @@
     "capturedAt": "2026-07-09"
   },
   "format": "toml",
-  "rootKeys": ["mcp_servers"],
+  "rootKeys": [
+    "mcp_servers"
+  ],
   "serverContainer": "mcp_servers",
-  "entryKeys": ["args", "command", "env", "url"]
+  "entryKeys": [
+    "args",
+    "command",
+    "env",
+    "url"
+  ],
+  "remoteEntryKeys": [
+    "url"
+  ],
+  "paths": {
+    "user": "/home/dev/.codex/config.toml"
+  }
 }

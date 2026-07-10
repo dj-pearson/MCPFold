@@ -90,7 +90,13 @@ describe('runStatus (S10.1)', () => {
   it('has a stable --json data shape', async () => {
     await runSync({ cwd, osContext: ctx });
     const result = await runStatus({ cwd, osContext: ctx, backend: inMemoryBackend() });
-    expect(Object.keys(result.data).sort()).toEqual(['clients', 'cloud', 'health', 'ok']);
+    expect(Object.keys(result.data).sort()).toEqual([
+      'clients',
+      'cloud',
+      'health',
+      'installedUnconfigured',
+      'ok',
+    ]);
     const client = result.data.clients[0]!;
     expect(Object.keys(client).sort()).toEqual(
       [

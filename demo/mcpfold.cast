@@ -2,7 +2,7 @@
 [0.4,"o","\u001b[36mMCP tool-schemas cost context. mcpfold cuts them ~80% (7476 → 1497 tokens).\u001b[0m\r\n"]
 [0.8,"o","\u001b[36m# (server names below are examples — no endorsement implied)\u001b[0m\r\n"]
 [1.2,"o","\u001b[32m$ \u001b[0mmcpfold init\r\n"]
-[1.6,"o","Created ~/project/mcp.config.jsonc\r\n\r\nDetected clients: cursor.\r\n\r\nNext: edit the config, then run `mcpfold sync` to fold it out.\r\nAlready have a .mcp.json? Run `mcpfold import` to adopt it. Need one for another tool?\r\n`mcpfold export --mcp-json` writes one.\r\n"]
+[1.6,"o","Created ~/project/mcp.config.jsonc\r\n\r\nConfigured clients: cursor.\r\n\r\nNext: edit the config, then run `mcpfold sync` to fold it out.\r\nAlready have a .mcp.json? Run `mcpfold import` to adopt it. Need one for another tool?\r\n`mcpfold export --mcp-json` writes one.\r\n"]
 [2,"o","\u001b[32m$ \u001b[0mmcpfold import\r\n"]
 [2.4,"o","Imported from: cursor.\r\nServers: filesystem, github, playwright.\r\nProfiles: cursor.\r\n\r\nWrote ~/project/mcp.config.jsonc\r\n"]
 [2.8,"o","\u001b[32m$ \u001b[0mmcpfold sync\r\n"]

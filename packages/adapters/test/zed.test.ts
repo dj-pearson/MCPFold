@@ -25,6 +25,18 @@ describe('zedAdapter (S2.7)', () => {
     );
   });
 
+  it('resolves and renders a project-scope .zed/settings.json (S19.3)', () => {
+    expect(zedAdapter.resolvePath('project', '/repos/x', linux)).toBe(
+      '/repos/x/.zed/settings.json',
+    );
+    expect(() => zedAdapter.resolvePath('project', undefined, linux)).toThrow(/project path/);
+    const projectServers = sampleServers('zed', 'project', '/repos/x');
+    const file = zedAdapter.render(projectServers, linux);
+    expect(file.path).toBe('/repos/x/.zed/settings.json');
+    const parsed = JSON.parse(file.contents) as Record<string, unknown>;
+    expect('context_servers' in parsed).toBe(true);
+  });
+
   it('parses context_servers back to canonical', () => {
     const file = zedAdapter.render(sampleServers('zed'), linux);
     expect(zedAdapter.parse(file.contents).servers?.playwright?.command).toBe('npx');

@@ -8,6 +8,7 @@ import { checkClientFiles } from '../checks/clients.js';
 import {
   checkDeprecatedTransports,
   checkHardcodedSecrets,
+  checkNativeEnvFallback,
   checkPinIntegrity,
   checkSecretSchemes,
   checkUnpinnedLatest,
@@ -62,6 +63,7 @@ export function runDoctor(options: DoctorOptions): CommandOutput<DoctorData> {
       findings.push(...checkPinIntegrity(config, configPath));
       findings.push(...checkHardcodedSecrets(config, configPath));
       findings.push(...checkSecretSchemes(config, configPath));
+      findings.push(...checkNativeEnvFallback(config, configPath));
       findings.push(...checkClientFiles(config, ctx));
     }
   }

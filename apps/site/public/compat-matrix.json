@@ -1,0 +1,149 @@
+{
+  "generatedAsOf": "2026-07-09",
+  "clients": [
+    {
+      "client": "claude-code",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `type+url`",
+      "secretStrategy": "shim (native-env available)",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "claude-desktop",
+      "format": "json",
+      "scopes": "user",
+      "transport": "mcp-remote shim",
+      "secretStrategy": "shim",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "cline",
+      "format": "json",
+      "scopes": "user",
+      "transport": "native `url`",
+      "secretStrategy": "shim",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "codex-cli",
+      "format": "toml",
+      "scopes": "user",
+      "transport": "native `url`",
+      "secretStrategy": "shim",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "continue",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `url`",
+      "secretStrategy": "shim",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "copilot-cli",
+      "format": "json",
+      "scopes": "user",
+      "transport": "native `type+url`",
+      "secretStrategy": "shim (native-env available)",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "cursor",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `url`",
+      "secretStrategy": "shim (native-env available)",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "gemini-cli",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `httpUrl`",
+      "secretStrategy": "shim (native-env available)",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "goose",
+      "format": "yaml",
+      "scopes": "user",
+      "transport": "native `url`",
+      "secretStrategy": "shim",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "jetbrains",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `url`",
+      "secretStrategy": "shim",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "lm-studio",
+      "format": "json",
+      "scopes": "user",
+      "transport": "native `url`",
+      "secretStrategy": "shim",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "opencode",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `url`",
+      "secretStrategy": "shim (native-env available)",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "roo-code",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `url`",
+      "secretStrategy": "shim",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "visual-studio",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `type+url`",
+      "secretStrategy": "native-input",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "vscode",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `type+url`",
+      "secretStrategy": "native-input",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "warp",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `url`",
+      "secretStrategy": "shim (native-env available)",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "windsurf",
+      "format": "json",
+      "scopes": "user",
+      "transport": "native `url` (shim if authed)",
+      "secretStrategy": "shim (native-env available)",
+      "lastVerified": "2026-07-09"
+    },
+    {
+      "client": "zed",
+      "format": "json",
+      "scopes": "user, project",
+      "transport": "native `url`",
+      "secretStrategy": "shim",
+      "lastVerified": "2026-07-09"
+    }
+  ]
+}

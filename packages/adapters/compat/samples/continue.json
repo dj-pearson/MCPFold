@@ -2,9 +2,23 @@
   "client": "continue",
   "source": {
     "type": "captured",
-    "capturedAt": "2026-07-08"
+    "capturedAt": "2026-07-09"
   },
-  "rootKeys": ["mcpServers"],
+  "rootKeys": [
+    "mcpServers"
+  ],
   "serverContainer": "mcpServers",
-  "entryKeys": ["args", "command", "env", "url"]
+  "entryKeys": [
+    "args",
+    "command",
+    "env",
+    "url"
+  ],
+  "remoteEntryKeys": [
+    "url"
+  ],
+  "paths": {
+    "user": "/home/dev/.continue/mcpServers/mcpfold.json",
+    "project": "/home/dev/repo/.continue/mcpServers/mcpfold.json"
+  }
 }

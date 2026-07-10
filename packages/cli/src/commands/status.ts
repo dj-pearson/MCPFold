@@ -4,6 +4,7 @@ import type { ClientId } from '@mcpfold/core';
 import type { SecretProvider } from '@mcpfold/secrets';
 import { runDiff } from './diff.js';
 import { runDoctor } from './doctor.js';
+import { detectClients } from '../util/detect-clients.js';
 import { loadSession, osKeychainBackend, type KeychainBackend } from '../cloud/token-store.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
@@ -35,6 +36,8 @@ export interface StatusCloud {
 
 export interface StatusData {
   clients: StatusClient[];
+  /** S19.3: client ids installed on this machine but not yet in any profile (onboarding hint). */
+  installedUnconfigured: string[];
   health: { errors: number; warnings: number };
   cloud: StatusCloud | null;
   ok: boolean;
@@ -72,6 +75,11 @@ function renderHuman(data: StatusData): string {
     const restart = c.needsRestart && !c.inSync ? ' · needs restart' : '';
     const mark = c.inSync ? '✓' : '•';
     lines.push(`  ${mark} ${c.client} (${c.profile}): ${state}${restart}`);
+  }
+  if (data.installedUnconfigured.length > 0) {
+    lines.push(
+      `  (installed, no profile yet: ${data.installedUnconfigured.join(', ')} — add a profile to fold to them)`,
+    );
   }
   lines.push('');
   lines.push(
@@ -121,7 +129,13 @@ export async function runStatus(options: StatusOptions): Promise<CommandOutput<S
     };
   }
 
+  // S19.3: clients installed on the machine but not yet covered by any profile — an onboarding hint.
+  const profileClients = new Set(clients.map((c) => c.client));
+  const installedUnconfigured = detectClients(ctx)
+    .filter((c) => c.state === 'installed-only' && !profileClients.has(c.id))
+    .map((c) => c.id);
+
   const ok = !diff.data.drift && health.errors === 0 && health.warnings === 0;
-  const data: StatusData = { clients, health, cloud, ok };
+  const data: StatusData = { clients, installedUnconfigured, health, cloud, ok };
   return { data, human: renderHuman(data), exit: ok ? EXIT.SUCCESS : EXIT.DIFF };
 }

@@ -121,8 +121,18 @@ export async function runGuided(
   write("Welcome to mcpfold — let's get you from zero to synced.");
   if (dryRun) write('(dry-run: showing the plan; nothing will be written)');
 
-  const detected = detectClients(ctx).filter((c) => c.installed);
-  write(`Detected clients: ${detected.map((c) => c.id).join(', ') || 'none'}`);
+  const allDetected = detectClients(ctx);
+  const configured = allDetected.filter((c) => c.state === 'configured');
+  const installedOnly = allDetected.filter((c) => c.state === 'installed-only');
+  write(`Configured clients: ${configured.map((c) => c.id).join(', ') || 'none'}.`);
+  if (installedOnly.length > 0) {
+    // S19.3: surface installed-but-unconfigured clients as fold targets — the exact gap guided fills.
+    write(
+      `Installed but not yet configured (mcpfold can fold to these too): ${installedOnly
+        .map((c) => c.id)
+        .join(', ')}.`,
+    );
+  }
 
   // --- Step 1: get a canonical config (never clobber without confirmation) --------------------
   let configPath = findConfigPath(options.cwd);
@@ -144,7 +154,7 @@ export async function runGuided(
 
   if (!configPath) {
     if (
-      detected.length > 0 &&
+      configured.length > 0 &&
       (await prompt.confirm('Import your existing client configs?', true))
     ) {
       const preview = runImport({ cwd: options.cwd, osContext: ctx, force: true, dryRun: true });

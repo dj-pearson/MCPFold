@@ -2,9 +2,19 @@
   "client": "claude-desktop",
   "source": {
     "type": "captured",
-    "capturedAt": "2026-07-08"
+    "capturedAt": "2026-07-09"
   },
-  "rootKeys": ["mcpServers"],
+  "rootKeys": [
+    "mcpServers"
+  ],
   "serverContainer": "mcpServers",
-  "entryKeys": ["args", "command", "env"]
+  "entryKeys": [
+    "args",
+    "command",
+    "env"
+  ],
+  "remoteEntryKeys": [],
+  "paths": {
+    "user": "/home/dev/.config/Claude/claude_desktop_config.json"
+  }
 }
