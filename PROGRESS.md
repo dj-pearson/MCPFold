@@ -990,6 +990,7 @@ in the prerender Playwright config, ignored by the dev-server config) asserts an
 actually GET 200 as SVG), colors, one-liner, and no-endorsement copy, that /brand is in the
 sitemap+footer while /404 is not, and that the `_redirects` legacy map ships without the old SPA
 fallback — 13/13 prerender tests pass. Site typecheck and repo-wide `format:check` green.
+
 ## S17.8 — MCPB bundle support as an install source
 
 Started/done: 2026-07-10. `mcpfold add --from-mcpb <file|url>` installs from an MCPB bundle (`.mcpb`,
@@ -1023,6 +1024,7 @@ docs:build; demo unchanged). CLI 263 tests pass. Same pre-existing Windows-only 
 **Follow-ups:** full OS-trust-store chain validation for "signed" (we classify self-signed vs
 CA-issued and surface the signer; we don't execute the bundle, so we don't gate on a trusted chain);
 `user_config` `multiple:true` array expansion into repeated args (single-value substitution ships).
+
 ## S19.3 — Project-scope expansion & installed-app detection
 
 Started/done: 2026-07-09. Two audit gaps closed: (1) clients that support a project-scoped MCP
@@ -1148,6 +1150,7 @@ docs:build + matrix-drift + demo). adapters 25 files / 151 tests. Same pre-exist
 **Follow-ups:** a dedicated styled site page (vs the on-site docs page + JSON asset) for the E13/E15
 marketing tie-in; the live-doc heuristic is token-presence — a schema-parse path could sharpen it for
 clients that publish machine-readable schemas.
+
 ## S20.3 — Pending-invite redemption & enterprise SSO
 
 Started/done: 2026-07-09. Two onboarding walls removed: inviting an email with no account used to

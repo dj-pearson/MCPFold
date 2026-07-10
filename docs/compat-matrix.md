@@ -18,7 +18,7 @@ _Generated 2026-07-09 · 18 clients._
 | gemini-cli | json | user, project | native `httpUrl` | shim (native-env available) | 2026-07-09 |
 | goose | yaml | user | native `url` | shim | 2026-07-09 |
 | jetbrains | json | user, project | native `url` | shim | 2026-07-09 |
-| lm-studio | json | user | native `url` | shim | 2026-07-09 |
+| lm-studio | json | user, project | native `url` | shim | 2026-07-09 |
 | opencode | json | user, project | native `url` | shim (native-env available) | 2026-07-09 |
 | roo-code | json | user, project | native `url` | shim | 2026-07-09 |
 | visual-studio | json | user, project | native `type+url` | native-input | 2026-07-09 |
