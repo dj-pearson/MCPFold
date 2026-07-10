@@ -1,5 +1,11 @@
 import { DIRECTORY, categoriesWithPages, categoryMeta, entriesForCategory } from '@mcpfold/core';
 import { POSTS } from '../blog/posts';
+import { GUIDE_CLIENTS, guideById } from '../guides/guides.data';
+import { GLOSSARY, termById } from '../glossary/terms';
+import { COMPARISONS, comparisonById } from '../compare/comparisons';
+import { FEATURES, featureById } from '../features/features';
+import { USE_CASES, useCaseById } from '../use-cases/use-cases';
+import { LEGAL_DOCS, legalDocById } from '../legal/legal-content';
 
 /**
  * Single source of truth for per-route <title>/description/canonical (S15.1).
@@ -72,6 +78,80 @@ export function resolveMeta(path: string): RouteMeta {
     }
     return meta('Server not found — mcpfold directory', 'No such server.', p);
   }
+  if (p === '/guides') {
+    return meta(
+      'MCP setup guides — add MCP servers to any client · mcpfold',
+      `Copy-paste guides to add MCP servers to ${GUIDE_CLIENTS.length} clients — Claude Code, Cursor, VS Code, Windsurf, and more — with one mcpfold config folded out to each.`,
+      '/guides',
+    );
+  }
+  if (p.startsWith('/guides/')) {
+    const guide = guideById(p.slice('/guides/'.length));
+    if (guide) {
+      return meta(
+        `Add MCP servers to ${guide.label} · mcpfold`,
+        `Set up MCP servers in ${guide.label} with mcpfold: one canonical config folded into ${guide.label}'s own format, secrets kept as references. Config paths straight from the adapter.`,
+        `/guides/${guide.id}`,
+      );
+    }
+    return meta('Guide not found — mcpfold', 'No such client guide.', p);
+  }
+  if (p === '/glossary') {
+    return meta(
+      'MCP glossary — Model Context Protocol concepts explained · mcpfold',
+      'Clear, neutral definitions of MCP concepts — MCP server, Model Context Protocol, MCP client, MCP tools, context window, secret reference, and MCP config manager.',
+      '/glossary',
+    );
+  }
+  if (p.startsWith('/glossary/')) {
+    const entry = termById(p.slice('/glossary/'.length));
+    if (entry) {
+      return meta(`${entry.heading} · mcpfold glossary`, entry.short, `/glossary/${entry.id}`);
+    }
+    return meta('Term not found — mcpfold glossary', 'No such glossary entry.', p);
+  }
+  if (p === '/compare') {
+    return meta(
+      'How mcpfold compares — MCP config, by hand vs gateway vs mcpfold',
+      'Honest, factual comparisons of ways to manage MCP servers across clients — by hand, with a hosted gateway, or with mcpfold, a local-first open-source CLI. Clear about what mcpfold is not.',
+      '/compare',
+    );
+  }
+  if (p.startsWith('/compare/')) {
+    const entry = comparisonById(p.slice('/compare/'.length));
+    if (entry) {
+      return meta(`${entry.metaTitle} · mcpfold`, entry.intro, `/compare/${entry.id}`);
+    }
+    return meta('Comparison not found — mcpfold', 'No such comparison.', p);
+  }
+  if (p === '/features') {
+    return meta(
+      'Features — what mcpfold does · one config, curation, secrets, drift',
+      'Go deep on each mcpfold pillar: one config folded to every client, per-server tool curation to cut context tokens, secrets as references, and sync/diff/drift control.',
+      '/features',
+    );
+  }
+  if (p.startsWith('/features/')) {
+    const feature = featureById(p.slice('/features/'.length));
+    if (feature) {
+      return meta(`${feature.metaTitle}`, feature.tagline, `/features/${feature.id}`);
+    }
+    return meta('Feature not found — mcpfold', 'No such feature.', p);
+  }
+  if (p === '/use-cases') {
+    return meta(
+      'Who mcpfold is for — solo developers, teams, power users',
+      'The same product framed around your situation: one MCP config across your own clients, a repo-committed setup for teams with a CI drift gate, or tool curation to cut the context tax.',
+      '/use-cases',
+    );
+  }
+  if (p.startsWith('/use-cases/')) {
+    const uc = useCaseById(p.slice('/use-cases/'.length));
+    if (uc) {
+      return meta(`${uc.metaTitle}`, uc.tagline, `/use-cases/${uc.id}`);
+    }
+    return meta('Use case not found — mcpfold', 'No such use case.', p);
+  }
   if (p === '/pricing') {
     return meta(
       'Pricing — mcpfold',
@@ -84,6 +164,26 @@ export function resolveMeta(path: string): RouteMeta {
       'Security & trust — mcpfold',
       'How mcpfold handles secrets (references, never values), stays local-first, redacts diagnostics, keeps telemetry off by default, and how to report a vulnerability privately.',
       '/security',
+    );
+  }
+  if (p === '/about') {
+    return meta(
+      'About mcpfold — the open-source MCP config manager',
+      'mcpfold’s mission and open-source model: one neutral mcp.config.jsonc format for every client, MIT-licensed CLI, an optional self-hostable cloud, and how to contribute an adapter.',
+      '/about',
+    );
+  }
+  {
+    const legal = p.startsWith('/') ? legalDocById(p.slice(1)) : undefined;
+    if (legal && legal.path === p) {
+      return meta(legal.metaTitle, legal.metaDescription, legal.path);
+    }
+  }
+  if (p === '/community') {
+    return meta(
+      'Community & support — mcpfold',
+      'Get help in GitHub Discussions, report a bug with the redaction-safe `mcpfold diagnose` bundle, request or contribute a client adapter, and find the contributing guide.',
+      '/community',
     );
   }
   if (p === '/blog') {
@@ -108,6 +208,28 @@ export function resolveMeta(path: string): RouteMeta {
       '/changelog',
     );
   }
+  if (p === '/roadmap') {
+    return meta(
+      'Roadmap — mcpfold',
+      'Where mcpfold is headed: what has shipped, what is next, and what we are exploring — rendered from the project’s single roadmap source. Nothing here is a dated commitment.',
+      '/roadmap',
+    );
+  }
+
+  if (p === '/brand') {
+    return meta(
+      'Brand & press kit — mcpfold',
+      'Logo and wordmark downloads, color tokens, the product one-liner, and usage guidelines for representing mcpfold — an independent, open-source project.',
+      '/brand',
+    );
+  }
+  if (p === '/404') {
+    return meta(
+      'Page not found — mcpfold',
+      'This page doesn’t exist. Here’s the way back.',
+      '/404',
+    );
+  }
 
   // Unknown route: keep a sane, non-empty default rather than an empty <title>.
   return meta('mcpfold', HOME_DESC, p);
@@ -121,10 +243,25 @@ export function allRoutes(): string[] {
     '/directory',
     '/pricing',
     '/security',
+    '/about',
+    '/community',
+    '/brand',
     '/blog',
     '/changelog',
+    '/guides',
+    '/features',
+    ...FEATURES.map((f) => `/features/${f.id}`),
+    '/use-cases',
+    ...USE_CASES.map((u) => `/use-cases/${u.id}`),
+    ...LEGAL_DOCS.map((d) => d.path),
+    '/roadmap',
+    '/glossary',
+    '/compare',
     ...categoriesWithPages().map((c) => `/directory/category/${c.id}`),
     ...DIRECTORY.map((e) => `/directory/${e.id}`),
+    ...GUIDE_CLIENTS.map((c) => `/guides/${c.id}`),
+    ...GLOSSARY.map((t) => `/glossary/${t.id}`),
+    ...COMPARISONS.map((c) => `/compare/${c.id}`),
     ...POSTS.map((p) => `/blog/${p.slug}`),
   ];
 }

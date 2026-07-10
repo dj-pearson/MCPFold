@@ -131,6 +131,13 @@ jobs:
           pnpm demo:record
           git diff --exit-code demo/mcpfold.cast docs/assets/demo.svg apps/site/public/demo.svg
 
+      # Per-client setup guides (S15.5) are generated from live adapter facts — regenerate and fail
+      # if the committed data drifted, so a guide can never lie about a client's config path/secrets.
+      - name: Client setup guides are up to date (no drift from adapters)
+        run: |
+          pnpm --filter @mcpfold/site guides:gen
+          git diff --exit-code apps/site/src/guides/guides.data.ts
+
   # Database integration gate (S6.1): stand up the CI Supabase database from the same
   # compose developers use, apply the migrations with the psql runner, and smoke-test the
   # result (which also asserts the runner is idempotent). A broken migration fails here

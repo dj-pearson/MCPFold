@@ -1,71 +1,61 @@
 /**
- * The keyword → page map (S15.3). Documents the single focus keyword cluster each core page targets,
- * so on-page copy, titles, and the internal-link graph stay coherent as the site grows. This is the
- * source of intent; the actual copy lives in each page + `meta.ts`.
+ * In-repo keyword → page map (S15.8) — the single source of truth for rank & GEO tracking.
  *
- * `status: 'live'` pages exist today; `status: 'planned'` pages ship with their own story (guides
- * S15.5, glossary S15.6) — the homepage links to them once they're live.
+ * Every target query the site is trying to win is listed here against the ONE canonical page meant to
+ * rank for it, with its rough monthly search volume and intent. This drives:
+ *   - the documented rank-check cadence (docs/seo-measurement.md reads these pairs),
+ *   - the GEO prompt checklist (which head terms to ask assistants about),
+ *   - a build-time guard: every `page` here must be a real, prerendered route (see gen-seo.mjs), so a
+ *     renamed or removed page can never leave a tracked keyword pointing at a 404.
+ *
+ * Pages that ship in later pSEO stories (guides/glossary/compare) get their keyword rows added when
+ * those routes land — the sitemap/OG machinery already covers them generically.
  */
 
+export type SearchIntent = 'informational' | 'commercial' | 'transactional' | 'navigational';
+
 export interface KeywordTarget {
-  path: string;
-  /** The primary keyword cluster this page should rank for and read as the answer to. */
+  /** The target query. */
   keyword: string;
-  /** Supporting terms to weave into the copy. */
-  related: string[];
-  status: 'live' | 'planned';
+  /** The ONE canonical page meant to rank for it — must be a real prerendered route. */
+  page: string;
+  /** Rough monthly search volume (order-of-magnitude planning input, not a promise). */
+  volume: number;
+  intent: SearchIntent;
+  /** Whether this term is a priority GEO (AI-answer) citation target. */
+  geo?: boolean;
 }
 
-export const KEYWORD_MAP: KeywordTarget[] = [
+export const KEYWORD_MAP: readonly KeywordTarget[] = [
+  { keyword: 'mcp config manager', page: '/', volume: 200, intent: 'commercial', geo: true },
+  { keyword: 'manage mcp servers', page: '/', volume: 400, intent: 'commercial', geo: true },
+  { keyword: 'mcp config', page: '/', volume: 1600, intent: 'informational', geo: true },
+  { keyword: 'mcp server directory', page: '/directory', volume: 900, intent: 'commercial' },
   {
-    path: '/',
-    keyword: 'MCP config',
-    related: [
-      'one config for every MCP client',
-      'manage MCP servers',
-      'sync MCP config across clients',
-    ],
-    status: 'live',
+    keyword: 'best mcp servers',
+    page: '/directory',
+    volume: 2400,
+    intent: 'commercial',
+    geo: true,
   },
   {
-    path: '/install',
-    keyword: 'install mcpfold',
-    related: ['mcpfold npm', 'mcpfold Homebrew', 'MCP config CLI'],
-    status: 'live',
+    keyword: 'database mcp server',
+    page: '/directory/category/database',
+    volume: 700,
+    intent: 'commercial',
   },
-  {
-    path: '/directory',
-    keyword: 'MCP server directory',
-    related: ['find MCP servers', 'add an MCP server', 'MCP registry'],
-    status: 'live',
-  },
-  {
-    path: '/pricing',
-    keyword: 'mcpfold pricing',
-    related: ['MCP config free', 'MCP team config', 'self-host MCP cloud'],
-    status: 'live',
-  },
-  {
-    path: '/docs/coverage',
-    keyword: 'MCP client support',
-    related: ['Claude Code MCP config', 'VS Code MCP config', 'Cursor MCP config'],
-    status: 'live',
-  },
-  {
-    path: '/guides',
-    keyword: 'add MCP servers to <client>',
-    related: ['per-client MCP setup', 'Claude Desktop MCP setup', 'Windsurf MCP setup'],
-    status: 'planned', // S15.5
-  },
-  {
-    path: '/glossary',
-    keyword: 'MCP terms',
-    related: ['what is MCP', 'what is an MCP server', 'stdio vs streamable-http'],
-    status: 'planned', // S15.6
-  },
+  { keyword: 'install mcpfold', page: '/install', volume: 50, intent: 'transactional' },
+  { keyword: 'mcpfold', page: '/', volume: 100, intent: 'navigational' },
+  { keyword: 'mcp secrets', page: '/security', volume: 300, intent: 'informational' },
+  { keyword: 'mcp config manager pricing', page: '/pricing', volume: 40, intent: 'commercial' },
 ];
 
-/** The primary keyword for a path, or undefined if it isn't mapped. */
-export function keywordFor(path: string): string | undefined {
-  return KEYWORD_MAP.find((k) => k.path === path)?.keyword;
+/** The distinct set of canonical pages any tracked keyword points at (for the build-time guard). */
+export function mappedPaths(): string[] {
+  return [...new Set(KEYWORD_MAP.map((k) => k.page))];
+}
+
+/** The primary tracked keyword for a page, if any (first match in declaration order). */
+export function keywordFor(page: string): string | undefined {
+  return KEYWORD_MAP.find((k) => k.page === page)?.keyword;
 }

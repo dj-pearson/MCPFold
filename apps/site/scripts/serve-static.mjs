@@ -40,6 +40,14 @@ function resolve(urlPath) {
 createServer((req, res) => {
   const file = resolve(req.url ?? '/');
   if (!file) {
+    // Mirror Cloudflare Pages: serve the branded 404.html (S13.17) with a real 404 status when an
+    // unmatched path is requested, falling back to plain text if it hasn't been generated.
+    const notFound = join(dist, '404.html');
+    if (existsSync(notFound)) {
+      res.writeHead(404, { 'content-type': TYPES['.html'] });
+      createReadStream(notFound).pipe(res);
+      return;
+    }
     res.writeHead(404, { 'content-type': 'text/plain' });
     res.end('404');
     return;
