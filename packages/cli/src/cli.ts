@@ -450,9 +450,14 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       .option('--url <url>', 'remote server URL (creates an http server)')
       .option('--package <spec>', 'npm package spec (creates a stdio npx server)')
       .option('--from-registry', 'resolve <name> from the official MCP registry (pinned, ref-only)')
+      .option('--from-mcpb', 'install from an .mcpb bundle (<name> is a file path or https URL)')
+      .option(
+        '--integrity <sha256>',
+        'expected .mcpb SHA-256 (hex or SRI) to verify before install',
+      )
       .option(
         '--secret-scheme <s>',
-        'scheme for registry secret refs: env|dotenv|infisical|keychain|op',
+        'scheme for registry/mcpb secret refs: env|dotenv|infisical|keychain|op',
       )
       .option(
         '--as <name>',
@@ -470,6 +475,8 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
         url?: string;
         package?: string;
         fromRegistry?: boolean;
+        fromMcpb?: boolean;
+        integrity?: string;
         secretScheme?: 'env' | 'dotenv' | 'infisical' | 'keychain' | 'op';
         as?: string;
         transport?: 'http' | 'sse' | 'stdio';
@@ -491,6 +498,8 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
               url: opts.url,
               package: opts.package,
               fromRegistry: opts.fromRegistry,
+              fromMcpb: opts.fromMcpb,
+              mcpbIntegrity: opts.integrity,
               secretScheme: opts.secretScheme,
               as: opts.as,
               transport: opts.transport,

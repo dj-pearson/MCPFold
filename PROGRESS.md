@@ -990,3 +990,36 @@ in the prerender Playwright config, ignored by the dev-server config) asserts an
 actually GET 200 as SVG), colors, one-liner, and no-endorsement copy, that /brand is in the
 sitemap+footer while /404 is not, and that the `_redirects` legacy map ships without the old SPA
 fallback — 13/13 prerender tests pass. Site typecheck and repo-wide `format:check` green.
+## S17.8 — MCPB bundle support as an install source
+
+Started/done: 2026-07-10. `mcpfold add --from-mcpb <file|url>` installs from an MCPB bundle (`.mcpb`,
+renamed from DXT) — a ZIP whose root `manifest.json` declares a server. mcpfold parses it into a
+**canonical, ref-only** stdio server; it does not extract or run the bundle (the MCP client's job) —
+it maps, verifies, and surfaces. Format verified against modelcontextprotocol/mcpb MANIFEST.md v0.3 +
+`src/node/sign.ts` (July 2026).
+
+- **`registry/mcpb.ts`** (new): `parseMcpbManifest` (fflate unzip — tolerates the appended signature
+  block), `mapMcpbManifest` (mcp_config → command/args/env with this OS's `platform_overrides`;
+  `${user_config.KEY}` rewritten — `sensitive:true` → a `${keychain:…}` ref (or `--secret-scheme`),
+  **never a value**; non-sensitive → its default; bundle runtime vars `${__dirname}`/`${HOME}` left
+  verbatim + flagged), `inspectMcpbSignature` (reads the `MCPB_SIG_V1 <len> DER MCPB_SIG_END` block →
+  **unsigned / self-signed (issuer CN == subject CN) / signed**, surfacing publisher+issuer via
+  node-forge), and `verifyMcpbIntegrity` (whole-file SHA-256 vs a registry `fileSha256`, hex or SRI).
+  An unsupported `server.type` fails with a clear list of what's supported.
+- **`add.ts`**: `--from-mcpb` + `--integrity <sha256>` wired; the name is derived from the manifest;
+  the signature status + mapping warnings are surfaced in the output; a bad integrity hash refuses
+  the install before touching the config. New deps `fflate` + `node-forge` (CLI only).
+
+Tests: `mcpb.test.ts` (12) — mapping (keychain ref, platform override, chosen scheme, runtime-var
+warning, unsupported-type error), parse-from-real-ZIP, signature (unsigned/self-signed/signed via a
+node-forge-signed fixture), integrity match/mismatch, and a `runAdd --from-mcpb` integration (ref-only
+server added, signature surfaced, integrity refusal). `docs/registry.md` documents the flow; the
+shell-completion snapshot picked up the two new flags.
+
+`verify_all` green (eslint + core-purity, typecheck ×10, `pnpm -r test`, `pnpm -r build`, Prettier,
+docs:build; demo unchanged). CLI 263 tests pass. Same pre-existing Windows-only red
+(`e2e/deploy-env.test.ts`; passes on CI ubuntu).
+
+**Follow-ups:** full OS-trust-store chain validation for "signed" (we classify self-signed vs
+CA-issued and surface the signer; we don't execute the bundle, so we don't gate on a trusted chain);
+`user_config` `multiple:true` array expansion into repeated args (single-value substitution ships).

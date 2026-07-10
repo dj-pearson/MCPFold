@@ -49,6 +49,37 @@ Registry `server.json` (schema 2025-12-11) maps ~1:1 onto the canonical format:
 
 A listing with both packages and remotes prefers the **package** (the pinned/integrity path).
 
+## Add from an MCPB bundle (`--from-mcpb`) — S17.8
+
+An [MCPB bundle](https://github.com/modelcontextprotocol/mcpb) (`.mcpb`, renamed from DXT) is a ZIP
+whose root `manifest.json` declares a server + its launch config. mcpfold parses that into a
+**canonical, ref-only** stdio server — it does not extract or run the bundle (that's the MCP
+client's job); it maps, verifies, and surfaces.
+
+```bash
+mcpfold add ./weather.mcpb --from-mcpb
+mcpfold add https://github.com/owner/repo/releases/download/v1/weather.mcpb --from-mcpb \
+  --integrity <sha256>          # verify the download against a registry fileSha256 first
+mcpfold add ./weather.mcpb --from-mcpb --secret-scheme op   # choose the ref scheme
+```
+
+What the mapping does:
+
+- **`mcp_config` → command/args/env**, applying this OS's `platform_overrides`.
+- **`user_config` → refs.** A field with `sensitive: true` becomes a `${keychain:<key>}` reference
+  (or your `--secret-scheme`) — **never a value on disk**. A non-sensitive field with a `default`
+  fills it in; without one you get an `${env:KEY}` ref and a warning.
+- **Bundle runtime variables** (`${__dirname}`, `${HOME}`, …) are preserved verbatim and flagged —
+  they resolve only when an MCPB-aware client runs the extracted bundle.
+- **Unsupported server types** (`server.type` other than `node`/`python`/`binary`/`uv`) fail with a
+  clear error naming what IS supported.
+
+**Signature + integrity.** mcpfold reads the appended PKCS#7 signature and reports the bundle as
+**signed** (CA-issued), **self-signed**, or **unsigned** — so you know what you're installing (it
+surfaces the publisher; it does not gate execution). With `--integrity <sha256>` (a registry
+`fileSha256`) it verifies the whole-file SHA-256 **before** touching your config and refuses a
+mismatch.
+
 ## Subregistries and mirrors
 
 The registry base URL is overridable for a subregistry or self-hosted mirror:

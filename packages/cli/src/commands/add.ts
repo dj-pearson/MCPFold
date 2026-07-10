@@ -7,6 +7,13 @@ import { findConfigPath } from '../util/config.js';
 import { checkServer, describeViolation, loadPolicy } from '../util/policy.js';
 import { mapRegistryServer, type SecretScheme } from '../registry/map.js';
 import { httpRegistryClient, type RegistryClient } from '../registry/client.js';
+import {
+  inspectMcpbSignature,
+  mapMcpbManifest,
+  type McpbSignature,
+  parseMcpbManifest,
+  verifyMcpbIntegrity,
+} from '../registry/mcpb.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import type { CommandOutput } from '../output/render.js';
 
@@ -33,6 +40,12 @@ export interface AddOptions {
   dryRun?: boolean;
   /** Resolve `<name>` from the official MCP registry into a pinned, ref-only entry (S17.7). */
   fromRegistry?: boolean;
+  /** Install from an `.mcpb` bundle (S17.8): `<name>` is a local file path or an https URL. */
+  fromMcpb?: boolean;
+  /** Expected SHA-256 (hex or SRI) to verify the `.mcpb` against — e.g. a registry `fileSha256`. */
+  mcpbIntegrity?: string;
+  /** Injectable bundle loader (S17.8); defaults to reading the file / fetching the URL. */
+  loadBundle?: (source: string) => Promise<Uint8Array>;
   /** Secret scheme for refs synthesized from registry `isSecret` env vars (default prompts, else env). */
   secretScheme?: SecretScheme;
   /** Local config key to store a registry server under (defaults to the name's last path segment). */
@@ -66,6 +79,24 @@ export interface AddData {
   server: ServerConfig;
   configPath: string;
   wrote: boolean;
+  /** MCPB bundle signature status (S17.8), surfaced when installed via `--from-mcpb`. */
+  signature?: McpbSignature;
+  /** MCPB mapping warnings (S17.8) — unresolved runtime vars, env the user still owes. */
+  warnings?: string[];
+}
+
+/** Load an `.mcpb` from a local path or an https URL (S17.8). */
+async function loadMcpbBundle(source: string): Promise<Uint8Array> {
+  if (/^https?:\/\//.test(source)) {
+    const res = await fetch(source);
+    if (!res.ok) throw new UsageError(`Could not download .mcpb (${res.status}) from ${source}.`);
+    return new Uint8Array(await res.arrayBuffer());
+  }
+  try {
+    return readFileSync(source);
+  } catch (e) {
+    throw new UsageError(`Could not read .mcpb bundle at ${source}: ${(e as Error).message}`);
+  }
 }
 
 function defaultPrompt(): Prompt {
@@ -93,21 +124,30 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
   if (!loaded.ok) {
     throw new UsageError(`Config at ${configPath} is invalid; run \`mcpfold doctor\` first.`);
   }
-  // The config key: for a registry add, derive a clean local name from the reverse-DNS name.
-  const configKey = options.fromRegistry
-    ? (options.as ?? deriveLocalName(options.name))
-    : options.name;
-  if (loaded.config.servers[configKey]) {
-    throw new UsageError(`A server named "${configKey}" already exists.`, {
-      hint: 'Pick a different name (--as <name>) or edit the config directly.',
-    });
-  }
-
   const prompt = options.prompt ?? (needsPrompting(options) ? defaultPrompt() : undefined);
   const tags = options.tags ?? [];
   let server: ServerConfig;
+  let signature: McpbSignature | undefined;
+  let warnings: string[] | undefined;
+  let derivedName = options.name;
 
-  if (options.fromRegistry) {
+  if (options.fromMcpb) {
+    // S17.8: parse the .mcpb → a canonical, ref-only stdio server; verify integrity + surface signature.
+    const bundle = await (options.loadBundle ?? loadMcpbBundle)(options.name);
+    if (options.mcpbIntegrity && !verifyMcpbIntegrity(bundle, options.mcpbIntegrity)) {
+      throw new UsageError(
+        `.mcpb integrity check failed — its SHA-256 does not match the expected ${options.mcpbIntegrity}.`,
+        { hint: 'The bundle may be corrupted or tampered with; do not install it.' },
+      );
+    }
+    const manifest = parseMcpbManifest(bundle);
+    signature = inspectMcpbSignature(bundle);
+    const mapped = mapMcpbManifest(manifest, { secretScheme: options.secretScheme ?? 'keychain' });
+    server = mapped.server;
+    server.tags = tags;
+    warnings = mapped.warnings.length > 0 ? mapped.warnings : undefined;
+    derivedName = manifest.name;
+  } else if (options.fromRegistry) {
     // S17.7: resolve the registry listing into a pinned, integrity-hashed, ref-only server.
     const client = options.registry ?? httpRegistryClient();
     let scheme = options.secretScheme;
@@ -158,6 +198,17 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
     }
   }
 
+  // The config key: for registry/mcpb adds, derive a clean local name from the reverse-DNS name.
+  const configKey =
+    options.fromRegistry || options.fromMcpb
+      ? (options.as ?? deriveLocalName(derivedName))
+      : options.name;
+  if (loaded.config.servers[configKey]) {
+    throw new UsageError(`A server named "${configKey}" already exists.`, {
+      hint: 'Pick a different name (--as <name>) or edit the config directly.',
+    });
+  }
+
   // Org policy (S18.3): refuse to add a server the org policy blocks — before it ever enters config.
   const violation = checkServer(
     loadPolicy(options.cwd, options.osContext ?? realOsContext()),
@@ -184,22 +235,39 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
     );
   }
 
+  // S17.8: surface the bundle's signature status + any mapping caveats.
+  const sigLine = signature ? `\n${describeSignature(signature)}` : '';
+  const warnLines = warnings?.length ? `\n${warnings.map((w) => `  ⚠ ${w}`).join('\n')}` : '';
+
   if (options.dryRun) {
     return {
-      data: { name: configKey, server, configPath, wrote: false },
-      human: `Would add "${configKey}" to ${configPath}:\n\n${newText}`,
+      data: { name: configKey, server, configPath, wrote: false, signature, warnings },
+      human: `Would add "${configKey}" to ${configPath}:${sigLine}${warnLines}\n\n${newText}`,
     };
   }
 
   atomicWrite(configPath, newText);
   return {
-    data: { name: configKey, server, configPath, wrote: true },
-    human: `Added "${configKey}" (${server.transport}) to ${configPath}. Run \`mcpfold sync\` to fold it out.`,
+    data: { name: configKey, server, configPath, wrote: true, signature, warnings },
+    human: `Added "${configKey}" (${server.transport}) to ${configPath}.${sigLine}${warnLines}\nRun \`mcpfold sync\` to fold it out.`,
   };
+}
+
+/** One-line human summary of an MCPB signature status (S17.8). */
+function describeSignature(sig: McpbSignature): string {
+  if (sig.status === 'unsigned')
+    return '  ⚠ Bundle is UNSIGNED — its integrity/author cannot be verified.';
+  const who = sig.publisher ? ` by "${sig.publisher}"` : '';
+  if (sig.status === 'self-signed') {
+    return `  ⚠ Bundle is SELF-SIGNED${who} (issuer not a trusted CA) — verify the publisher yourself.`;
+  }
+  return `  ✓ Bundle is SIGNED${who}${sig.issuer ? ` (issuer: ${sig.issuer})` : ''}.`;
 }
 
 function needsPrompting(options: AddOptions): boolean {
   // A registry add only needs input to pick a secret scheme (skipped when --secret-scheme is set).
   if (options.fromRegistry) return !options.secretScheme;
+  // MCPB maps non-interactively (defaults + keychain refs); no prompt needed.
+  if (options.fromMcpb) return false;
   return !options.url && !options.package;
 }
