@@ -38,7 +38,7 @@ export {
   requireAdapter,
 } from './registry.js';
 
-// Concrete client adapters (S2.2–S2.7, S14.1, S19.1)
+// Concrete client adapters (S2.2–S2.7, S14.1, S19.1, S19.2)
 export { cursorAdapter } from './cursor.js';
 export { claudeDesktopAdapter } from './claude-desktop.js';
 export { claudeCodeAdapter } from './claude-code.js';
@@ -54,4 +54,7 @@ export { rooCodeAdapter } from './roo-code.js';
 export { gooseAdapter } from './goose.js';
 export { codexCliAdapter } from './codex-cli.js';
 export { lmStudioAdapter } from './lm-studio.js';
+export { warpAdapter } from './warp.js';
+export { opencodeAdapter } from './opencode.js';
+export { copilotCliAdapter } from './copilot-cli.js';
 export { ALL_ADAPTERS, registerAll } from './all.js';

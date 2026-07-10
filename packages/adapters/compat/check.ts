@@ -1,6 +1,3 @@
-import { parse as parseYaml } from 'yaml';
-import { parse as parseToml } from 'smol-toml';
-
 /**
  * Live-client compatibility harness (S14.2). Adapters render to committed fixtures; if a client
  * changes its on-disk config format upstream, mcpfold can silently produce a file the client no
@@ -11,17 +8,19 @@ import { parse as parseToml } from 'smol-toml';
  * Pure + injectable: `runCompatCheck` takes the rendered output per client and the samples, and an
  * optional `fetchLatest` for clients that publish a schema (skips cleanly when it's unavailable).
  */
+import { parse as parseYaml } from 'yaml';
+import { parse as parseToml } from 'smol-toml';
 
-/** On-disk config format of a client (S19.2 adds non-JSON clients). Defaults to `json`. */
-export type CompatFormat = 'json' | 'yaml' | 'toml';
+/** On-disk config format of a client file — drives which parser the shape check uses. */
+export type ConfigFormat = 'json' | 'yaml' | 'toml';
 
 export interface CompatSample {
   client: string;
   /** Where the accepted-format sample comes from. `url` samples are pulled live; `captured` ones
    *  are a versioned snapshot refreshed by hand (see compat/README.md). */
   source: { type: 'captured' | 'url'; url?: string; capturedAt: string };
-  /** The client's config file format. Omit for JSON (the default). */
-  format?: CompatFormat;
+  /** The client's on-disk config format. Defaults to `json`; Goose is `yaml`, Codex CLI `toml`. */
+  format?: ConfigFormat;
   /** Top-level keys the client's config accepts. */
   rootKeys: string[];
   /** The root key whose values are the per-server entries. */
@@ -30,8 +29,11 @@ export interface CompatSample {
   entryKeys: string[];
 }
 
-/** Parse a rendered client config of any supported format into a plain object. */
-function parseConfig(rendered: string, format: CompatFormat): Record<string, unknown> {
+/** Parse rendered client config text by its on-disk format (JSON / YAML / TOML). */
+export function parseByFormat(
+  rendered: string,
+  format: ConfigFormat = 'json',
+): Record<string, unknown> {
   if (format === 'yaml') return (parseYaml(rendered) ?? {}) as Record<string, unknown>;
   if (format === 'toml') return (parseToml(rendered) ?? {}) as Record<string, unknown>;
   return JSON.parse(rendered) as Record<string, unknown>;
@@ -51,9 +53,9 @@ export interface CompatResult {
 export function shapeOf(
   rendered: string,
   serverContainer: string,
-  format: CompatFormat = 'json',
+  format: ConfigFormat = 'json',
 ): { rootKeys: string[]; entryKeys: string[] } {
-  const json = parseConfig(rendered, format);
+  const json = parseByFormat(rendered, format);
   const rootKeys = Object.keys(json).sort();
   const container = (json[serverContainer] ?? {}) as Record<string, unknown>;
   const entryKeys = new Set<string>();
@@ -67,7 +69,7 @@ export function shapeOf(
 
 /** Compare one adapter's rendered output against the client's accepted-format sample. */
 export function checkAdapter(rendered: string, sample: CompatSample): CompatResult {
-  const shape = shapeOf(rendered, sample.serverContainer, sample.format ?? 'json');
+  const shape = shapeOf(rendered, sample.serverContainer, sample.format);
   const divergence: string[] = [];
 
   for (const k of shape.rootKeys.filter((x) => !sample.rootKeys.includes(x))) {

@@ -10,11 +10,21 @@ import { fileURLToPath } from 'node:url';
 import { loadConfigOrThrow, resolveProfile, type ResolvedServer } from '@mcpfold/core';
 import { ALL_ADAPTERS } from '../src/all.js';
 import type { OsContext } from '../src/types.js';
-import { type CompatSample, runCompatCheck, shapeOf } from './check.js';
+import {
+  type CompatSample,
+  type ConfigFormat,
+  parseByFormat,
+  runCompatCheck,
+  shapeOf,
+} from './check.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const samplesDir = join(here, 'samples');
 const linux: OsContext = { platform: 'linux', home: '/home/dev', env: {} };
+
+/** Non-JSON client config formats (S19.2). Everything else renders JSON. */
+const FORMAT_BY_CLIENT: Record<string, ConfigFormat> = { goose: 'yaml', 'codex-cli': 'toml' };
+const formatOf = (client: string): ConfigFormat => FORMAT_BY_CLIENT[client] ?? 'json';
 
 const config = loadConfigOrThrow(
   readFileSync(join(here, '..', 'test', 'fixtures', 'canonical.jsonc'), 'utf8'),
@@ -26,8 +36,8 @@ const serversFor = (client: string): ResolvedServer[] =>
   }));
 
 /** The root key whose values are the per-server entries (mcpServers / servers / context_servers). */
-function containerOf(rendered: string): string {
-  const json = JSON.parse(rendered) as Record<string, unknown>;
+function containerOf(rendered: string, format: ConfigFormat = 'json'): string {
+  const json = parseByFormat(rendered, format);
   for (const [k, v] of Object.entries(json)) {
     if (v && typeof v === 'object' && !Array.isArray(v)) {
       const vals = Object.values(v as Record<string, unknown>);
@@ -48,11 +58,13 @@ if (process.argv.includes('--capture')) {
   mkdirSync(samplesDir, { recursive: true });
   for (const adapter of ALL_ADAPTERS) {
     const contents = rendered[adapter.id]!;
-    const container = containerOf(contents);
-    const shape = shapeOf(contents, container);
+    const format = formatOf(adapter.id);
+    const container = containerOf(contents, format);
+    const shape = shapeOf(contents, container, format);
     const sample: CompatSample = {
       client: adapter.id,
       source: { type: 'captured', capturedAt: process.env.CAPTURE_DATE ?? '2026-07-08' },
+      ...(format === 'json' ? {} : { format }),
       rootKeys: shape.rootKeys,
       serverContainer: container,
       entryKeys: shape.entryKeys,

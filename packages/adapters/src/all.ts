@@ -14,6 +14,9 @@ import { rooCodeAdapter } from './roo-code.js';
 import { gooseAdapter } from './goose.js';
 import { codexCliAdapter } from './codex-cli.js';
 import { lmStudioAdapter } from './lm-studio.js';
+import { warpAdapter } from './warp.js';
+import { opencodeAdapter } from './opencode.js';
+import { copilotCliAdapter } from './copilot-cli.js';
 import type { ClientAdapter } from './types.js';
 
 /** Every built-in adapter, in a stable order. */
@@ -33,6 +36,9 @@ export const ALL_ADAPTERS: readonly ClientAdapter[] = [
   gooseAdapter,
   codexCliAdapter,
   lmStudioAdapter,
+  warpAdapter,
+  opencodeAdapter,
+  copilotCliAdapter,
 ];
 
 /** Register every built-in adapter into the shared registry. Idempotent. */

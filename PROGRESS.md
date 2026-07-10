@@ -545,41 +545,44 @@ overstatement.
 
 ---
 
-## S19.2 (partial — wave 2a) — Adapter wave 2: bespoke formats
+## S19.2 — Adapter wave 2: bespoke formats (Goose, Codex CLI, LM Studio, Warp, opencode, Copilot CLI)
 
-Started/done: 2026-07-09. Shipped the **bespoke non-JSON** thesis of S19.2 plus the reusable
-preservation architecture. Matrix 12 → **15**.
+Started/done: 2026-07-09. Added six new client adapters — the matrix goes **12 → 18** — including
+the first non-JSON (YAML/TOML) and first shared-config-file (merge, not clobber) adapters. Every
+format was verified against current primary docs at implementation time (six parallel doc-research
+passes; dates + sources recorded in `docs/coverage.md`), and none were deferred — every researched
+client had a stable, documented on-disk file.
 
-**Shipped (3), each verified against primary docs (July 2026; records in `docs/coverage.md`):**
+- **Shared-factory adapters** (dedicated JSON files, full replace, `mcpServers` root): **LM Studio**
+  (`~/.lmstudio/mcp.json`, Cursor notation), **Warp** (`~/.warp/.mcp.json` user + project,
+  file-based `.mcp.json`), **Copilot CLI** (`~/.copilot/mcp-config.json`, honors `COPILOT_HOME`,
+  `includeType` so entries carry `type: stdio|http`).
+- **Bespoke adapters** (merge into a file the client shares with non-MCP settings — preserve every
+  unmanaged key): **Goose** (YAML `config.yaml`, `extensions` map, `cmd`/`uri`, keeps builtin
+  extensions + comments), **Codex CLI** (TOML `config.toml`, `[mcp_servers.*]`, honors `CODEX_HOME`;
+  preserves other tables — comments not preserved, the honest TOML limit), **opencode** (JSON `mcp`
+  key, `command` **array** + `environment`, XDG path even on Windows; comment-preserving jsonc edit).
+- **Framework**: `render()` gained an optional `existing?: string` so shared-config adapters merge;
+  `renderWithStrategy` + `sync` thread the on-disk contents through (read BEFORE render). Dedicated-
+  file adapters ignore it. New deps `yaml` + `smol-toml` live in `packages/adapters` only — **core
+  purity gate stays green** (`packages/core` still parser/I-O-free). `CLIENT_IDS` 12 → 18; JSON
+  schema regenerated.
+- **Evidence surfaces**: compat harness made format-aware (`shapeOf`/`containerOf` parse by
+  `format: json|yaml|toml`); six new compat samples captured (all 18 compatible). `docs/coverage.md`
+  matrix rows + per-client verified-July-2026 notes + shared-config `‡` footnote + wave-2 roadmap;
+  site "supported clients" list + FAQ (12 → 18, YAML/TOML called out); `adapter_request.yml` refreshed
+  (format + shared-file + updated root-key choices).
 
-- **Goose** (`goose`) — YAML, `~/.config/goose/config.yaml`, root `extensions:`; remote via
-  `type: streamable_http` + `uri`.
-- **Codex CLI** (`codex-cli`) — TOML, `~/.codex/config.toml` (`CODEX_HOME`), `[mcp_servers.<name>]`
-  snake_case tables.
-- **LM Studio** (`lm-studio`) — JSON, `~/.lmstudio/mcp.json`, Cursor-compatible `mcpServers`.
+Tests: per-adapter suites for all six (per-OS paths, render→parse round-trip; merge + idempotency for
+Goose/Codex/opencode), matrix goldens (18, incl. `goose.yaml` + `codex-cli.toml`), compat format-aware
+tests, `detect-clients` wave-2 coverage, and a `runSync` integration test proving a Goose fold
+preserves the user's non-MCP `config.yaml` keys/comments end-to-end.
 
-**New architecture — unmanaged-key preservation.** Extended `ClientAdapter.render(servers, ctx,
-existing?)`; `renderWithStrategy` now reads the on-disk file and passes it, so shared-file adapters
-(Goose, Codex — files that also hold the client's own settings) **merge the managed section in and
-preserve every unmanaged key** (and comments, for YAML via the `yaml` Document API). Round-trip +
-preservation are unit-tested. Parse deps (`yaml`, `smol-toml`) live only in `packages/adapters` —
-**core purity stays green**.
+`verify_all` green (eslint + core-purity, typecheck ×10, `pnpm -r test`, `pnpm -r build`, Prettier,
+docs:build). Adapters 140 / core 92 / cli 251 pass. Pre-existing, unrelated red on Windows only:
+`e2e/deploy-env.test.ts` (Git-Bash mangles the `scripts/gen-cloud-env.sh` path — fails identically on
+a clean tree, passes on CI ubuntu).
 
-**Deferred, with rationale (doc-verified, not speculative):**
-
-- **Warp** — permanent-for-now: its authoritative MCP store is a **synced cloud DB via the UI**, not
-  a canonical file; a file adapter would be non-authoritative and silently overridden.
-- **opencode + GitHub Copilot CLI** — next wave (2b); both documented + stable JSON, they land next
-  reusing the preservation mechanism. (This is why **S19.2 stays `todo`** — wave 2b completes it.)
-
-Integration: core `CLIENT_IDS` +3 (+ generated JSON Schema regenerated), `all.ts`/`index.ts`
-registration, `detectClients` (adapter-driven, auto), compat harness extended for YAML/TOML +
-3 samples, matrix goldens (`goose.yaml`, `codex-cli.toml`, `lm-studio.json`), site client count
-12 → 15 (FAQ + homepage list), coverage.md.
-
-`verify_all` green (lint, typecheck ×8, `pnpm -r test`, `pnpm -r build`, Prettier); adapters 112,
-compat harness 15/15 compatible, site e2e green. (token-store DPAPI test is a pre-existing
-parallel-run flake — passes in isolation.)
-
-**Remaining for S19.2 done:** opencode + Copilot CLI adapters (wave 2b) + their compat samples,
-goldens, and coverage rows.
+**Follow-ups:** S19.4 (native-interpolation secrets) can replace the `shim` default for Goose
+(`env_keys`), Continue (`${{ secrets }}`), and opencode variable substitution; S19.5 (compat harness
+v2) can add live evidence + a public compat matrix for the YAML/TOML clients.

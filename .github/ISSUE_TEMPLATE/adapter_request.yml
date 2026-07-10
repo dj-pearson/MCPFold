@@ -7,18 +7,38 @@ body:
       value: |
         Adding a client is a **one-PR** contribution — see
         [docs/adapters.md](../../docs/adapters.md) and run `mcpfold scaffold-adapter <name>`.
+        mcpfold already folds to **18 clients** (JSON, YAML, and TOML formats) — check
+        [docs/coverage.md](../../docs/coverage.md) first so we don't duplicate one.
   - type: input
     id: client
     attributes:
       label: Client name
-      placeholder: 'e.g. Continue, Cline, JetBrains AI'
+      placeholder: 'e.g. Cody, Kiro, or any client not already in docs/coverage.md'
     validations:
       required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: On-disk config format
+      options:
+        - JSON (like Cursor / VS Code / Warp)
+        - YAML (like Goose)
+        - TOML (like Codex CLI)
+        - other / unknown
   - type: input
     id: root-key
     attributes:
-      label: Native config root key
-      placeholder: 'mcpServers | servers | context_servers | other'
+      label: Native config root/section key
+      placeholder: 'mcpServers | servers | context_servers | extensions | mcp | mcp_servers | other'
+  - type: dropdown
+    id: shared-file
+    attributes:
+      label: Does that file also hold non-MCP client settings?
+      description: If yes, the adapter must merge (preserve unmanaged keys) rather than replace — like Goose / Codex CLI / opencode.
+      options:
+        - 'No — a dedicated MCP config file (full replace is safe)'
+        - 'Yes — shared with model/theme/other settings (merge required)'
+        - unknown
   - type: textarea
     id: paths
     attributes:

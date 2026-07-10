@@ -6,23 +6,26 @@ prioritized. Adding a client is a one-PR job — see [Adapters](./adapters.md) a
 
 ## Supported clients
 
-| Client         | Config root              | Scopes        | Secret strategy | Restart on change | Remote transport                 |
-| -------------- | ------------------------ | ------------- | --------------- | ----------------- | -------------------------------- |
-| Claude Code    | `mcpServers`             | user          | shim            | no                | native `type`+`url`              |
-| Claude Desktop | `mcpServers`             | user          | shim            | **yes**           | shim (stdio-only)†               |
-| Cursor         | `mcpServers`             | user, project | shim            | no                | native `url`                     |
-| VS Code        | `servers`                | user, project | native input    | no                | native `type`+`url`              |
-| Windsurf       | `mcpServers`\*           | user          | shim            | **yes**           | native `url`; shim if authed\*   |
-| Zed            | `context_servers`        | user          | shim            | no                | native `url`                     |
-| Cline          | `mcpServers`             | user          | shim            | no                | native `url`                     |
-| Gemini CLI     | `mcpServers`             | user          | shim            | no                | native `httpUrl`/`url`           |
-| JetBrains      | `mcpServers`             | user, project | shim            | no                | native `url`                     |
-| Visual Studio  | `servers`\*\*            | user, project | native input    | no                | native `type`+`url`              |
-| Continue       | `mcpServers`\*\*\*       | user, project | shim            | no                | native `url`                     |
-| Roo Code       | `mcpServers`             | user, project | shim            | no                | native `url`                     |
-| Goose          | `extensions:` (YAML)     | user          | shim            | no                | native `uri` (`streamable_http`) |
-| Codex CLI      | `[mcp_servers.*]` (TOML) | user          | shim            | no                | native `url`                     |
-| LM Studio      | `mcpServers`             | user          | shim            | no                | native `url`                     |
+| Client         | Config root        | Scopes        | Secret strategy | Restart on change | Remote transport                 |
+| -------------- | ------------------ | ------------- | --------------- | ----------------- | -------------------------------- |
+| Claude Code    | `mcpServers`       | user          | shim            | no                | native `type`+`url`              |
+| Claude Desktop | `mcpServers`       | user          | shim            | **yes**           | shim (stdio-only)†               |
+| Cursor         | `mcpServers`       | user, project | shim            | no                | native `url`                     |
+| VS Code        | `servers`          | user, project | native input    | no                | native `type`+`url`              |
+| Windsurf       | `mcpServers`\*     | user          | shim            | **yes**           | native `url`; shim if authed\*   |
+| Zed            | `context_servers`  | user          | shim            | no                | native `url`                     |
+| Cline          | `mcpServers`       | user          | shim            | no                | native `url`                     |
+| Gemini CLI     | `mcpServers`       | user          | shim            | no                | native `httpUrl`/`url`           |
+| JetBrains      | `mcpServers`       | user, project | shim            | no                | native `url`                     |
+| Visual Studio  | `servers`\*\*      | user, project | native input    | no                | native `type`+`url`              |
+| Continue       | `mcpServers`\*\*\* | user, project | shim            | no                | native `url`                     |
+| Roo Code       | `mcpServers`       | user, project | shim            | no                | native `url`                     |
+| Goose          | `extensions`‡      | user          | shim            | no                | native `uri` (`streamable_http`) |
+| Codex CLI      | `mcp_servers`‡     | user          | shim            | no                | native `url`                     |
+| LM Studio      | `mcpServers`       | user          | shim            | no                | native `url`                     |
+| Warp           | `mcpServers`       | user, project | shim            | no                | native `url`                     |
+| opencode       | `mcp`‡             | user, project | shim            | no                | native `url`                     |
+| Copilot CLI    | `mcpServers`       | user          | shim            | no                | native `type`+`url`              |
 
 **Remote transport (S17.2).** `mcp-remote` is explicitly transitional ("as soon as your client
 supports remote, authorized servers, you can remove it"), so mcpfold folds a remote server to the
@@ -52,44 +55,18 @@ resolution — see the client-specific note below.
 Cline users), so mcpfold folds to a JSON file there with the standard `mcpServers` root — no YAML
 dependency.
 
+‡ **Shared config files (S19.2).** Goose (`config.yaml`), Codex CLI (`config.toml`), and opencode
+(`opencode.json`) keep their MCP servers in a file that _also_ holds non-MCP client settings (model,
+provider, theme, keyring…). These adapters therefore **merge** — they rewrite only the managed
+server section and preserve every other key. Goose/opencode also preserve comments (via the
+comment-aware YAML document / jsonc structural edit); TOML has no comment-preserving serializer we
+depend on, so Codex CLI preserves unmanaged **keys** but not comments (the honest limit of "where
+feasible"). Goose additionally preserves its own non-server extensions (`type: builtin | platform |
+frontend | inline_python`) untouched. The YAML/TOML parse+serialize dependencies (`yaml`,
+`smol-toml`) live in `packages/adapters` only — `packages/core` stays I/O- and parser-free.
+
 Every adapter passes the shared cross-adapter matrix (render → committed golden + render → parse
 round-trip) and the deterministic-serialization invariant.
-
-### Wave 2 — bespoke non-JSON formats (S19.2, verified July 2026)
-
-These clients require render/parse beyond the `mcpServers` JSON factory. Their YAML/TOML parse
-dependencies (`yaml`, `smol-toml`) live only in `packages/adapters` (the core purity gate stays
-green). Goose and Codex write into a **shared** config file that also holds the client's own
-settings, so the adapter merges the managed section in and **preserves every unmanaged key**
-(and comments, for YAML) — round-trip-tested.
-
-- **Goose** — `~/.config/goose/config.yaml` (Windows `%APPDATA%\Block\goose\config\config.yaml`).
-  YAML, root `extensions:`; each server is `{name, type, enabled, cmd, args, envs}` for stdio or
-  `{type: streamable_http, uri, headers}` for remote (SSE is deprecated upstream but still parsed).
-  Verified against `github.com/block/goose` `documentation/docs/guides/config-files.md` + the
-  `ExtensionConfig` source.
-- **Codex CLI** — `~/.codex/config.toml` (`CODEX_HOME` overrides the base). TOML, `[mcp_servers.<name>]`
-  tables (snake_case — **not** `mcpServers`); stdio `command`/`args`/`env`, remote `url` +
-  `http_headers`. TOML comments are not preserved by the parser (key/table preservation only, which
-  the AC allows "where feasible"). Verified against `developers.openai.com/codex/config-reference`
-  and `/codex/mcp`.
-- **LM Studio** — `~/.lmstudio/mcp.json`. JSON, Cursor-compatible `mcpServers` (dedicated MCP-only
-  file, so a full rewrite is fine). Verified against `lmstudio.ai/docs/app/mcp`.
-
-### Deferred (S19.2)
-
-Verified against primary docs but **not shipped**, with rationale — a doc-verified deferral, not a
-speculative omission:
-
-- **Warp** — DEFERRED. Warp's authoritative MCP store is a **synced cloud account/DB configured
-  through its UI**, not a canonical on-disk file; the file paths it also ingests
-  (`~/.warp/.mcp.json`) are a secondary path that Warp can override on re-sync. A file-writing
-  adapter would therefore be non-authoritative and could be silently reverted — shipping it would
-  mislead. Reconsider if Warp documents a stable, authoritative local config.
-- **opencode** and **GitHub Copilot CLI** — deferred to the next wave (2b), not for format doubt
-  (both are documented + stable JSON: opencode's `mcp` root with `type: local|remote`, array
-  `command`, and `environment`; Copilot CLI's `~/.copilot/mcp-config.json` with `type:
-local|http|sse`). They land next using the preservation mechanism this story introduced.
 
 ### Client-specific notes (verified July 2026)
 
@@ -128,6 +105,42 @@ local|http|sse`). They land next using the preservation mechanism this story int
   `<VS Code User>/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json` (user,
   keeping Cline's original filename) and `<project>/.roo/mcp.json` (project, which takes precedence
   on a name clash). `mcpServers` root, secret strategy `shim` (matching Cline).
+- **Goose** (S19.2): block/goose stores MCP servers as **extensions** in a shared YAML
+  `config.yaml` — `~/.config/goose/config.yaml` (macOS/Linux), `%APPDATA%\Block\goose\config\config.yaml`
+  (Windows). Format quirks: root key `extensions` (a map), stdio uses `type: stdio` with **`cmd`**
+  (not `command`) and **`envs`** (not `env`); remotes use `type: streamable_http` (legacy `sse`)
+  with **`uri`** (not `url`). mcpfold merges (see ‡). Secret strategy `shim` (Goose's keyring
+  `env_keys` is S19.4's native-interpolation job). Verified July 2026 against the goose-docs.ai
+  config-files guide and the `ExtensionConfig` enum in block/goose source.
+- **Codex CLI** (S19.2): OpenAI Codex reads `[mcp_servers.<name>]` tables from a shared TOML
+  `~/.codex/config.toml` (honors `CODEX_HOME`). stdio: `command`/`args`/`env`; remote streamable
+  HTTP: `url` + `http_headers` (Codex authenticates via `bearer_token_env_var`/`auth`, handled by
+  the shim). mcpfold merges, preserving other tables (comments not preserved — see ‡). Secret
+  strategy `shim`. Verified July 2026 against the hosted Codex config-reference
+  (`developers.openai.com/codex/config-reference` → learn.chatgpt.com).
+- **LM Studio** (S19.2): "currently follows Cursor's `mcp.json` notation" — root `mcpServers`,
+  stdio `command`/`args`/`env`, remote `url`/`headers`, no `type` — so it reuses the shared factory.
+  Dedicated file `~/.lmstudio/mcp.json` on every OS (full replace). Secret strategy `shim`. Verified
+  July 2026 against lmstudio.ai/docs/app/mcp and the v0.3.17 release notes.
+- **Warp** (S19.2): folds to Warp's **file-based** `.mcp.json` — `~/.warp/.mcp.json` (user) and
+  `<project>/.warp/.mcp.json` (project) — standard `mcpServers` root, dedicated file (full replace).
+  Warp gates file-defined servers behind a one-time approval and never auto-spawns project-scoped
+  servers, so the user enables them in Warp after the fold. (GUI-added servers live in Warp Drive,
+  which is not a user-editable file — mcpfold targets `.mcp.json` only.) Secret strategy `shim`.
+  Verified July 2026 against docs.warp.dev.
+- **opencode** (S19.2): the SST terminal agent. MCP servers live under the **`mcp`** key of a shared
+  `opencode.json` — `~/.config/opencode/opencode.json` (XDG even on Windows; honors
+  `XDG_CONFIG_HOME`) and `<project>/opencode.json`. Distinctive shape: `type: "local"` with
+  **`command` as an array** (`[exe, …args]`) and **`environment`** (not `env`); remotes are
+  `type: "remote"` with `url`/`headers`; every entry has `enabled: true`. mcpfold merges via a
+  comment-preserving jsonc edit (see ‡). Secret strategy `shim`. Verified July 2026 against
+  opencode.ai/docs.
+- **Copilot CLI** (S19.2): the standalone GitHub Copilot CLI (`copilot`, not `gh copilot`). Dedicated
+  `mcp-config.json` under `~/.copilot/` (honors `COPILOT_HOME`) with `mcpServers` root; entries carry
+  an explicit `type` (`stdio` / `http`) plus `command`/`args`/`env` or `url`/`headers` — the shared
+  factory's `includeType` shape. An optional per-entry `tools` allowlist exists but is left unset
+  (mcpfold curates tools through the run shim, not the client file). Secret strategy `shim`. Verified
+  July 2026 against docs.github.com (add-mcp-servers + CLI config-dir reference).
 
 ## Roadmap & prioritization
 
@@ -141,9 +154,16 @@ New clients are prioritized by, in order:
 **Shipped in wave 1** (S19.1): JetBrains AI Assistant, Visual Studio, Continue, Roo Code — see the
 table and client-specific notes above.
 
-**Next candidates** (unimplemented): Goose, Warp, Cody, LM Studio, Codex CLI. Several use
-non-`mcpServers` formats (YAML, TOML, nested config), so they need a bespoke `render`/`parse` rather
-than the shared `mcpServers` factory — a good first contribution via `scaffold-adapter`.
+**Shipped in wave 2** (S19.2): Goose (YAML), Codex CLI (TOML), LM Studio, Warp, opencode, Copilot
+CLI — bringing the matrix to **18 clients**, including the first non-JSON (YAML/TOML) and
+shared-config-file (merge, not clobber) adapters. Each was verified against current primary docs at
+implementation time (see the client-specific notes and the dates recorded there).
+
+**Next candidates** (unimplemented): Cody. No client with a stable, documented on-disk config file
+was deferred in wave 2 — every researched client (Goose, Codex CLI, LM Studio, Warp, opencode,
+Copilot CLI) had a format stable enough to ship. Clients that expose MCP config only through a GUI /
+internal store with no user-editable file (e.g. Warp's Warp Drive objects) are intentionally not
+targeted — mcpfold folds the on-disk file where one exists.
 
 ## Add a client
 

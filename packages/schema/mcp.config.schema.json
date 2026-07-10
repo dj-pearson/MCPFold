@@ -142,7 +142,10 @@
                   "roo-code",
                   "goose",
                   "codex-cli",
-                  "lm-studio"
+                  "lm-studio",
+                  "warp",
+                  "opencode",
+                  "copilot-cli"
                 ]
               },
               "scope": {

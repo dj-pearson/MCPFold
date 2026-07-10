@@ -1,16 +1,21 @@
 extensions:
   github:
-    name: github
     type: streamable_http
-    enabled: true
+    name: github
     uri: https://api.githubcopilot.com/mcp/
-  playwright:
-    name: playwright
-    type: stdio
+    headers: {}
     enabled: true
+    bundled: false
+    timeout: 300
+  playwright:
+    type: stdio
+    name: playwright
     cmd: npx
     args:
       - -y
       - "@playwright/mcp@latest"
     envs:
       HEADLESS: "true"
+    enabled: true
+    bundled: false
+    timeout: 300

@@ -7,5 +7,16 @@
   "format": "yaml",
   "rootKeys": ["extensions"],
   "serverContainer": "extensions",
-  "entryKeys": ["args", "cmd", "enabled", "envs", "headers", "name", "type", "uri"]
+  "entryKeys": [
+    "args",
+    "bundled",
+    "cmd",
+    "enabled",
+    "envs",
+    "headers",
+    "name",
+    "timeout",
+    "type",
+    "uri"
+  ]
 }
