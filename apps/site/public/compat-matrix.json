@@ -84,7 +84,7 @@
     {
       "client": "lm-studio",
       "format": "json",
-      "scopes": "user",
+      "scopes": "user, project",
       "transport": "native `url`",
       "secretStrategy": "shim",
       "lastVerified": "2026-07-09"

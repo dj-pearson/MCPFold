@@ -6,20 +6,15 @@ import { expect, test } from '@playwright/test';
  * link, and the theme toggle — all driven by site-structure.ts.
  */
 
-test('header shows live pages, marks the active route, and omits planned pages', async ({
-  page,
-}) => {
+test('header shows live pages and marks the active route', async ({ page }) => {
   await page.goto('/directory');
-  // Live top-level items are present.
-  for (const item of ['directory', 'docs', 'pricing', 'blog']) {
+  // Live top-level items are present (Features S13.10 + Guides S15.5 now shipped).
+  for (const item of ['features', 'docs', 'directory', 'guides', 'pricing', 'blog']) {
     await expect(page.getByTestId(`nav-${item}`)).toBeVisible();
   }
   // Active route is indicated.
   await expect(page.getByTestId('nav-directory')).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('nav-pricing')).not.toHaveAttribute('aria-current', 'page');
-  // Planned pages (Features S13.10, Guides S15.5) are not linked yet — no dead links.
-  await expect(page.getByTestId('nav-features')).toHaveCount(0);
-  await expect(page.getByTestId('nav-guides')).toHaveCount(0);
   // Primary install CTA.
   await expect(page.getByTestId('cta-install')).toHaveAttribute('href', '/install');
 });
@@ -57,22 +52,19 @@ test('mobile menu: opens, navigates, and closes on link click + Escape', async (
   await expect(page.getByTestId('mobile-menu')).toHaveCount(0);
 });
 
-test('footer link map resolves against the route table (no 404) and omits planned pages', async ({
-  page,
-}) => {
+test('footer link map resolves against the route table (no 404)', async ({ page }) => {
   await page.goto('/');
   const links = page.locator('footer [data-testid^="footer-link-"]');
   const hrefs = await links.evaluateAll((els) => els.map((e) => e.getAttribute('href') ?? ''));
   expect(hrefs.length).toBeGreaterThan(6);
 
-  const validInternal = /^\/($|install$|directory$|pricing$|security$|changelog$|blog$|docs(\/|$))/;
+  // Every live internal footer href must map to a mounted route in the E13 surface.
+  const validInternal =
+    /^\/($|install$|directory$|compare$|use-cases$|pricing$|features$|changelog$|security$|about$|privacy$|terms$|analytics$|brand$|glossary$|roadmap$|guides$|community$|blog$|docs(\/|$))/;
   for (const href of hrefs) {
     if (href.startsWith('http')) continue; // external
     expect(href, `footer link ${href} must resolve`).toMatch(validInternal);
   }
-  // Planned pages are absent from the footer.
-  expect(hrefs).not.toContain('/features');
-  expect(hrefs).not.toContain('/guides');
 
   // A real marketing footer link resolves (not a 404 shell).
   await page.getByTestId('footer-link-/changelog').click();

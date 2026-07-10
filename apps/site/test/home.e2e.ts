@@ -115,17 +115,18 @@ test('the how-it-works section walks init → import → sync → diff with copy
 test('the use-cases teaser links each persona to a live page', async ({ page }) => {
   await page.goto('/');
   const uc = page.getByTestId('use-cases');
+  // Each persona links to its dedicated /use-cases/<id> page (S13.11).
   await expect(uc.getByTestId('persona-solo').getByRole('link')).toHaveAttribute(
     'href',
-    '/install',
+    '/use-cases/solo',
   );
   await expect(uc.getByTestId('persona-teams').getByRole('link')).toHaveAttribute(
     'href',
-    '/pricing',
+    '/use-cases/teams',
   );
   await expect(uc.getByTestId('persona-power-users').getByRole('link')).toHaveAttribute(
     'href',
-    '/directory',
+    '/use-cases/power-users',
   );
 });
 
