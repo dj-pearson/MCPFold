@@ -4,9 +4,12 @@
  * Pure + deterministic: no secrets, no network. The home.e2e.ts test asserts the default fixture
  * reproduces the published numbers (7476 → 1497, ~80%), so the site can't drift from the docs.
  *
- * Tokenizer: the documented 1 token ≈ 4 characters of serialized JSON. Exact counts vary by model
- * tokenizer, but the relative reduction — what we report — is stable because both sides measure it
- * identically.
+ * Tokenizer: the documented 1 token ≈ 4 characters of serialized JSON. Kept here for instant,
+ * dependency-free interactivity in the browser (no tiktoken/wasm shipped to visitors). The docs
+ * benchmark additionally publishes exact per-model counts (GPT via tiktoken, Claude via
+ * @anthropic-ai/tokenizer) that land within a few percent of this approximation — see S21.3 and
+ * packages/proxy/bench/context-benchmark.ts. The relative reduction — what we report — is stable
+ * across every tokenizer because both sides measure it identically.
  */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);

@@ -49,5 +49,9 @@
   "author": "Dan Pearson <dan@danpearson.net> (https://mcpfold.com)",
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@anthropic-ai/tokenizer": "^0.0.4",
+    "js-tiktoken": "^1.0.21"
   }
 }

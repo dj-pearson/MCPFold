@@ -115,6 +115,14 @@ export function Calculator() {
           </div>
         </div>
       </div>
+
+      <p style={{ color: 'var(--fg-muted)', fontSize: '0.85rem', marginBottom: 0 }}>
+        Tokens use the 1-token≈4-chars approximation for instant estimates. The{' '}
+        <a href="https://github.com/dj-pearson/MCPFold/blob/main/docs/benchmark.md#exact-per-model-token-counts">
+          benchmark publishes exact GPT and Claude counts
+        </a>{' '}
+        that land within a few percent.
+      </p>
     </section>
   );
 }
