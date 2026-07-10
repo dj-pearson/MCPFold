@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.6.0.schema.json
+# Version manifest. `version` is kept in lockstep with npm by scripts/sync-packaging-version.mjs and
+# enforced by scripts/check-version-parity.mjs; the concrete installer URL/hash are filled at publish
+# time by scripts/render-packaging.mjs and submitted to microsoft/winget-pkgs from the release workflow.
+PackageIdentifier: PearsonMedia.mcpfold
+PackageVersion: 1.0.2
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0

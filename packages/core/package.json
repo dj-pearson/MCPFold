@@ -37,5 +37,18 @@
   "homepage": "https://mcpfold.com",
   "bugs": {
     "url": "https://github.com/dj-pearson/MCPFold/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcpfold",
+    "config",
+    "schema",
+    "drift",
+    "engine"
+  ],
+  "author": "Dan Pearson <dan@danpearson.net> (https://mcpfold.com)",
+  "engines": {
+    "node": ">=20"
   }
 }

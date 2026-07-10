@@ -68,4 +68,26 @@ scoop.architecture['64bit'].url =
 scoop.architecture['64bit'].hash = shaFor('mcpfold-windows-x64.exe');
 writeFileSync(join(root, outDir, 'mcpfold.json'), JSON.stringify(scoop, null, 2) + '\n');
 
-console.log(`✓ rendered ${outDir}/mcpfold.rb + mcpfold.json for ${tag}`);
+// --- WinGet manifests: version + concrete Windows installer URL + sha256 (uppercase, as winget
+// convention), written to <outDir>/winget/ for `wingetcreate submit` to push to winget-pkgs. ---
+const winExe = 'mcpfold-windows-x64.exe';
+const wingetSrc = join(root, 'packaging/winget');
+const wingetOut = join(root, outDir, 'winget');
+mkdirSync(wingetOut, { recursive: true });
+for (const f of readdirSync(wingetSrc).filter((n) => n.endsWith('.yaml'))) {
+  let content = readFileSync(join(wingetSrc, f), 'utf8').replace(
+    /PackageVersion:\s*\S+/g,
+    `PackageVersion: ${version}`,
+  );
+  if (f.includes('installer')) {
+    content = content
+      .replace(
+        /InstallerUrl:\s*\S+/,
+        `InstallerUrl: https://github.com/dj-pearson/MCPFold/releases/download/${tag}/${winExe}`,
+      )
+      .replace(/InstallerSha256:\s*\S+/, `InstallerSha256: ${shaFor(winExe).toUpperCase()}`);
+  }
+  writeFileSync(join(wingetOut, f), content);
+}
+
+console.log(`✓ rendered ${outDir}/mcpfold.rb + mcpfold.json + winget/ for ${tag}`);

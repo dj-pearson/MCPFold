@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: PearsonMedia.mcpfold
+PackageVersion: 1.0.2
+PackageLocale: en-US
+Publisher: Pearson Media
+PublisherUrl: https://mcpfold.com
+PublisherSupportUrl: https://github.com/dj-pearson/MCPFold/issues
+Author: Dan Pearson
+PackageName: mcpfold
+PackageUrl: https://mcpfold.com
+License: MIT
+LicenseUrl: https://github.com/dj-pearson/MCPFold/blob/main/LICENSE
+Copyright: Copyright (c) Pearson Media
+ShortDescription: Connect every MCP server without paying the context-window tax.
+Description: >-
+  mcpfold is a local-first CLI and proxy that curates your Model Context Protocol (MCP) servers.
+  Write one canonical config and fold it out to every client — loading only the tools each agent
+  needs, and resolving secret references instead of hardcoding values. Free forever and MIT-licensed,
+  with an optional self-hostable cloud for accounts, config sync, and teams.
+Moniker: mcpfold
+Tags:
+  - mcp
+  - model-context-protocol
+  - ai
+  - llm
+  - agents
+  - cli
+  - developer-tools
+  - proxy
+  - secrets
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

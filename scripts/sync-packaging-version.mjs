@@ -5,7 +5,7 @@
  * Only the version string changes here — the real URLs/hashes are filled at publish time by
  * scripts/render-packaging.mjs. Run: node scripts/sync-packaging-version.mjs
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,4 +23,14 @@ const scoop = JSON.parse(readFileSync(scoopPath, 'utf8'));
 scoop.version = version;
 writeFileSync(scoopPath, JSON.stringify(scoop, null, 2) + '\n');
 
-console.log(`✓ synced homebrew + scoop version to ${version}`);
+// WinGet: bump PackageVersion across all three manifests (version/installer/locale).
+const wingetDir = join(root, 'packaging/winget');
+for (const f of readdirSync(wingetDir).filter((n) => n.endsWith('.yaml'))) {
+  const p = join(wingetDir, f);
+  writeFileSync(
+    p,
+    readFileSync(p, 'utf8').replace(/PackageVersion:\s*\S+/g, `PackageVersion: ${version}`),
+  );
+}
+
+console.log(`✓ synced homebrew + scoop + winget version to ${version}`);

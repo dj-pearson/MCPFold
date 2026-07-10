@@ -47,5 +47,27 @@
   "homepage": "https://mcpfold.com",
   "bugs": {
     "url": "https://github.com/dj-pearson/MCPFold/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "mcp-client",
+    "mcp-proxy",
+    "mcp-tools",
+    "ai",
+    "llm",
+    "agents",
+    "cli",
+    "developer-tools",
+    "claude",
+    "cursor",
+    "context-window",
+    "token-optimization",
+    "secrets"
+  ],
+  "author": "Dan Pearson <dan@danpearson.net> (https://mcpfold.com)",
+  "engines": {
+    "node": ">=20"
   }
 }

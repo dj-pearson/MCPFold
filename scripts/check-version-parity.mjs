@@ -21,6 +21,12 @@ const brewVersion = /version\s+"([^"]+)"/.exec(brew)?.[1];
 
 const scoop = JSON.parse(readFileSync(join(root, 'packaging/scoop/mcpfold.json'), 'utf8')).version;
 
+const wingetManifest = readFileSync(
+  join(root, 'packaging/winget/PearsonMedia.mcpfold.yaml'),
+  'utf8',
+);
+const wingetVersion = /PackageVersion:\s*(\S+)/.exec(wingetManifest)?.[1];
+
 // The version the shipped binary actually reports. Prefer the built dist (what users run); fall
 // back to the generated source when dist hasn't been built yet (e.g. release.yml runs this first).
 const distVersionPath = join(root, 'packages/cli/dist/version.js');
@@ -34,6 +40,7 @@ const channels = {
   npm: npmVersion,
   homebrew: brewVersion,
   scoop,
+  winget: wingetVersion,
   'cli-binary': embeddedVersion,
 };
 const mismatched = Object.entries(channels).filter(([, v]) => v !== npmVersion);
@@ -51,7 +58,7 @@ if (mismatched.length > 0) {
   process.exit(1);
 }
 console.log(
-  `✓ all install channels at version ${npmVersion} (npm, homebrew, scoop, cli-binary from ${
+  `✓ all install channels at version ${npmVersion} (npm, homebrew, scoop, winget, cli-binary from ${
     embeddedSource === distVersionPath ? 'dist' : 'src'
   })`,
 );

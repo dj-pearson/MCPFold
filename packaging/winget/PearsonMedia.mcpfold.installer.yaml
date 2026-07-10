@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+# The Windows artifact is a standalone .exe (built by scripts/build-binary.mjs), so this is a
+# `portable` install with `mcpfold` / `mcpf` command aliases. InstallerUrl + InstallerSha256 carry
+# placeholders here; scripts/render-packaging.mjs fills the real values for each release.
+PackageIdentifier: PearsonMedia.mcpfold
+PackageVersion: 1.0.2
+InstallerType: portable
+Commands:
+  - mcpfold
+  - mcpf
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/dj-pearson/MCPFold/releases/download/v1.0.2/mcpfold-windows-x64.exe
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+ManifestType: installer
+ManifestVersion: 1.6.0
