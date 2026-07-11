@@ -182,8 +182,18 @@ export function connectProxy(
     client.send(message);
   });
 
-  return () => {
+  // S22.10: tear the whole session down exactly once — whether the caller disposes explicitly or
+  // either transport signals a stream error/EOF (a crashing or flooding server). Guarded so the
+  // close() calls below don't re-enter through the peers' own onClose handlers.
+  let disposed = false;
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
     client.close();
     server.close();
   };
+  client.onClose?.(dispose);
+  server.onClose?.(dispose);
+
+  return dispose;
 }

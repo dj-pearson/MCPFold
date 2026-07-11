@@ -1412,3 +1412,27 @@ Tests: integrity survives resolution (resolve.test.ts); a matching hash installs
 **Follow-ups:** npm/pypi registry packages carry an `integrity` from the listing's `fileSha256`, but
 mcpfold doesn't fetch their tarballs (npm/uvx do at runtime), so their integrity is recorded for audit
 but not byte-verified here — the mcpb bundle path is where mcpfold actually holds the bytes.
+
+## S22.10 — Cap the proxy stdio read buffer and handle stream errors/close
+
+Started/done: 2026-07-11. HIGH + MEDIUM (verified). `streamTransport` (proxy stdio) did
+`buffer += chunk` and drained only up to the last newline, with NO maximum — a server (the untrusted
+party the proxy exists to contain) could stream gigabytes with no newline and the proxy accumulated it
+all (OOM). It also registered only `input.on('data')` — a stream error (EPIPE when the child dies)
+became an uncaught exception; `close()` only removed the data listener (never destroyed the stream),
+and residual bytes after the final newline were dropped on EOF.
+
+**Fix.** `streamTransport` gained a `maxLineBytes` cap (default 8 MiB): after draining complete lines,
+an unterminated remainder past the cap force-closes with an error. It now handles `error`/`end`/`close`
+on the input and `error` on the output, wraps `send()` writes in try/catch, and surfaces all of these
+through a new optional `MessageTransport.onClose(handler)` (error set on abnormal close, undefined on
+clean EOF). `close()` removes every listener and destroys the input stream. A final newline-less
+message is delivered on clean EOF instead of dropped. `connectProxy` wires `onClose` from both
+transports to a once-guarded disposer, so a crashing/flooding server tears the WHOLE session down
+cleanly.
+
+Tests (new proxy/test/stdio.test.ts): an over-cap unterminated flood closes with a "line cap" error and
+destroys the stream (bounded memory); a stream `error` surfaces via `onClose` without throwing;
+`close()` removes listeners + destroys; a trailing newline-less message is delivered on EOF; a
+server-side error tears down both sides via `connectProxy`. `verify_all` green — lint, typecheck, full
+suite (proxy 66), and build.

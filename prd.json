@@ -5074,7 +5074,7 @@
       "epic": "E22",
       "order": 10,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Cap the proxy stdio read buffer and handle stream errors/close",
       "user_story": "As a user running the curation proxy, I want a malicious or crashing MCP server to be contained, so it can't OOM the proxy or take it down with an uncaught stream error.",
