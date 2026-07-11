@@ -223,6 +223,27 @@ describe('httpRegistryClient (S17.7)', () => {
     const client = httpRegistryClient('https://reg.test', fakeFetch({}, false, 503));
     await expect(client.search('x')).rejects.toThrow(/Registry request failed \(503\)/);
   });
+
+  // S22.18: a mirror that accepts the connection but never responds must time out, not hang.
+  it('times out a non-responding mirror via the request signal', async () => {
+    const hanging = ((_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', function (this: AbortSignal) {
+          reject(this.reason);
+        });
+      })) as unknown as typeof fetch;
+    const client = httpRegistryClient('https://reg.test', hanging, { timeoutMs: 20 });
+    await expect(client.search('x')).rejects.toThrow(/did not respond within/);
+  });
+
+  // S22.18: an oversized response body is bounded and rejected rather than buffered unbounded.
+  it('rejects an oversized response body', async () => {
+    const big = `{"servers":[]}${'x'.repeat(4096)}`;
+    const oversized = (async () =>
+      new Response(big, { status: 200 })) as unknown as typeof fetch;
+    const client = httpRegistryClient('https://reg.test', oversized, { maxResponseBytes: 256 });
+    await expect(client.search('x')).rejects.toThrow(/too large/);
+  });
 });
 
 // ------------------------------------------------------------------------------------------------

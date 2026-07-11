@@ -1590,3 +1590,25 @@ survives.
 Tests (watch.test.ts): a rejecting onChange registers no `unhandledRejection` and the watch keeps
 running (a second change still drives onChange). `verify_all` green — lint, typecheck, full suite,
 and build.
+
+## S22.18 — Add a request timeout and response/zip size limits to the registry client
+
+Started/done: 2026-07-11. MEDIUM + LOW (verified). `registry/client.ts` `fetchImpl(url, { headers })`
+set no AbortSignal/timeout, so a mirror that accepts the connection but never responds hung the CLI
+forever (contradicting the S0.9 fail-clearly contract). `res.json()` read an unbounded body, and
+`registry/mcpb.ts` `unzipSync` decompressed a `.mcpb` with no size/entry cap (fflate has no zip-bomb
+guard).
+
+**Fix.** (1) Registry fetches attach `AbortSignal.timeout` (15s default, injectable `timeoutMs`); a
+timeout/abort surfaces as the degraded-mode UsageError ("did not respond within …"). (2) A new
+`readBoundedJson` caps the response body (8 MiB default, injectable `maxResponseBytes`) — it meters a
+real streaming body chunk-by-chunk and aborts past the cap, falling back to `res.json()` for non-stream
+test mocks. (3) `parseMcpbManifest` now passes fflate a `filter` that runs per entry on metadata alone:
+it decompresses ONLY `manifest.json`, and only when its declared `originalSize` is within the cap
+(4 MiB), with an entry-count limit (10k) — so an oversized or many-entry zip bomb is rejected before
+any bytes inflate. Caps are injectable (`McpbLimits`) for tests.
+
+Tests: registry times out a non-responding mirror (signal-aware fetch + 20ms timeout) and rejects an
+oversized response body (real Response + 256-byte cap); mcpb reads a normal bundle, rejects a manifest
+past a tiny cap, and rejects a 2-entry archive with `maxEntries:1`. `verify_all` green — lint,
+typecheck, full suite, and build.

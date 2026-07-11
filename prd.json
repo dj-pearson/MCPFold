@@ -5291,7 +5291,7 @@
       "epic": "E22",
       "order": 18,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Add a request timeout and response/zip size limits to the registry client",
       "user_story": "As a user, I want registry calls to fail fast and bounded, so a slow or malicious mirror can't hang the CLI or exhaust memory.",

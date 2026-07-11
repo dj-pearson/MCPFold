@@ -149,6 +149,28 @@ describe('mcpb integrity (S17.8)', () => {
   });
 });
 
+// S22.18: reading an .mcpb must be size- and entry-bounded so a zip bomb can't exhaust memory.
+describe('mcpb archive limits (S22.18)', () => {
+  it('reads a normal bundle within the default caps', () => {
+    expect(parseMcpbManifest(buildBundle(MANIFEST)).name).toBe(MANIFEST.name);
+  });
+
+  it('rejects a manifest larger than the cap without inflating it', () => {
+    // The real manifest is a few hundred bytes; a tiny cap rejects it via the metadata filter.
+    expect(() => parseMcpbManifest(buildBundle(MANIFEST), { maxManifestBytes: 10 })).toThrow(
+      /exceeds the .*limit/,
+    );
+  });
+
+  it('rejects an archive with more entries than the cap', () => {
+    const zip = zipSync({
+      'manifest.json': strToU8(JSON.stringify(MANIFEST)),
+      'extra.bin': strToU8('x'),
+    });
+    expect(() => parseMcpbManifest(zip, { maxEntries: 1 })).toThrow(/entries/i);
+  });
+});
+
 describe('runAdd --from-mcpb (S17.8)', () => {
   let cwd: string;
   const CONFIG = `{ "version": 1, "servers": {}, "profiles": {} }`;

@@ -50,16 +50,52 @@ export interface McpbManifest {
   user_config?: Record<string, McpbUserConfigField>;
 }
 
+/** Max uncompressed size of manifest.json — a manifest is tiny; anything larger is a zip bomb (S22.18). */
+const MAX_MANIFEST_BYTES = 4 * 1024 * 1024;
+/** Cap the archive's entry count so a many-entry zip bomb can't exhaust memory walking it (S22.18). */
+const MAX_MCPB_ENTRIES = 10_000;
+
+/** Size/entry caps for reading an `.mcpb` (S22.18); injectable so tests can use small thresholds. */
+export interface McpbLimits {
+  maxManifestBytes?: number;
+  maxEntries?: number;
+}
+
 /** Read `manifest.json` from an `.mcpb` ZIP (fflate tolerates the appended signature block). */
-export function parseMcpbManifest(bundle: Uint8Array): McpbManifest {
+export function parseMcpbManifest(bundle: Uint8Array, limits: McpbLimits = {}): McpbManifest {
+  const maxManifestBytes = limits.maxManifestBytes ?? MAX_MANIFEST_BYTES;
+  const maxEntries = limits.maxEntries ?? MAX_MCPB_ENTRIES;
   let files: Record<string, Uint8Array>;
+  let entryCount = 0;
+  let manifestTooLarge = false;
   try {
-    files = unzipSync(bundle);
+    // S22.18: only decompress manifest.json, and only when its DECLARED uncompressed size is within
+    // the cap — fflate's filter runs per entry on metadata alone, so an oversized or many-entry zip
+    // bomb is rejected before any bytes are inflated.
+    files = unzipSync(bundle, {
+      filter: (file) => {
+        if (++entryCount > maxEntries) {
+          throw new Error(`archive has more than ${maxEntries} entries`);
+        }
+        if (file.name !== 'manifest.json') return false;
+        if (file.originalSize > maxManifestBytes) {
+          manifestTooLarge = true;
+          return false;
+        }
+        return true;
+      },
+    });
   } catch (e) {
     throw new UsageError(`Not a valid .mcpb bundle (unreadable ZIP): ${(e as Error).message}`);
   }
   const raw = files['manifest.json'];
-  if (!raw) throw new UsageError('.mcpb bundle has no manifest.json at its root.');
+  if (!raw) {
+    throw new UsageError(
+      manifestTooLarge
+        ? `.mcpb manifest.json exceeds the ${maxManifestBytes}-byte limit — refusing to read it.`
+        : '.mcpb bundle has no manifest.json at its root.',
+    );
+  }
   let manifest: McpbManifest;
   try {
     manifest = JSON.parse(strFromU8(raw)) as McpbManifest;
