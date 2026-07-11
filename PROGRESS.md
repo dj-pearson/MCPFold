@@ -1651,3 +1651,25 @@ the loop moves on to the completable E22 p3 security backlog.
 
 Unblock with a focused product/marketing session (SEO tooling + copy decision for S21.7; framing +
 GitHub labels + acknowledgment plan for S21.8).
+
+## S22.20 — Harden atomicWrite (durability + symlink) and use it in export/init
+
+Started/done: 2026-07-11. LOW (verified). `io/atomic-write.ts` gave atomic content replacement but no
+fsync of the file or directory, so the documented crash-mid-write guarantee was weaker than stated (a
+power loss just after `renameSync` can lose the rename or leave a zero-length file). `renameSync` over
+a symlinked target replaced the link with a regular file, silently destroying a user's symlinked
+config. And `export.ts`/`init.ts` used bare `writeFileSync` (a torn read is possible when
+`export --force` overwrites a file another tool is reading).
+
+**Fix.** `atomicWrite` now opens the temp file, `fsync`s it before the rename, and `fsync`s the
+containing directory after (best-effort; no-op on win32 where a directory can't be opened as an fd),
+so the durability claim holds. It resolves the target with `realpathSync` first, so a symlinked config
+is FOLLOWED — the write goes to the link's real file and the symlink is preserved (documented in the
+module header). `export` and `init` now write via `atomicWrite`.
+
+Tests: atomic-write follows a symlinked target and preserves the link (real file gets the new content,
+no temp remnant); init `--force` writes through a symlinked config. Both symlink tests skip on win32
+(symlinkSync needs elevation there). `verify_all` green — lint, typecheck, full suite, and build.
+
+**Note:** all canonical-config writers (sync, pull, migrate, add, import, export, init) now go through
+the hardened atomicWrite.

@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -38,6 +46,17 @@ describe('runInit (S3.2)', () => {
   it('--force overwrites', () => {
     runInit({ cwd, osContext: ctx });
     expect(() => runInit({ cwd, force: true, osContext: ctx })).not.toThrow();
+  });
+
+  // S22.20: init writes via atomicWrite, so a symlinked config target is followed (link preserved).
+  it.skipIf(process.platform === 'win32')('--force writes through a symlinked config', () => {
+    const real = join(cwd, 'real-config.jsonc');
+    writeFileSync(real, '{}');
+    const configPath = join(cwd, 'mcp.config.jsonc');
+    symlinkSync(real, configPath);
+    runInit({ cwd, force: true, osContext: ctx });
+    expect(lstatSync(configPath).isSymbolicLink()).toBe(true);
+    expect(readFileSync(real, 'utf8')).toContain('"$schema"');
   });
 
   it('--dry-run writes nothing', () => {

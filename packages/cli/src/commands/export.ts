@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { basename, join, resolve as resolvePath } from 'node:path';
 import {
   resolveProfile,
@@ -8,6 +8,7 @@ import {
   type ResolvedServer,
 } from '@mcpfold/core';
 import { loadConfigFromDisk, CONFIG_FILENAMES, MCP_JSON_FILENAME } from '../util/config.js';
+import { atomicWrite } from '../io/atomic-write.js';
 import type { CommandOutput } from '../output/render.js';
 
 /**
@@ -164,7 +165,7 @@ export function runExport(options: ExportOptions): CommandOutput<ExportData> {
     });
   }
 
-  writeFileSync(outputPath, contents, { encoding: 'utf8' });
+  atomicWrite(outputPath, contents);
   return {
     data: { ...data, wrote: true },
     human: renderHuman({ ...data, wrote: true }, contents, true),

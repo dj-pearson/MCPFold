@@ -5345,7 +5345,7 @@
       "epic": "E22",
       "order": 20,
       "priority": "p3",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Harden atomicWrite (durability + symlink) and use it in export/init",
       "user_story": "As a user, I want config writes to be crash-durable and to not silently replace my symlinked config files, and I want every config writer to be atomic.",
