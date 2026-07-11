@@ -36,6 +36,17 @@ describe('filterTools (S5.2)', () => {
     expect(isToolAllowed('y', { mode: 'allow', list: ['x'] })).toBe(false);
     expect(isToolAllowed('x', { mode: 'deny', list: ['x'] })).toBe(false);
   });
+
+  // S22.12: matching is case/whitespace-normalized so a spelling variant can't slip past the filter.
+  it('normalizes case and whitespace so a variant is treated per the policy', () => {
+    const deny: ToolsDirective = { mode: 'deny', list: ['foo'] };
+    expect(isToolAllowed('FOO', deny)).toBe(false);
+    expect(isToolAllowed(' foo ', deny)).toBe(false);
+    expect(isToolAllowed('Foo', deny)).toBe(false);
+    const allow: ToolsDirective = { mode: 'allow', list: ['Foo'] };
+    expect(isToolAllowed('foo', allow)).toBe(true);
+    expect(isToolAllowed('bar', allow)).toBe(false);
+  });
 });
 
 describe('connectProxy — filtering on tools/list (S5.2)', () => {

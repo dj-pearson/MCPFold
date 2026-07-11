@@ -1,5 +1,6 @@
 import { PassThrough } from 'node:stream';
 import { describe, expect, it } from 'vitest';
+import type { ToolsDirective } from '@mcpfold/core';
 import { connectProxy } from '../src/proxy.js';
 import { MemoryTransport } from '../src/transport/memory.js';
 import { streamTransport } from '../src/transport/stdio.js';
@@ -42,6 +43,46 @@ describe('connectProxy — transparent passthrough (S5.1)', () => {
     const err: JsonRpcMessage = { jsonrpc: '2.0', id: 2, error: { code: -32000, message: 'boom' } };
     server.receive(err);
     expect(client.sent[1]).toEqual(err);
+  });
+});
+
+describe('connectProxy — tool filter cannot be bypassed (S22.12)', () => {
+  const deny: ToolsDirective = { mode: 'deny', list: ['blocked'] };
+
+  it('drops a NOTIFICATION-form call (no id) to a denied tool instead of forwarding it', () => {
+    const client = new MemoryTransport();
+    const server = new MemoryTransport();
+    connectProxy(client, server, { tools: deny });
+    // A tools/call sent as a notification (no id) must NOT reach the server.
+    client.receive({ jsonrpc: '2.0', method: 'tools/call', params: { name: 'blocked' } });
+    expect(server.sent).toHaveLength(0);
+  });
+
+  it('rejects a request-form call to a denied tool with an error, not forwarding it', () => {
+    const client = new MemoryTransport();
+    const server = new MemoryTransport();
+    connectProxy(client, server, { tools: deny });
+    client.receive({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'blocked' } });
+    expect(server.sent).toHaveLength(0);
+    expect(client.sent[0]?.error?.message).toMatch(/not available/);
+  });
+
+  it('blocks a case/whitespace variant of a denied tool name', () => {
+    const client = new MemoryTransport();
+    const server = new MemoryTransport();
+    connectProxy(client, server, { tools: deny });
+    client.receive({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name: '  BLOCKED ' } });
+    expect(server.sent).toHaveLength(0);
+    expect(client.sent[0]?.error).toBeDefined();
+  });
+
+  it('still forwards an allowed tool call in both request and notification form', () => {
+    const client = new MemoryTransport();
+    const server = new MemoryTransport();
+    connectProxy(client, server, { tools: deny });
+    client.receive({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'ok' } });
+    client.receive({ jsonrpc: '2.0', method: 'tools/call', params: { name: 'ok' } });
+    expect(server.sent).toHaveLength(2);
   });
 });
 

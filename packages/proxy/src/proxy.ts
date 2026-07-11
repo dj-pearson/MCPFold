@@ -107,22 +107,28 @@ export function connectProxy(
   const pendingToolListing = new Set<JsonRpcId>();
 
   client.onMessage((message) => {
-    // Reject calls to filtered-out tools before they ever reach the real server. `tools/call`
-    // keeps its `params.name` shape in stateless mode, so this enforcement is mode-agnostic.
-    if (isRequest(message, 'tools/call') && message.id !== undefined) {
+    // Reject calls to filtered-out tools before they ever reach the real server. `tools/call` keeps
+    // its `params.name` shape in stateless mode, so this enforcement is mode-agnostic. S22.12: the
+    // filter applies whether the call is a request (has id) OR a NOTIFICATION (no id) — otherwise a
+    // notification-form call to a blocked tool would skip the check and fire-and-forget at the server.
+    if (isRequest(message, 'tools/call')) {
       const name = callToolName(message);
       if (directive && rejectFiltered && name && !isToolAllowed(name, directive)) {
         audit.denied(name, 'filtered by mcpfold');
-        client.send(
-          errorResponse(message.id, {
-            code: METHOD_NOT_FOUND,
-            message: `Tool "${name}" is not available (filtered by mcpfold).`,
-          }),
-        );
+        // A request gets an error response; a notification has no id to respond to, so it is simply
+        // dropped. Either way the blocked tool never reaches the server.
+        if (message.id !== undefined) {
+          client.send(
+            errorResponse(message.id, {
+              code: METHOD_NOT_FOUND,
+              message: `Tool "${name}" is not available (filtered by mcpfold).`,
+            }),
+          );
+        }
         return;
       }
       // Record the start so the response can be timed and its outcome logged (S18.4).
-      audit.callStart(message.id, name, message.params);
+      if (message.id !== undefined) audit.callStart(message.id, name, message.params);
     }
     if (
       (directive || pinned) &&

@@ -5129,7 +5129,7 @@
       "epic": "E22",
       "order": 12,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Close proxy tool-filter bypasses (notification-form call, alias/case)",
       "user_story": "As a user relying on the curation proxy's deny list, I want a blocked tool to stay blocked no matter how the call is shaped, so the filter is a real boundary.",

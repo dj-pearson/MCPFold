@@ -1458,3 +1458,24 @@ no longer a mapped stdio runner). `verify_all` green — lint, typecheck, full s
 **Follow-ups:** cargo/nuget/mcpb registry packages are now rejected by `--from-registry` (they never
 produced a working runner before — the command was the bogus literal type). mcpb listings should be
 installed via `add --from-mcpb`.
+
+## S22.12 — Close proxy tool-filter bypasses (notification-form call, alias/case)
+
+Started/done: 2026-07-11. MEDIUM (security, verified). Two bypasses of the curation proxy's tool
+deny/allow filter: (1) proxy.ts gated the `tools/call` rejection on `message.id !== undefined`, so a
+`tools/call` sent as a NOTIFICATION (no id) skipped `!isToolAllowed` and was forwarded to the server —
+a blocked tool executed fire-and-forget. (2) `isToolAllowed` used exact `list.includes(name)`, so a
+deny-listed tool the server also honors under a different case/whitespace spelling (`FOO`, `foo `)
+passed the filter.
+
+**Fix.** (1) The `tools/call` guard now runs whenever the method is `tools/call` regardless of id; a
+blocked request still gets an error response, and a blocked notification (no id to answer) is dropped —
+either way it never reaches the server. Audit `callStart` only records when there is an id. (2)
+`isToolAllowed` normalizes both the directive list and the queried name via `trim().toLowerCase()`, so
+the `tools/list` filter and the `tools/call` guard agree by construction and a case/whitespace variant
+is blocked.
+
+Tests: filter.test.ts covers case/whitespace normalization for allow + deny; passthrough.test.ts
+covers a notification-form denied call (not forwarded), a request-form denied call (error, not
+forwarded), a case/whitespace variant (blocked), and an allowed call still forwarding in both forms.
+`verify_all` green — lint, typecheck, full suite (proxy 68), and build.
