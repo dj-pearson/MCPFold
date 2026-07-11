@@ -4988,7 +4988,7 @@
       "epic": "E22",
       "order": 7,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Keep loadConfig's no-throw contract for malformed version numbers",
       "user_story": "As a user, I want a config with a bad version number to produce a clear error rather than crash doctor/sync, so one typo doesn't take down the tool.",

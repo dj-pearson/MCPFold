@@ -1349,3 +1349,20 @@ Tests (load.test.ts): 500-level input returns a positioned "too deep" error with
 typecheck, full suite (core 98, + all packages), and build.
 
 **Follow-ups:** none. 64 is ~10× the deepest legitimate config path, so no real config is affected.
+
+## S22.7 — Keep loadConfig's no-throw contract for malformed version numbers
+
+Started/done: 2026-07-11. HIGH (verified). `loadConfig` called `migrateConfig(value, SCHEMA_VERSION)`
+with no try/catch whenever `detectVersion(value) < 2`. `detectVersion` reports any number verbatim
+(0, negatives, fractionals), and `migrateConfig` loops `while (current < target)` and throws
+`MigrationError` when no step has `from === current`. So version 0 and version 1.5 both threw uncaught,
+crashing doctor/sync which rely on the documented no-throw `LoadResult`.
+
+**Fix.** `loadConfig` now (1) rejects a non-integer or `< 1` version up front with a positioned
+`schema` error (path `version`), before any migration, and (2) wraps the `migrateConfig` call in a
+try/catch that converts a `MigrationError` into an `ok:false` positioned error — defense in depth for
+any future missing-step gap.
+
+Tests (load.test.ts): version 0, -1, and 1.5 each return `ok:false` (never throw) with a `version`
+path; a valid v1 config still auto-migrates to v2 and loads. `verify_all` green — lint, typecheck,
+full suite, and build.

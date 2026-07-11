@@ -238,6 +238,28 @@ export function loadConfig(text: string): LoadResult {
   // Detect a config authored by a NEWER mcpfold before schema validation, so the user gets
   // an actionable "upgrade" message instead of a confusing literal-mismatch error (S0.7).
   const version = detectVersion(value);
+
+  // A malformed version (0, negative, or fractional) must be a clean schema error, not an uncaught
+  // MigrationError out of migrateConfig below — that would crash doctor/sync (S22.7). detectVersion
+  // reports any number verbatim; the range/integer check lives here so it can return ok:false.
+  if (!Number.isInteger(version) || version < 1) {
+    const versionNode = findNodeAtLocation(tree, ['version']);
+    const { line, column } = offsetToLineCol(text, versionNode?.offset ?? tree.offset);
+    return {
+      ok: false,
+      errors: [
+        {
+          code: 'schema',
+          message: `Invalid config version ${version} — must be a positive integer (1 or 2).`,
+          path: 'version',
+          line,
+          column,
+          hint: 'Set "version": 2 (the current canonical format).',
+        },
+      ],
+    };
+  }
+
   if (version > SCHEMA_VERSION) {
     return {
       ok: false,
@@ -256,10 +278,30 @@ export function loadConfig(text: string): LoadResult {
 
   // An older config auto-migrates in-memory so it keeps loading (S17.5); `mcpfold migrate` is what
   // persists the upgrade to disk. Validation then always runs against the current (v2) schema.
-  const toValidate =
-    version < SCHEMA_VERSION && value && typeof value === 'object'
-      ? migrateConfig(value as Record<string, unknown>, SCHEMA_VERSION).config
-      : value;
+  // Defense in depth (S22.7): a missing migration step throws MigrationError — never let it escape
+  // the no-throw LoadResult contract.
+  let toValidate: unknown = value;
+  if (version < SCHEMA_VERSION && value && typeof value === 'object') {
+    try {
+      toValidate = migrateConfig(value as Record<string, unknown>, SCHEMA_VERSION).config;
+    } catch (err) {
+      const versionNode = findNodeAtLocation(tree, ['version']);
+      const { line, column } = offsetToLineCol(text, versionNode?.offset ?? tree.offset);
+      return {
+        ok: false,
+        errors: [
+          {
+            code: 'schema',
+            message: err instanceof Error ? err.message : `Cannot migrate config version ${version}.`,
+            path: 'version',
+            line,
+            column,
+            hint: 'Set "version": 2 (the current canonical format), or run `mcpfold migrate`.',
+          },
+        ],
+      };
+    }
+  }
 
   const result = ConfigSchema.safeParse(toValidate);
   if (result.success) {

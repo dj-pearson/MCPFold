@@ -69,6 +69,29 @@ describe('loadConfig (S1.2)', () => {
     });
   });
 
+  // S22.7: a malformed version must be a clean ok:false, never an uncaught MigrationError.
+  describe('malformed version numbers (S22.7)', () => {
+    for (const bad of [0, -1, 1.5]) {
+      it(`version ${bad} returns ok:false instead of throwing`, () => {
+        let res;
+        expect(() => (res = loadConfig(`{ "version": ${bad}, "servers": {}, "profiles": {} }`))).not.toThrow();
+        expect(res!.ok).toBe(false);
+        if (!res!.ok) {
+          expect(res!.errors[0]?.code).toBe('schema');
+          expect(res!.errors[0]?.path).toBe('version');
+        }
+      });
+    }
+
+    it('a valid v1 config still auto-migrates and loads', () => {
+      const res = loadConfig(
+        '{ "version": 1, "servers": { "g": { "transport": "stdio", "command": "x" } }, "profiles": {} }',
+      );
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.config.version).toBe(2);
+    });
+  });
+
   // S22.6: a pathologically nested document must be a clean ok:false, never an uncaught RangeError.
   describe('recursion-depth limit (S22.6)', () => {
     it('returns a positioned error (not a throw) for deeply nested input', () => {
