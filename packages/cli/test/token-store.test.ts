@@ -49,8 +49,14 @@ describe('token store (S6.3)', () => {
     const secret = 'TOP-SECRET-TOKEN';
 
     const mac = keychainCommands('darwin', 'session');
-    expect(mac.set(secret).command).toBe('security');
-    expect(mac.set(secret).args).toContain('add-generic-password');
+    const macSet = mac.set(secret);
+    expect(macSet.command).toBe('security');
+    expect(macSet.args).toContain('add-generic-password');
+    // S22.14: the secret is fed over stdin (via a bare `-w`), never inlined into argv where `ps`
+    // could read it.
+    expect(macSet.stdin).toBe(secret);
+    expect(macSet.args).not.toContain(secret);
+    expect(macSet.args.at(-1)).toBe('-w'); // -w with no trailing value
     expect(mac.get.args).toContain('find-generic-password');
 
     const linux = keychainCommands('linux', 'session');

@@ -1521,3 +1521,19 @@ Tests: audit evicts the oldest call past a cap of 2 (only the surviving id emits
 unsupported version (no tools/list, no header echo — `state.negotiated` stays undefined) and rejects a
 null initialize result as unreachable; the proxy forwards an error response to a tracked `tools/list`
 unchanged (id evicted, no leak). `verify_all` green — lint, typecheck, full suite (proxy 71), and build.
+
+## S22.14 — Pass the macOS session secret over stdin, not argv
+
+Started/done: 2026-07-11. MEDIUM (verified). The darwin `set` command in `cloud/token-store.ts` was
+`security add-generic-password -U -s mcpfold -a <account> -w <secret>` — placing the serialized
+CloudSession (both access and refresh tokens) directly in argv, where another local process could read
+it from `ps` while login ran. The module's Linux and Windows branches already fed the value over stdin;
+only macOS inlined it.
+
+**Fix.** The darwin `set` now uses a bare `-w` (no inline value) and supplies the secret via `stdin`
+(which `run()` already pipes and closes) — `security` reads the password from the piped stdin. This
+matches the Linux/Windows branches, so the secret never appears in argv on any platform.
+
+Tests (token-store.test.ts): the darwin set command carries the secret via `stdin`, its args do NOT
+contain the secret, and the final arg is a bare `-w`. `verify_all` green — lint, typecheck, full suite,
+and build.

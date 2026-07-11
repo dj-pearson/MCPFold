@@ -5185,7 +5185,7 @@
       "epic": "E22",
       "order": 14,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Pass the macOS session secret over stdin, not argv",
       "user_story": "As a macOS user, I want my session tokens kept out of the process argument list, so another local process can't read them from ps while login runs.",
