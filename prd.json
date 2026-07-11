@@ -5456,7 +5456,7 @@
       "epic": "E22",
       "order": 24,
       "priority": "p3",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Reduce proxy audit-sink syscalls and use a Set for the tool directive",
       "user_story": "As a user with auditing on, I want the audit sink to be cheap and reliable and tool filtering to be O(1), so per-call overhead and lost audit records are avoided.",

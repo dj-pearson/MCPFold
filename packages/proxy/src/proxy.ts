@@ -7,7 +7,7 @@ import {
   type JsonRpcId,
   type JsonRpcMessage,
 } from './jsonrpc.js';
-import { filterTools, isToolAllowed, type McpTool } from './filter.js';
+import { compileDirective, filterTools, type McpTool } from './filter.js';
 import {
   canonicalizeTools,
   diffToolSurface,
@@ -98,6 +98,8 @@ export function connectProxy(
   options: ProxyOptions = {},
 ): () => void {
   const directive = options.tools;
+  // S22.24: compile the directive once into an O(1) matcher for the tools/call hot path.
+  const compiledDirective = directive ? compileDirective(directive) : undefined;
   const rejectFiltered = options.rejectFilteredCalls ?? true;
   const pinned = options.pinnedTools;
   const pinnedMode = pinned?.mode ?? 'warn';
@@ -113,7 +115,7 @@ export function connectProxy(
     // notification-form call to a blocked tool would skip the check and fire-and-forget at the server.
     if (isRequest(message, 'tools/call')) {
       const name = callToolName(message);
-      if (directive && rejectFiltered && name && !isToolAllowed(name, directive)) {
+      if (compiledDirective && rejectFiltered && name && !compiledDirective.allows(name)) {
         audit.denied(name, 'filtered by mcpfold');
         // A request gets an error response; a notification has no id to respond to, so it is simply
         // dropped. Either way the blocked tool never reaches the server.

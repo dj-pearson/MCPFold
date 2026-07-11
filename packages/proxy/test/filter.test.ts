@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolsDirective } from '@mcpfold/core';
-import { filterTools, isToolAllowed } from '../src/filter.js';
+import { compileDirective, filterTools, isToolAllowed } from '../src/filter.js';
 import { connectProxy } from '../src/proxy.js';
 import { MemoryTransport } from '../src/transport/memory.js';
 import type { JsonRpcMessage } from '../src/jsonrpc.js';
@@ -46,6 +46,17 @@ describe('filterTools (S5.2)', () => {
     const allow: ToolsDirective = { mode: 'allow', list: ['Foo'] };
     expect(isToolAllowed('foo', allow)).toBe(true);
     expect(isToolAllowed('bar', allow)).toBe(false);
+  });
+
+  // S22.24: the directive precompiles into a Set for O(1) membership, honoring mode + normalization.
+  it('compileDirective gives O(1) Set-based membership consistent with isToolAllowed', () => {
+    const deny = compileDirective({ mode: 'deny', list: ['a', 'B'] });
+    expect(deny.allows('a')).toBe(false);
+    expect(deny.allows('b')).toBe(false); // normalized
+    expect(deny.allows('c')).toBe(true);
+    const allow = compileDirective({ mode: 'allow', list: ['x'] });
+    expect(allow.allows('X')).toBe(true);
+    expect(allow.allows('y')).toBe(false);
   });
 });
 

@@ -1733,3 +1733,24 @@ Tests: an `sse` server survives claude-code export→import; a `__proto__`-named
 key with an untouched prototype; the migration preserves `servers` absence (and loadConfig then rejects
 it); a `__proto__` schema key changes the tool digest (can't evade drift). `verify_all` green — lint,
 typecheck, full suite, and build.
+
+## S22.24 — Reduce proxy audit-sink syscalls and use a Set for the tool directive
+
+Started/done: 2026-07-11. LOW x2 (verified). `fileAuditSink` did `mkdirSync(recursive)` + `statSync` +
+`appendFileSync` (three syscalls) per event, and its size-check-then-`renameSync` rotation was a
+check-then-act with no locking, so concurrent proxies sharing a log path could both stat-under-limit
+then both rename/append, clobbering records. `isToolAllowed` did `directive.list.includes(name)` — an
+O(n) scan per tool → O(n*m) filtering on the `tools/call` hot path.
+
+**Fix.** The audit sink now creates the directory ONCE (cached flag) and keeps a running byte counter
+seeded from the file size a single time (no per-write `statSync`); on reaching `maxBytes` it rotates to
+a UNIQUE per-process filename (`${path}.<pid>.<seq>.<rand>`), so concurrent writers never clobber each
+other's rotated logs (and O_APPEND keeps interleaved appends atomic). New `compileDirective` precompiles
+the directive's list into a normalized `Set`; `filterTools`, `isToolAllowed`, and — via a compiled
+matcher held once in `connectProxy` — the `tools/call` guard all do O(1) membership.
+
+Tests: `compileDirective` gives Set-based membership consistent with mode + normalization; the audit
+sink rotates to a unique per-process file (holding the earlier event) and two writers sharing a path
+lose no records across rotation. `verify_all` green — lint, typecheck, full suite, and build.
+
+**All E22 stories (S22.1–S22.24) complete.**
