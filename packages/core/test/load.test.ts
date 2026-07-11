@@ -69,6 +69,29 @@ describe('loadConfig (S1.2)', () => {
     });
   });
 
+  // S22.6: a pathologically nested document must be a clean ok:false, never an uncaught RangeError.
+  describe('recursion-depth limit (S22.6)', () => {
+    it('returns a positioned error (not a throw) for deeply nested input', () => {
+      const depth = 500; // well past the 64-level cap
+      const text = '['.repeat(depth) + ']'.repeat(depth);
+      let res;
+      expect(() => (res = loadConfig(text))).not.toThrow();
+      expect(res!.ok).toBe(false);
+      if (!res!.ok) {
+        expect(res!.errors[0]?.message).toMatch(/too deep/i);
+        expect(res!.errors[0]?.line).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it('does not throw a RangeError even on ~200k levels of nesting', () => {
+      const depth = 200_000;
+      const text = '['.repeat(depth) + ']'.repeat(depth);
+      let res;
+      expect(() => (res = loadConfig(text))).not.toThrow();
+      expect(res!.ok).toBe(false);
+    });
+  });
+
   it('returns a pathed zod error for invalid-but-parseable config', () => {
     const text = `{
   "version": 1,

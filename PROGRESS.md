@@ -1327,3 +1327,25 @@ no backup. `verify_all` green — lint, typecheck, full suite (cli 283 incl. 20 
 undone in-tool) is explicitly optional and was deferred — it needs a new non-profile target concept
 and selection UX. The backup itself uses the standard `.mcpfold.bak.` format and is manually
 restorable today; the DoD (never overwrite without a timestamped backup) is met.
+
+## S22.6 — Enforce recursion-depth limits in core traversals (parse/serialize/diff)
+
+Started/done: 2026-07-11. HIGH (DoS, verified). `nodeToValue` (load.ts), `sortKeysDeep` (serialize.ts),
+and diff's `semanticEqual` recurse once per nesting level with no cap. A config with ~200k nested
+brackets made `loadConfig` throw an uncaught `RangeError: Maximum call stack size exceeded`, violating
+the documented no-throw `LoadResult` contract.
+
+**Fix.** Empirically the overflow hits BEFORE reconstruction — `parseTree` itself recurses per level —
+so a catch after parsing is insufficient. `loadConfig` now runs `findExcessiveDepthOffset`, an O(n)
+iterative scan of the raw text (skipping string contents and line/block comments so their brackets
+don't count) that returns a positioned `ok:false` when structural nesting exceeds 64 levels, BEFORE
+`parseTree`. Defense in depth: `nodeToValue` carries a depth counter and throws a caught
+`MaxNestingError` (→ positioned `ok:false`), and `sortKeysDeep` is depth-capped (which transitively
+bounds diff's `semanticEqual`, since it compares through `serialize`). Also fixed a latent bug where
+`[].map(sortKeysDeep)`/`[].map(nodeToValue)` passed the array index as the depth arg.
+
+Tests (load.test.ts): 500-level input returns a positioned "too deep" error without throwing;
+~200k-level input returns `ok:false` and never throws a RangeError. `verify_all` green — lint,
+typecheck, full suite (core 98, + all packages), and build.
+
+**Follow-ups:** none. 64 is ~10× the deepest legitimate config path, so no real config is affected.

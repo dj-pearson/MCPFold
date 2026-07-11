@@ -4960,7 +4960,7 @@
       "epic": "E22",
       "order": 6,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Enforce recursion-depth limits in core traversals (parse/serialize/diff)",
       "user_story": "As a user, I want a pathologically nested config to be rejected cleanly rather than crash the tool, so a typo or hostile file can't DoS mcpfold.",
