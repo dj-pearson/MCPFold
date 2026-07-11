@@ -206,3 +206,22 @@ describe('fileAuditSink (S18.4)', () => {
     expect(warnings[0]).toContain('audit log write failed');
   });
 });
+
+describe('audit in-flight map is bounded (S22.13)', () => {
+  it('evicts the oldest tracked call once the cap is exceeded, so unmatched ids do not accumulate', () => {
+    const events: AuditEvent[] = [];
+    let t = 1_000;
+    const rec = createAuditRecorder({
+      server: 'gh',
+      sink: (e) => events.push(e),
+      now: () => (t += 5),
+      maxInflight: 2,
+    });
+    rec.callStart(1, 'a', {});
+    rec.callStart(2, 'b', {});
+    rec.callStart(3, 'c', {}); // over the cap → evicts id 1 (oldest)
+    rec.callEnd(1, 'ok'); // id 1 was evicted → emits nothing
+    rec.callEnd(3, 'ok'); // id 3 still tracked → emits
+    expect(events.map((e) => e.tool)).toEqual(['c']);
+  });
+});

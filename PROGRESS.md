@@ -1498,3 +1498,26 @@ loop moves past them to the completable E22 security backlog per the blocked-han
 
 Unblock by running a focused session with live-server/credential access (S21.4), the site's analytics
 configuration (S21.5), then S21.6 once the new pages exist.
+
+## S22.13 — Bound proxy pending maps and validate the handshake protocol version
+
+Started/done: 2026-07-11. MEDIUM x2 (verified). Two unbounded/unvalidated spots in the proxy:
+(1) `pendingToolListing` (proxy.ts) and the audit `inflight` map (audit.ts) only shrank on a matching
+response, so a server that never replies — or replies with an error/non-tools result — leaked an entry
+per request, with no TTL or cap. (2) `handshake.ts` accepted `init.protocolVersion` unconditionally
+(`protocolSupported` was computed but never gated anything), sent `notifications/initialized` +
+`tools/list` regardless, and then echoed the attacker-chosen version as the `MCP-Protocol-Version`
+header on every later request; `init` could also be null.
+
+**Fix.** (1) The `tools/call`/`tools/list` tracking now evicts a tracked id on ANY response — only a
+genuine tools result is curated; an error/other result evicts and forwards unfiltered. The audit
+recorder gained a `maxInflight` cap (default 1024) that evicts the oldest tracked calls (Map insertion
+order) once exceeded. (2) The handshake validates that the `initialize` result is a non-null object
+(else `reachable:false`), and when the negotiated version is unsupported it returns
+`protocolSupported:false` with zero tools BEFORE sending `initialized`/`tools/list` or calling
+`setProtocolVersion` — so an unsupported version is never spoken or echoed as a header.
+
+Tests: audit evicts the oldest call past a cap of 2 (only the surviving id emits); handshake refuses an
+unsupported version (no tools/list, no header echo — `state.negotiated` stays undefined) and rejects a
+null initialize result as unreachable; the proxy forwards an error response to a tracked `tools/list`
+unchanged (id evicted, no leak). `verify_all` green — lint, typecheck, full suite (proxy 71), and build.

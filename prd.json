@@ -5156,7 +5156,7 @@
       "epic": "E22",
       "order": 13,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Bound proxy pending maps and validate the handshake protocol version",
       "user_story": "As a user, I want the proxy to stay bounded and speak only a protocol version it understands, so a slow or hostile server can't leak memory or push an unsupported version.",

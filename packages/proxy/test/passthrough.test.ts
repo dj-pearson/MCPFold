@@ -84,6 +84,18 @@ describe('connectProxy — tool filter cannot be bypassed (S22.12)', () => {
     client.receive({ jsonrpc: '2.0', method: 'tools/call', params: { name: 'ok' } });
     expect(server.sent).toHaveLength(2);
   });
+
+  // S22.13: a tracked tools/list id that comes back as an error (not a tools result) must be evicted
+  // and the error forwarded unchanged — it must not leak in the pending map.
+  it('forwards an error response to a tracked tools/list unchanged (no pending-map leak)', () => {
+    const client = new MemoryTransport();
+    const server = new MemoryTransport();
+    connectProxy(client, server, { tools: deny });
+    client.receive({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    const err: JsonRpcMessage = { jsonrpc: '2.0', id: 1, error: { code: -32000, message: 'nope' } };
+    server.receive(err);
+    expect(client.sent[0]).toEqual(err); // forwarded verbatim, id evicted
+  });
 });
 
 describe('streamTransport framing (S5.1)', () => {

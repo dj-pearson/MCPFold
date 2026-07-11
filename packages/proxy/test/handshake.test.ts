@@ -77,6 +77,38 @@ describe('handshake protocol negotiation (S17.4)', () => {
     expect(res.protocolSupported).toBe(false);
   });
 
+  // S22.13: an unsupported version must abort the handshake before tools/list and before the version
+  // is echoed as the MCP-Protocol-Version header.
+  it('does not complete the handshake for an unsupported version — no tools/list, no header echo', async () => {
+    const { transport, state } = fakeServer('2099-01-01', 5); // server claims 5 tools
+    const res = await handshake(transport, { timeoutMs: 500 });
+    expect(res.reachable).toBe(true);
+    expect(res.protocolSupported).toBe(false);
+    // tools/list was NOT sent, so no tools are reported despite the server offering 5.
+    expect(res.toolCount).toBe(0);
+    expect(res.tools).toEqual([]);
+    // The unsupported version was never pushed to the transport as the MCP-Protocol-Version header.
+    expect(state.negotiated).toBeUndefined();
+  });
+
+  it('rejects a null initialize result as unreachable (S22.13)', async () => {
+    let onMsg: ((m: JsonRpcMessage) => void) | undefined;
+    const transport: MessageTransport = {
+      onMessage: (h) => {
+        onMsg = h;
+      },
+      send: (msg) => {
+        if (msg.id != null && msg.method === 'initialize') {
+          queueMicrotask(() => onMsg?.({ jsonrpc: '2.0', id: msg.id!, result: null }));
+        }
+      },
+      close: () => {},
+    };
+    const res = await handshake(transport, { timeoutMs: 500 });
+    expect(res.reachable).toBe(false);
+    expect(res.error).toMatch(/non-object/);
+  });
+
   it('does not pin a single hardcoded date — the supported table is ordered oldest→newest', () => {
     expect(SUPPORTED_PROTOCOL_VERSIONS[0]).toBe('2024-11-05');
     expect(SUPPORTED_PROTOCOL_VERSIONS.at(-1)).toBe(PREFERRED_PROTOCOL_VERSION);

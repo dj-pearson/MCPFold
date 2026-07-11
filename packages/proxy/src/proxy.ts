@@ -146,42 +146,43 @@ export function connectProxy(
     if (isResponse(message) && message.id !== undefined) {
       audit.callEnd(message.id, message.error !== undefined ? 'error' : 'ok');
     }
-    if (
-      (directive || pinned) &&
-      message.id !== undefined &&
-      pendingToolListing.has(message.id) &&
-      isToolsResult(message.result)
-    ) {
+    if (message.id !== undefined && pendingToolListing.has(message.id)) {
+      // S22.13: evict on ANY response for a tracked id. A server that answers a tools/list with an
+      // error or a non-tools result would otherwise leak an entry per request (no TTL/cap). Only a
+      // genuine tools result is curated; anything else falls through and forwards unfiltered.
       pendingToolListing.delete(message.id);
-
-      // Tool-definition pinning (S18.1): verify the live surface against the trusted one BEFORE
-      // filtering, so drift is measured against everything the server actually offers.
-      if (pinned) {
-        const diff = diffToolSurface(pinned.surface, canonicalizeTools(message.result.tools));
-        if (hasToolDrift(diff)) {
-          pinned.onDrift?.(diff);
-          audit.drift(
-            `${diff.added.length} added, ${diff.removed.length} removed, ${diff.changed.length} changed`,
-          );
-          if (pinnedMode === 'block') {
-            // Refuse the whole listing — a drifted server shouldn't inject anything into context.
-            client.send(
-              errorResponse(message.id, {
-                code: SECURITY_BLOCKED,
-                message:
-                  'Tool definitions changed since you trusted this server (blocked by mcpfold). ' +
-                  'Review the diff and re-run `mcpfold trust` to approve.',
-              }),
+      if ((directive || pinned) && isToolsResult(message.result)) {
+        // Tool-definition pinning (S18.1): verify the live surface against the trusted one BEFORE
+        // filtering, so drift is measured against everything the server actually offers.
+        if (pinned) {
+          const diff = diffToolSurface(pinned.surface, canonicalizeTools(message.result.tools));
+          if (hasToolDrift(diff)) {
+            pinned.onDrift?.(diff);
+            audit.drift(
+              `${diff.added.length} added, ${diff.removed.length} removed, ${diff.changed.length} changed`,
             );
-            return;
+            if (pinnedMode === 'block') {
+              // Refuse the whole listing — a drifted server shouldn't inject anything into context.
+              client.send(
+                errorResponse(message.id, {
+                  code: SECURITY_BLOCKED,
+                  message:
+                    'Tool definitions changed since you trusted this server (blocked by mcpfold). ' +
+                    'Review the diff and re-run `mcpfold trust` to approve.',
+                }),
+              );
+              return;
+            }
           }
         }
-      }
 
-      const tools = directive ? filterTools(message.result.tools, directive) : message.result.tools;
-      // Spread the original result so `_meta` and any other discover fields survive untouched.
-      client.send({ ...message, result: { ...message.result, tools } });
-      return;
+        const tools = directive
+          ? filterTools(message.result.tools, directive)
+          : message.result.tools;
+        // Spread the original result so `_meta` and any other discover fields survive untouched.
+        client.send({ ...message, result: { ...message.result, tools } });
+        return;
+      }
     }
     // Everything else (MRTR input_required results, _meta-carrying messages, notifications,
     // errors) forwards verbatim — no rewriting, so stateless-core traffic is never corrupted.

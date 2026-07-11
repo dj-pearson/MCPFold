@@ -80,8 +80,11 @@ export function createAuditRecorder(opts: {
   sink: AuditSink;
   /** Injectable clock (ms since epoch) for deterministic tests. */
   now?: () => number;
+  /** Max concurrently-tracked in-flight calls before the oldest are evicted (S22.13). Default 1024. */
+  maxInflight?: number;
 }): AuditRecorder {
   const now = opts.now ?? (() => Date.now());
+  const maxInflight = opts.maxInflight ?? 1024;
   const iso = (ms: number) => new Date(ms).toISOString();
   const inflight = new Map<
     JsonRpcId,
@@ -90,6 +93,13 @@ export function createAuditRecorder(opts: {
 
   return {
     callStart(id, tool, params) {
+      // Bound the map: a server that never sends a matching response would otherwise leak one entry
+      // per call. Evict the oldest tracked calls (Map keeps insertion order) once over the cap (S22.13).
+      while (inflight.size >= maxInflight) {
+        const oldest = inflight.keys().next().value;
+        if (oldest === undefined) break;
+        inflight.delete(oldest);
+      }
       inflight.set(id, { tool, argShape: argumentShape(params), at: now() });
     },
     callEnd(id, outcome) {
