@@ -232,6 +232,11 @@
       "id": "E21",
       "title": "Editor-native surface & exposure expansion",
       "goal": "Grow exposure through surfaces developers already live in, plus the growth loops around them: a VS Code extension (MVP shipped in apps/vscode-extension), a free MCP token calculator, the token/context-reduction GEO cluster (pillar + comparison pages), and the instrumentation to know which channels convert. Captures the follow-ups from the July 2026 exposure sweep - see docs/exposure-plan.md, docs/token-query-geo-plan.md, and docs/launch/growth-channels.md."
+    },
+    {
+      "id": "E22",
+      "title": "Post-1.0 code review - CLI, core, adapters & proxy hardening",
+      "goal": "Close the security, data-safety, and robustness findings from the CLI/core/adapters/proxy/secrets code review so the daily-driver path (run, sync, pull, import) is safe against tampered configs, malicious MCP servers, and malformed input. Findings were produced by a five-way parallel review and each blocker/high was verified against the code."
     }
   ],
   "stories": [
@@ -4801,6 +4806,675 @@
       ],
       "definition_of_done": [
         "Adding a client is a visible, low-friction, one-PR path that turns users into contributors."
+      ]
+    },
+    {
+      "id": "S22.1",
+      "epic": "E22",
+      "order": 1,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Fix PowerShell command injection in the Windows keychain provider",
+      "user_story": "As a Windows user, I want `${keychain:...}` references resolved without letting a config value execute arbitrary PowerShell, so a tampered or synced config can't run code on my machine.",
+      "context": "Review finding (BLOCKER, verified). packages/secrets/src/providers/keychain.ts:32-40 interpolates the untrusted `account` (the path in `${keychain:path}`, which core's SECRET_REF_RE at schema.ts:68 allows as `.+`) directly into a single-quoted PowerShell -Command string: `(Get-StoredCredential -Target '${service}:${account}').GetNetworkCredential().Password`. A ref such as `${keychain:x'); Start-Process calc; ('}` closes the quote and executes injected statements. Secrets resolve at run/test time (commands/run.ts), and env-channel refs are not covered by the TOFU gate, so this is reachable for a tampered config even on an otherwise-trusted server. The POSIX branches pass `account` as an argv element (no shell); only the Windows branch string-interpolates.",
+      "acceptance_criteria": [
+        "The Windows keychain provider never interpolates account/service into a -Command script string; the value is passed out-of-band (a bound argv parameter via `-- <account>`, an env var, or -EncodedCommand).",
+        "A ${keychain:...} account containing a single quote, semicolon, ), $( , backtick, or newline resolves as a literal lookup key and cannot execute a command.",
+        "Behavior parity: a normal keychain account still resolves on win32.",
+        "Defense in depth: tighten core SECRET_REF_RE so the path excludes shell/quote metacharacters (coordinate with S22.22)."
+      ],
+      "files_hint": [
+        "packages/secrets/src/providers/keychain.ts",
+        "packages/secrets/test/keychain.test.ts",
+        "packages/core/src/schema.ts"
+      ],
+      "tests": [
+        "Unit: an injection-payload account does not alter the executed argv beyond the parameterized value, and no extra command runs.",
+        "Unit: a normal account still resolves on win32."
+      ],
+      "definition_of_done": [
+        "Windows keychain resolution is injection-proof, proven by a test that feeds a metacharacter-laden account and asserts no command execution."
+      ]
+    },
+    {
+      "id": "S22.2",
+      "epic": "E22",
+      "order": 2,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Merge into shared-state client files instead of overwriting them",
+      "user_story": "As a user of Claude Code, Zed, Gemini CLI, or VS Code, I want `mcpfold sync` to update only the MCP-servers section of my client config and preserve everything else, so folding my servers never wipes my login, editor settings, or history.",
+      "context": "Review finding (BLOCKER, data loss, verified). The sync engine reads the on-disk file and passes it as `existing` to adapter.render (commands/sync.ts:138-143; MCPAdapter.render accepts existing?, types.ts:104). Merge-aware adapters (codex-cli/goose/opencode) consume it, but the shared factory createMcpServersAdapter.render (packages/adapters/src/shared.ts:249-261), gemini-cli's custom render (gemini-cli.ts:70), and vscode (vscode.ts:105) omit the existing parameter and emit serialize({ [rootKey]: shape }) - a full replacement. claude-code user scope resolves to ~/.claude.json (Claude Code's entire user state: OAuth account, project history, numStartups), zed to ~/.config/zed/settings.json and .zed/settings.json (all editor settings), gemini-cli to ~/.gemini/settings.json (auth type, theme). The first sync destroys all non-MCP content. claude_desktop_config.json can also hold non-MCP keys (e.g. globalShortcut).",
+      "acceptance_criteria": [
+        "The shared full-replace factory (and any adapter whose target is not a dedicated MCP file) merges: parse existing, replace only the MCP-servers root key, and preserve every other top-level key.",
+        "claude-code (user), zed (user + project), gemini-cli (user + project), and vscode preserve all non-MCP keys on write.",
+        "claude-desktop is audited; if its target file can hold non-MCP keys, it merges too.",
+        "Dedicated files (.mcp.json project scope, canonical mcp.config.jsonc) may remain full-replace.",
+        "Merge preserves formatting/comments for JSONC client files (jsonc-parser modify/applyEdits, as opencode does)."
+      ],
+      "files_hint": [
+        "packages/adapters/src/shared.ts",
+        "packages/adapters/src/claude-code.ts",
+        "packages/adapters/src/zed.ts",
+        "packages/adapters/src/gemini-cli.ts",
+        "packages/adapters/src/vscode.ts",
+        "packages/adapters/src/claude-desktop.ts"
+      ],
+      "tests": [
+        "Per-adapter: render with an existing file containing unrelated top-level keys preserves them; only the servers key changes.",
+        "Round-trip: seed a realistic ~/.claude.json / zed settings.json with extra keys and assert they survive a sync write."
+      ],
+      "definition_of_done": [
+        "Syncing to claude-code/zed/gemini-cli/vscode never drops non-MCP content, proven by round-trip tests seeded with real-world extra keys."
+      ]
+    },
+    {
+      "id": "S22.3",
+      "epic": "E22",
+      "order": 3,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Reject __proto__/constructor keys in the core config parser",
+      "user_story": "As a user, I want a malformed or hostile config to fail validation rather than silently validate as empty, so the strict schema can't be bypassed and my real servers can't vanish.",
+      "context": "Review finding (HIGH, schema bypass, verified at runtime). packages/core/src/load.ts:180-187 nodeToValue reconstructs objects with obj[key] = nodeToValue(...). Bracket assignment to __proto__ invokes the prototype setter, so a `__proto__` property mutates the object's prototype instead of creating an own property. Confirmed: loadConfig of a document whose whole body is nested under __proto__ returns ok:true with zero own keys - the .strict() schema is fully bypassed and any real servers/profiles nested there silently disappear. detectVersion reads version through the prototype chain, so prototype content also drives version detection. A server literally named __proto__ corrupts the servers record.",
+      "acceptance_criteria": [
+        "nodeToValue builds objects with Object.create(null) or explicitly skips/rejects the keys __proto__, constructor, and prototype, emitting a positioned schema error for a literal __proto__ key.",
+        "The same hardening is applied in serialize.ts sortKeysDeep and the migration spreads.",
+        "A config whose body is nested under __proto__ returns ok:false (schema error), not a silently-empty valid config.",
+        "Real content under a normal key is never dropped."
+      ],
+      "files_hint": [
+        "packages/core/src/load.ts",
+        "packages/core/src/serialize.ts",
+        "packages/core/src/migrate/migrations.ts",
+        "packages/core/test/load.test.ts"
+      ],
+      "tests": [
+        "Unit: __proto__-bodied and __proto__-named-server payloads return ok:false; a normal config is unaffected."
+      ],
+      "definition_of_done": [
+        "The untrusted parse path cannot be bypassed via __proto__/constructor, proven by tests."
+      ]
+    },
+    {
+      "id": "S22.4",
+      "epic": "E22",
+      "order": 4,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Include env in the TOFU executable signature (NODE_OPTIONS/LD_PRELOAD)",
+      "user_story": "As a user with trusted MCP servers, I want a change to a server's environment to force re-approval, so a tampered config can't inject code via env vars behind my back.",
+      "context": "Review finding (HIGH, verified). packages/cli/src/trust/tofu.ts:31-38 executableSignature hashes only command, args, and pin. run.ts:235 spawns the child with { ...process.env, ...(s.env ?? {}) }. Server env is a first-class code-execution channel: NODE_OPTIONS=--require /evil.js (any node/npx server), LD_PRELOAD, LD_LIBRARY_PATH, DYLD_*, PYTHONSTARTUP, PYTHONPATH, BROWSER. Because env is outside the signed surface, a synced config can change a trusted server's env and it runs with no CHANGED / re-approve gate; pull.ts:169 even auto-approves via gate.approve.",
+      "acceptance_criteria": [
+        "executableSignature includes a canonicalized (sorted keys+values) form of env, or at minimum pins a denylist of code-execution env vars (NODE_OPTIONS, LD_PRELOAD, LD_LIBRARY_PATH, DYLD_*, PYTHONSTARTUP, PYTHONPATH, BROWSER) so any change forces re-approval.",
+        "Adding NODE_OPTIONS to a previously-trusted server flips the trust decision to changed / needs-approval.",
+        "run does not spawn the child until the changed server is re-approved."
+      ],
+      "files_hint": [
+        "packages/cli/src/trust/tofu.ts",
+        "packages/cli/src/commands/run.ts",
+        "packages/cli/src/commands/pull.ts",
+        "packages/cli/test/tofu.test.ts"
+      ],
+      "tests": [
+        "Unit: mutating a trusted server's env changes the signature / trust decision."
+      ],
+      "definition_of_done": [
+        "A trusted server whose env is altered by a pulled config is re-gated before it can run."
+      ]
+    },
+    {
+      "id": "S22.5",
+      "epic": "E22",
+      "order": 5,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Back up the canonical config before pull --yes overwrites it",
+      "user_story": "As a user, I want `mcpfold pull` to back up my local canonical config before applying a remote version, so I can recover uncommitted local edits if I pull the wrong thing.",
+      "context": "Review finding (HIGH, data loss, verified). commands/pull.ts:165 calls atomicWrite(target, serialize(remote.config)) with no prior backupIfExists (pull.ts imports only atomicWrite). Every other canonical-config writer backs up first: migrate.ts:80 and sync.ts:173 both call backupIfExists before atomicWrite. restore only enumerates client files via adapter.resolvePath per profile (restore.ts:47-56) and never targets the canonical mcp.config.jsonc, so a clobbered canonical config with uncommitted edits is unrecoverable.",
+      "acceptance_criteria": [
+        "runPull calls backupIfExists(target) immediately before atomicWrite.",
+        "The backup path is returned in PullData and surfaced in the human output (mirroring migrate/sync).",
+        "Optionally, restore learns to enumerate the canonical file so a pulled overwrite can be undone."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/pull.ts",
+        "packages/cli/src/io/backup.ts",
+        "packages/cli/src/commands/restore.ts",
+        "packages/cli/test/pull.test.ts"
+      ],
+      "tests": [
+        "Integration: a pre-existing canonical config is backed up before a pull applies; the backup path appears in output."
+      ],
+      "definition_of_done": [
+        "pull --yes never overwrites the canonical config without leaving a timestamped backup."
+      ]
+    },
+    {
+      "id": "S22.6",
+      "epic": "E22",
+      "order": 6,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Enforce recursion-depth limits in core traversals (parse/serialize/diff)",
+      "user_story": "As a user, I want a pathologically nested config to be rejected cleanly rather than crash the tool, so a typo or hostile file can't DoS mcpfold.",
+      "context": "Review finding (HIGH, DoS, verified at runtime). packages/core/src/load.ts:177-194 nodeToValue, serialize.ts:23-34 sortKeysDeep, and diff's semanticEqual recurse once per nesting level with no depth cap. Confirmed: a config with ~200k nested brackets makes loadConfig throw an uncaught RangeError: Maximum call stack size exceeded, violating the documented no-throw LoadResult contract.",
+      "acceptance_criteria": [
+        "A maximum nesting depth (e.g. 64) is enforced during parse and traversal; exceeding it returns a positioned schema/parse error (ok:false), never throws.",
+        "sortKeysDeep and semanticEqual are depth-capped or iterative.",
+        "A config with pathological nesting returns ok:false cleanly."
+      ],
+      "files_hint": [
+        "packages/core/src/load.ts",
+        "packages/core/src/serialize.ts",
+        "packages/core/src/diff.ts",
+        "packages/core/test/load.test.ts"
+      ],
+      "tests": [
+        "Unit: deeply nested input returns a positioned error instead of throwing."
+      ],
+      "definition_of_done": [
+        "No config text can make core throw a RangeError; deep nesting is a clean validation error."
+      ]
+    },
+    {
+      "id": "S22.7",
+      "epic": "E22",
+      "order": 7,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Keep loadConfig's no-throw contract for malformed version numbers",
+      "user_story": "As a user, I want a config with a bad version number to produce a clear error rather than crash doctor/sync, so one typo doesn't take down the tool.",
+      "context": "Review finding (HIGH, verified at runtime). load.ts:132-135 calls migrateConfig(value, SCHEMA_VERSION) with no try/catch whenever detectVersion(value) < 2. detectVersion (migrate/index.ts:17-26) accepts any number verbatim - 0, negatives, fractionals. migrateConfig then loops while (current < target) and throws MigrationError when no step has from === current. Confirmed: version 0 and version 1.5 both throw uncaught, crashing any consumer that relies on the documented no-throw LoadResult (doctor, sync).",
+      "acceptance_criteria": [
+        "loadConfig converts a thrown MigrationError into an ok:false PositionedError (code schema).",
+        "detectVersion rejects non-integer or < 1 versions as a schema error before migrating.",
+        "Configs with version 0, -1, and 1.5 all return ok:false rather than throwing."
+      ],
+      "files_hint": [
+        "packages/core/src/load.ts",
+        "packages/core/src/migrate/index.ts",
+        "packages/core/test/migrate.test.ts"
+      ],
+      "tests": [
+        "Unit: version 0 / -1 / 1.5 each yield ok:false."
+      ],
+      "definition_of_done": [
+        "Malformed version numbers never throw out of loadConfig."
+      ]
+    },
+    {
+      "id": "S22.8",
+      "epic": "E22",
+      "order": 8,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Parse client configs tolerantly (JSONC) and never crash on malformed input",
+      "user_story": "As a user, I want `mcpfold import` and drift detection to handle a client config that has comments or a small mistake, so a valid JSONC file or a corrupt file gives a clear error instead of a raw crash.",
+      "context": "Review finding (HIGH, verified). Every adapter parse() uses JSON.parse with no try/catch (shared.ts:263, vscode.ts:125, gemini-cli.ts:83, opencode.ts:100, and others). VS Code mcp.json, Cursor mcp.json, Claude Code config, and Roo/Cline settings are officially JSONC (comments and trailing commas are allowed and common). JSON.parse throws an uncaught SyntaxError on those, and on any user-corrupted file. opencode's own render can even emit JSONC its parse then can't read.",
+      "acceptance_criteria": [
+        "JSONC clients are parsed with a tolerant parser (jsonc-parser, already a dependency).",
+        "Every adapter parse is wrapped so a malformed or commented file raises a UsageError naming the file, never a raw exception.",
+        "import and drift detection handle a commented client file and a corrupt file gracefully."
+      ],
+      "files_hint": [
+        "packages/adapters/src/shared.ts",
+        "packages/adapters/src/vscode.ts",
+        "packages/adapters/src/gemini-cli.ts",
+        "packages/adapters/src/opencode.ts",
+        "packages/cli/src/commands/import.ts"
+      ],
+      "tests": [
+        "Unit: a JSONC file with comments parses cleanly; a corrupt file yields a UsageError, not a SyntaxError."
+      ],
+      "definition_of_done": [
+        "No third-party client config can crash import/drift with a raw parser exception."
+      ]
+    },
+    {
+      "id": "S22.9",
+      "epic": "E22",
+      "order": 9,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Wire package-integrity (SRI) verification end-to-end",
+      "user_story": "As a user who pins an integrity hash on a stdio server, I want the fetched package's bytes actually verified against it, so the supply-chain control is real and not decorative.",
+      "context": "Review finding (MEDIUM, combined + verified). packages/cli/src/trust/integrity.ts exports verifyPackageIntegrity and computeIntegrity, but a grep shows they are never called anywhere - only parseIntegrity is used, and only to warn on malformed syntax (checks/servers.ts:56). The supply-chain control is dead. Separately, core resolve.ts:42-60 toResolved never copies server.integrity onto ResolvedServer (types.ts has no integrity field), so the hash can't reach the fetch/install layer even once verification is wired.",
+      "acceptance_criteria": [
+        "integrity propagates through resolution: ResolvedServer gains integrity? and toResolved sets integrity: server.integrity.",
+        "The fetch/install/pin path computes the fetched tarball hash and calls verifyPackageIntegrity, failing closed on a mismatch with a clear supply-chain error.",
+        "A declared-but-mismatching integrity blocks the operation.",
+        "Tests cover propagation and match/mismatch/malformed."
+      ],
+      "files_hint": [
+        "packages/core/src/resolve.ts",
+        "packages/core/src/types.ts",
+        "packages/cli/src/registry/map.ts",
+        "packages/cli/src/registry/mcpb.ts",
+        "packages/cli/src/trust/integrity.ts"
+      ],
+      "tests": [
+        "Unit: integrity survives resolution; a mismatching hash fails closed."
+      ],
+      "definition_of_done": [
+        "A pinned integrity hash is enforced against fetched bytes, proven by a mismatch test."
+      ]
+    },
+    {
+      "id": "S22.10",
+      "epic": "E22",
+      "order": 10,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Cap the proxy stdio read buffer and handle stream errors/close",
+      "user_story": "As a user running the curation proxy, I want a malicious or crashing MCP server to be contained, so it can't OOM the proxy or take it down with an uncaught stream error.",
+      "context": "Review finding (HIGH + MEDIUM, verified). packages/proxy/src/transport/stdio.ts:14-24 onData does buffer += chunk and only drains up to the last newline, with no maximum. A server (the untrusted party the proxy exists to contain) can stream megabytes/gigabytes with no newline and the proxy accumulates it all. The transport also registers only input.on('data', ...) - no 'error'/'end'/'close' handler - so a stream error (EPIPE when the child dies) becomes an uncaught exception; close() only removes the data listener and never destroys the stream, and residual bytes after the final newline are dropped silently on EOF.",
+      "acceptance_criteria": [
+        "A maximum buffered-line length (a few MB, configurable) is enforced; exceeding it closes the connection with an error instead of growing.",
+        "input 'error'/'end'/'close' are handled and surfaced as a clean shutdown.",
+        "close() removes all listeners and destroys the stream.",
+        "A test streams an over-cap line and asserts bounded memory plus a clean error."
+      ],
+      "files_hint": [
+        "packages/proxy/src/transport/stdio.ts",
+        "packages/proxy/src/proxy.ts",
+        "packages/proxy/test/stdio.test.ts"
+      ],
+      "tests": [
+        "Unit: over-cap unterminated input closes with an error; a stream error does not crash the proxy."
+      ],
+      "definition_of_done": [
+        "The proxy survives a server that floods stdout or crashes mid-write."
+      ]
+    },
+    {
+      "id": "S22.11",
+      "epic": "E22",
+      "order": 11,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Validate registry-supplied runtime hints and remote URLs before writing configs",
+      "user_story": "As a user, I want the launch command mcpfold writes into my client configs to come from a known-safe set, so a malicious registry mirror can't make me run an arbitrary command.",
+      "context": "Review finding (MEDIUM, security, verified). packages/cli/src/registry/map.ts:50-64 runnerFor returns pkg.runtimeHint ?? 'npx'. runtimeHint is server-controlled data from server.json and flows directly into server.command (the process the client will spawn), with only the pinned package spec as args. A registry entry can set runtimeHint to an arbitrary command string. remote.url (map.ts:124) is also written into client configs without validating it is https.",
+      "acceptance_criteria": [
+        "Runners are whitelisted: known registryType/runtimeHint values map to npx/uvx/docker/etc.; an unknown runtime hint is rejected with a UsageError, never passed through as the command.",
+        "remote.url must be an https URL before it is written into a client config.",
+        "Tests cover a hostile runtimeHint and a non-https url."
+      ],
+      "files_hint": [
+        "packages/cli/src/registry/map.ts",
+        "packages/cli/src/registry/client.ts",
+        "packages/cli/test/registry.test.ts"
+      ],
+      "tests": [
+        "Unit: an arbitrary runtimeHint is rejected; a non-https remote url is rejected."
+      ],
+      "definition_of_done": [
+        "Registry data can only produce a whitelisted runner and an https remote url."
+      ]
+    },
+    {
+      "id": "S22.12",
+      "epic": "E22",
+      "order": 12,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Close proxy tool-filter bypasses (notification-form call, alias/case)",
+      "user_story": "As a user relying on the curation proxy's deny list, I want a blocked tool to stay blocked no matter how the call is shaped, so the filter is a real boundary.",
+      "context": "Review finding (MEDIUM, security, verified). packages/proxy/src/proxy.ts:112 gates the tools/call rejection on message.id !== undefined, so a tools/call sent as a notification (no id) skips the !isToolAllowed check and is forwarded to the server at proxy.ts:134 - a blocked tool executes fire-and-forget. Separately, filter.ts:14-22 isToolAllowed uses exact directive.list.includes(name), so a deny-listed tool the server also honors under a different case/whitespace/namespace spelling (FOO, 'foo ', pkg:foo) passes the filter.",
+      "acceptance_criteria": [
+        "The tool filter is applied to tools/call regardless of id presence; a notification-form call to a filtered tool is dropped or rejected, never forwarded.",
+        "Tool-name matching is normalized consistently on both the tools/list filter and the tools/call guard (or non-canonical forms are rejected).",
+        "Tests cover a notification-form blocked call and a case/namespace-variant name."
+      ],
+      "files_hint": [
+        "packages/proxy/src/proxy.ts",
+        "packages/proxy/src/filter.ts",
+        "packages/proxy/test/proxy.test.ts"
+      ],
+      "tests": [
+        "Unit: a notification-form blocked call is not forwarded; a case-variant name is treated per the deny policy."
+      ],
+      "definition_of_done": [
+        "A filtered tool cannot reach the server via a notification or a spelling variant."
+      ]
+    },
+    {
+      "id": "S22.13",
+      "epic": "E22",
+      "order": 13,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Bound proxy pending maps and validate the handshake protocol version",
+      "user_story": "As a user, I want the proxy to stay bounded and speak only a protocol version it understands, so a slow or hostile server can't leak memory or push an unsupported version.",
+      "context": "Review finding (MEDIUM x2, verified). packages/proxy/src/proxy.ts pendingToolListing (proxy.ts:132) and audit inflight (audit.ts:93) only shrink on a matching response; a server that never replies (or replies with an error/non-tools result) leaks an entry per request, with no TTL or size cap. handshake.ts:154-160 accepts init.protocolVersion unconditionally (protocolSupported is computed at line 166 but never gates anything), sends notifications/initialized and tools/list regardless, and then echoes the attacker-chosen version string as the MCP-Protocol-Version header on every later request (mcp-transport.ts:51-53); init may also be null.",
+      "acceptance_criteria": [
+        "A tracked id is evicted on ANY response for that id (forward unfiltered if it isn't a tools result).",
+        "The audit inflight map has a TTL or size cap so stale ids are dropped.",
+        "The handshake validates init is a non-null object and, when the negotiated version is unsupported, does not send initialized/tools/list (returns protocolSupported:false or fails per policy).",
+        "Tests cover a leaking id and an unsupported version."
+      ],
+      "files_hint": [
+        "packages/proxy/src/proxy.ts",
+        "packages/proxy/src/audit.ts",
+        "packages/proxy/src/handshake.ts",
+        "packages/cli/src/util/mcp-transport.ts"
+      ],
+      "tests": [
+        "Unit: unmatched ids don't accumulate; an unsupported protocol version aborts the handshake."
+      ],
+      "definition_of_done": [
+        "The proxy's pending state is bounded and it refuses unsupported protocol versions."
+      ]
+    },
+    {
+      "id": "S22.14",
+      "epic": "E22",
+      "order": 14,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Pass the macOS session secret over stdin, not argv",
+      "user_story": "As a macOS user, I want my session tokens kept out of the process argument list, so another local process can't read them from ps while login runs.",
+      "context": "Review finding (MEDIUM, verified). packages/cli/src/cloud/token-store.ts:68-71 - the darwin set command is `security add-generic-password -U -s mcpfold -a <account> -w <secret>`, placing the serialized CloudSession (both access and refresh tokens) directly in argv. The module docstring and the Linux (line 83) and Windows (line 124) branches deliberately use stdin (never argv); only the macOS branch inlines the value.",
+      "acceptance_criteria": [
+        "The darwin set command uses -w with no inline value and feeds the secret over stdin, matching the Linux/Windows branches.",
+        "run() writes stdin for the set command.",
+        "The secret never appears in argv on any platform.",
+        "A test asserts the darwin set command carries the secret via stdin, not args."
+      ],
+      "files_hint": [
+        "packages/cli/src/cloud/token-store.ts",
+        "packages/cli/test/token-store.test.ts"
+      ],
+      "tests": [
+        "Unit: darwin set specifies stdin and omits the secret from args."
+      ],
+      "definition_of_done": [
+        "No mcpfold-spawned credential command exposes a secret in argv."
+      ]
+    },
+    {
+      "id": "S22.15",
+      "epic": "E22",
+      "order": 15,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Validate the cloud refresh response before persisting the session",
+      "user_story": "As a user, I want a malformed token-refresh response to surface an error rather than silently log me out, so my session state stays consistent.",
+      "context": "Review finding (MEDIUM, verified). packages/cli/src/cloud/api.ts:113-117 refresh returns (await res.json()) as RefreshResponse with no shape check - unlike pollDevice, which validates tokens at the source (S16.6, lines 96-104). session.ts:41-49 then trusts it: accessToken: refreshed.access_token and expiresAt: now + refreshed.expires_in. A 200 response missing access_token/expires_in yields accessToken undefined (JSON.stringify drops it, so loadSession later returns null and silently logs the user out) and expiresAt NaN (defeats the still-valid check, so every call re-refreshes).",
+      "acceptance_criteria": [
+        "refresh validates access_token is a non-empty string and expires_in is finite before returning and/or before saveSession, reusing the pollDevice validation.",
+        "A malformed 200 surfaces a clear error instead of corrupting the stored session.",
+        "A test covers a missing-field 200."
+      ],
+      "files_hint": [
+        "packages/cli/src/cloud/api.ts",
+        "packages/cli/src/cloud/session.ts",
+        "packages/cli/test/session.test.ts"
+      ],
+      "tests": [
+        "Unit: a refresh 200 missing access_token/expires_in does not persist a corrupt session."
+      ],
+      "definition_of_done": [
+        "A bad refresh response can't silently log the user out or spin re-refreshes."
+      ]
+    },
+    {
+      "id": "S22.16",
+      "epic": "E22",
+      "order": 16,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Back up and atomically write on import --force, and re-validate the merged config",
+      "user_story": "As a user, I want `mcpfold import --force` to back up my existing config, write atomically, and refuse to persist an invalid result, so an import can't corrupt or silently break my canonical config.",
+      "context": "Review finding (MEDIUM + LOW, verified). commands/import.ts:246 uses writeFileSync(configPath, contents) - the --force overwrite path (the no-force case is guarded at line 159) takes no backupIfExists and is not atomic, unlike migrate/sync/add. import also writes without a loadConfig round-trip (add.ts:231-236 and init.ts:72-75 validate; import doesn't), so a client file that parses into a shape the canonical schema rejects yields an invalid mcp.config.jsonc on disk.",
+      "acceptance_criteria": [
+        "import routes the write through atomicWrite and calls backupIfExists when the file already exists.",
+        "import runs loadConfig on the merged result and raises a ConfigValidationError (or warns listing the offending servers) instead of persisting an invalid canonical file.",
+        "Tests cover force-overwrite backup and an invalid merge."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/import.ts",
+        "packages/cli/src/io/atomic-write.ts",
+        "packages/cli/src/io/backup.ts"
+      ],
+      "tests": [
+        "Integration: import --force backs up first; an invalid merge is rejected, not written."
+      ],
+      "definition_of_done": [
+        "import --force is atomic, backed up, and never writes an invalid canonical config."
+      ]
+    },
+    {
+      "id": "S22.17",
+      "epic": "E22",
+      "order": 17,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Make watchWithDebounce swallow onChange rejections (honor never-throws contract)",
+      "user_story": "As a user running `mcpfold sync --watch`, I want a transient error in a change handler to be contained, so the watch keeps running instead of crashing the process.",
+      "context": "Review finding (MEDIUM, verified). packages/cli/src/io/watch.ts:74 invokes the async fire as void fire() (and re-invokes via schedule() in the finally re-run path). If onChange returns a rejected promise, fire's promise rejects and, discarded with void, becomes an unhandled promise rejection - process-terminating on modern Node. The module's own doc (lines 37-38) promises the primitive never throws or dies. runSyncWatch happens to wrap its work in try/catch, but watchWithDebounce is a public export (index.ts:43) and the contract is unmet for any other caller.",
+      "acceptance_criteria": [
+        "fire catches internally so an onChange rejection can never escape (or every call site uses .catch).",
+        "A test with a rejecting onChange produces no unhandled rejection and the watch keeps running."
+      ],
+      "files_hint": [
+        "packages/cli/src/io/watch.ts",
+        "packages/cli/test/watch.test.ts"
+      ],
+      "tests": [
+        "Unit: a rejecting onChange does not surface an unhandled rejection."
+      ],
+      "definition_of_done": [
+        "watchWithDebounce honors its documented never-throws contract."
+      ]
+    },
+    {
+      "id": "S22.18",
+      "epic": "E22",
+      "order": 18,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Add a request timeout and response/zip size limits to the registry client",
+      "user_story": "As a user, I want registry calls to fail fast and bounded, so a slow or malicious mirror can't hang the CLI or exhaust memory.",
+      "context": "Review finding (MEDIUM + LOW, verified). packages/cli/src/registry/client.ts:49 fetchImpl(url, { headers }) sets no AbortSignal/timeout, so a mirror that accepts the connection but never responds hangs the CLI forever (contradicting the S0.9 fail-clearly contract). client.ts:64 res.json() reads an unbounded body, and registry/mcpb.ts:54-56 unzipSync decompresses a .mcpb bundle with no size or entry-count cap (fflate has no zip-bomb guard).",
+      "acceptance_criteria": [
+        "Registry fetches attach AbortSignal.timeout and surface a timeout via the existing degraded-mode UsageError.",
+        "A maximum content length is enforced on registry responses.",
+        "A maximum decompressed size / entry count is enforced when reading manifest.json, aborting past the threshold.",
+        "Tests cover a timeout and an oversize response/bundle."
+      ],
+      "files_hint": [
+        "packages/cli/src/registry/client.ts",
+        "packages/cli/src/registry/mcpb.ts",
+        "packages/cli/test/registry.test.ts"
+      ],
+      "tests": [
+        "Unit: a non-responding mirror times out; an oversized bundle is rejected."
+      ],
+      "definition_of_done": [
+        "Registry access is time-bounded and size-bounded."
+      ]
+    },
+    {
+      "id": "S22.19",
+      "epic": "E22",
+      "order": 19,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Fix policy package matching (segment boundary) and glob ReDoS",
+      "user_story": "As an org admin, I want allow/deny policy rules to match exactly the packages I name and evaluate in linear time, so governance isn't silently over/under-applied or hung by a glob.",
+      "context": "Review finding (MEDIUM + LOW, verified). packages/core/src/policy.ts:114-118 - the package matcher is stripVersion(pkg).startsWith(rule.package) || pkg.startsWith(rule.package), a raw startsWith with no path/segment boundary, so a rule for @modelcontextprotocol/server-git matches @modelcontextprotocol/server-github, and foo matches foo-bar (over/under-matching for a deny-wins control). policy.ts:101-104 globToRe maps each * to .* with no collapsing, so a url glob with ** compiles to adjacent .* groups - catastrophic backtracking against a long server.url.",
+      "acceptance_criteria": [
+        "The package matcher requires a name boundary: exact versionless-spec equality, or the next character after the prefix is /, @, or end-of-string.",
+        "Runs of * collapse to a single .* (or a linear segment matcher replaces the regex) before compiling.",
+        "Tests cover a sibling-package non-match and a ** glob against a long non-matching url with bounded time."
+      ],
+      "files_hint": [
+        "packages/core/src/policy.ts",
+        "packages/core/test/policy.test.ts"
+      ],
+      "tests": [
+        "Unit: server-git rule does not match server-github; a ** url glob evaluates in bounded time."
+      ],
+      "definition_of_done": [
+        "Policy matching is boundary-correct and ReDoS-free."
+      ]
+    },
+    {
+      "id": "S22.20",
+      "epic": "E22",
+      "order": 20,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Harden atomicWrite (durability + symlink) and use it in export/init",
+      "user_story": "As a user, I want config writes to be crash-durable and to not silently replace my symlinked config files, and I want every config writer to be atomic.",
+      "context": "Review finding (LOW, verified). packages/cli/src/io/atomic-write.ts:26 gives atomic content replacement but no fsync of the file or directory, so the documented crash-mid-write-leaves-original-intact guarantee is weaker than stated (a power-loss just after renameSync can lose the rename or leave a zero-length file). renameSync over a symlinked target replaces the link with a regular file (backupIfExists's copyFileSync reads through the link), silently destroying a user's symlinked config on the next sync. Separately, export.ts:167 and init.ts:90 use bare writeFileSync (a torn read is possible when export --force overwrites a file another tool is reading).",
+      "acceptance_criteria": [
+        "Optionally fsync the temp fd before rename and the directory after, if the durability claim is to hold.",
+        "Symlink intent is decided and documented (resolve realpathSync if links should be followed).",
+        "export and init write via atomicWrite."
+      ],
+      "files_hint": [
+        "packages/cli/src/io/atomic-write.ts",
+        "packages/cli/src/commands/export.ts",
+        "packages/cli/src/commands/init.ts"
+      ],
+      "tests": [
+        "Unit: export/init use atomicWrite; symlink behavior matches the documented intent."
+      ],
+      "definition_of_done": [
+        "All config writers are atomic and atomicWrite's durability/symlink behavior matches its docs."
+      ]
+    },
+    {
+      "id": "S22.21",
+      "epic": "E22",
+      "order": 21,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Validate numeric CLI flags and harden dotenv secret set",
+      "user_story": "As a user, I want bad numeric flags to be rejected and `mcpfold secret set` to write .env safely, so flags don't silently misbehave and secrets don't leak or duplicate.",
+      "context": "Review finding (LOW x2, verified). cli.ts:530 and :639 coerce --limit and --config-version with Number() and never reject NaN/negative/non-integer, forwarding garbage to the registry/cloud client (--limit abc becomes NaN; --config-version 1.5 stays non-integer). commands/secret.ts:84 appendFileSync(envPath, `${parsed.path}=${options.value}\\n`, { mode: 0o600 }) appends unconditionally: parsed.path ([^}]+) and value are unescaped (a newline injects extra KEY=VALUE lines), duplicate keys accumulate (last-wins masks stale values), and mode 0o600 only applies when .env is created - a pre-existing 0644 .env stays world-readable.",
+      "acceptance_criteria": [
+        "--limit and --config-version parse via a validated integer helper that throws UsageError on NaN/negative (and non-integer for version).",
+        "dotenv secret set rejects path/value containing newline or =, upserts an existing key instead of blind-appending, and chmods 0600 after writing on POSIX.",
+        "Tests cover bad flags and an injection value."
+      ],
+      "files_hint": [
+        "packages/cli/src/cli.ts",
+        "packages/cli/src/commands/secret.ts",
+        "packages/cli/test/secret.test.ts"
+      ],
+      "tests": [
+        "Unit: --limit abc and --config-version 1.5 raise UsageError; a newline in a secret value is rejected."
+      ],
+      "definition_of_done": [
+        "Numeric flags are validated and dotenv writes are safe and idempotent."
+      ]
+    },
+    {
+      "id": "S22.22",
+      "epic": "E22",
+      "order": 22,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Tighten redaction prefixes and unify the secret-ref grammar",
+      "user_story": "As a user, I want all common token formats reliably redacted and secret references parsed consistently, so a secret can't slip into logs and doctor/resolver agree on a ref's path.",
+      "context": "Review finding (LOW x2, verified). packages/cli/src/util/redact.ts:29-34 KNOWN_TOKEN_RE omits GitHub fine-grained PATs (github_pat_) and Stripe secret keys (sk_live_/sk_test_; note sk- requires a hyphen, Stripe uses _), leaving them to the fragile HIGH_ENTROPY_RE heuristic; refguard.ts RAW_SECRET already covers github_pat_, so the two lists are inconsistent. packages/core/src/secret-ref.ts:29-32 WHOLE_REF_RE uses greedy (.+) while EMBEDDED_REF_RE uses ([^}]+), so ${env:a}b} parses to path a}b vs a between the whole and embedded paths; SECRET_REF_RE (schema.ts:68) also uses .+.",
+      "acceptance_criteria": [
+        "KNOWN_TOKEN_RE adds github_pat_ and sk_(live|test)_ and is aligned with refguard's RAW_SECRET list.",
+        "Whole-ref and embedded-ref parsing use the same non-} path class and agree on ${env:a}b}.",
+        "SECRET_REF_RE is updated consistently (coordinate with S22.1's grammar tightening).",
+        "Tests cover the new prefixes and the ambiguous ref."
+      ],
+      "files_hint": [
+        "packages/cli/src/util/redact.ts",
+        "packages/cli/src/cloud/refguard.ts",
+        "packages/core/src/secret-ref.ts",
+        "packages/core/src/schema.ts"
+      ],
+      "tests": [
+        "Unit: github_pat_ and sk_live_ are masked by the known-prefix rule; whole/embedded parsing agree."
+      ],
+      "definition_of_done": [
+        "All common token prefixes redact and the secret-ref grammar is single-sourced."
+      ]
+    },
+    {
+      "id": "S22.23",
+      "epic": "E22",
+      "order": 23,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Fix adapter/migration round-trip fidelity and residual __proto__ handling",
+      "user_story": "As a user, I want import/export round-trips to preserve transports and my configs, and hostile keys to be neutralized everywhere they're rebuilt, so fidelity and pinning integrity hold.",
+      "context": "Review finding (LOW, several, verified). packages/adapters/src/shared.ts:122-125,191-194 - for url-shape clients (Cursor/Zed/Cline/Warp/LM Studio) an sse remote is written as a bare url with no transport marker, so fromMcpServersShape re-reads it as streamable-http (transport lost on export->import). migrate/migrations.ts:25-33 synthesizes servers:{} when a v1 file omits servers, masking the required-field error. Adapter servers maps are built with plain-object assignment (shared.ts:174-203 and vscode/gemini/opencode/codex/goose) and proxy tool-digest.ts:31-33 sortDeep assigns __proto__ via computed key, so a server named __proto__ or a schema __proto__ key is mishandled or evades the pinning schemaDigest (S18.1 drift).",
+      "acceptance_criteria": [
+        "SSE transport is preserved for url-shape clients where possible, or the coercion is documented.",
+        "The v1->v2 migration preserves the absence of servers so the required-field error still fires.",
+        "Adapter servers maps and proxy sortDeep use Object.create(null) or skip __proto__/constructor so hostile keys can't corrupt the map or evade schemaDigest.",
+        "Tests cover an SSE round-trip and a __proto__-named server."
+      ],
+      "files_hint": [
+        "packages/adapters/src/shared.ts",
+        "packages/core/src/migrate/migrations.ts",
+        "packages/proxy/src/tool-digest.ts"
+      ],
+      "tests": [
+        "Unit: an sse remote survives export->import; a __proto__ key is neutralized in adapters and the digest."
+      ],
+      "definition_of_done": [
+        "Round-trips preserve transports and hostile keys can't corrupt maps or the pinning digest."
+      ]
+    },
+    {
+      "id": "S22.24",
+      "epic": "E22",
+      "order": 24,
+      "priority": "p3",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Reduce proxy audit-sink syscalls and use a Set for the tool directive",
+      "user_story": "As a user with auditing on, I want the audit sink to be cheap and reliable and tool filtering to be O(1), so per-call overhead and lost audit records are avoided.",
+      "context": "Review finding (LOW x2, verified). packages/proxy/src/audit.ts:139-147 fileAuditSink does mkdirSync(recursive) + statSync + appendFileSync (three syscalls) per event, and its size-check then renameSync rotation is a check-then-act with no locking, so concurrent proxies sharing a log path can both stat-under-limit then both rename/append, losing or clobbering records. filter.ts:14-22 isToolAllowed does directive.list.includes(name) - an O(n) scan per tool giving O(n*m) filtering, on the tools/call hot path.",
+      "acceptance_criteria": [
+        "The audit directory is created once (cached), a running byte counter avoids per-write statSync, and rotation is atomic or uses per-process filenames.",
+        "The directive is precomputed into a Set for O(1) membership on both filtering and the call guard.",
+        "Tests/bench as feasible."
+      ],
+      "files_hint": [
+        "packages/proxy/src/audit.ts",
+        "packages/proxy/src/filter.ts"
+      ],
+      "tests": [
+        "Unit: directive membership is Set-based; audit rotation doesn't lose records under concurrent writers."
+      ],
+      "definition_of_done": [
+        "Auditing is low-overhead and race-safe, and tool filtering is O(1) per tool."
       ]
     }
   ],
