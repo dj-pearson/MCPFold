@@ -402,3 +402,42 @@ describe('httpCloudApi.pollDevice response validation (S16.6)', () => {
     });
   });
 });
+
+describe('httpCloudApi.refresh response validation (S22.15)', () => {
+  const fetchReturning = (status: number, body: unknown): typeof fetch =>
+    (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+  const refresh = (status: number, body: unknown) =>
+    httpCloudApi('https://api.test', fetchReturning(status, body)).refresh('rt');
+
+  it('returns a validated response for a well-formed 200 (rotated or not)', async () => {
+    expect(await refresh(200, { access_token: 'a2', expires_in: 3600, refresh_token: 'r2' })).toEqual({
+      access_token: 'a2',
+      expires_in: 3600,
+      refresh_token: 'r2',
+    });
+    // A server that does not rotate the refresh token omits it — that is allowed.
+    expect(await refresh(200, { access_token: 'a2', expires_in: 3600 })).toEqual({
+      access_token: 'a2',
+      expires_in: 3600,
+    });
+  });
+
+  it('rejects a 200 missing the access token (no silent logout)', async () => {
+    await expect(refresh(200, { expires_in: 3600 })).rejects.toThrow(/malformed session/);
+  });
+
+  it('rejects a 200 whose expires_in is not finite (no re-refresh spin)', async () => {
+    await expect(refresh(200, { access_token: 'a2', expires_in: 'soon' })).rejects.toThrow(
+      /invalid expires_in/,
+    );
+    await expect(refresh(200, { access_token: 'a2', expires_in: null })).rejects.toThrow(
+      /invalid expires_in/,
+    );
+  });
+
+  it('rejects a 200 with an empty rotated refresh token', async () => {
+    await expect(
+      refresh(200, { access_token: 'a2', expires_in: 3600, refresh_token: '' }),
+    ).rejects.toThrow(/malformed session/);
+  });
+});

@@ -1537,3 +1537,21 @@ matches the Linux/Windows branches, so the secret never appears in argv on any p
 Tests (token-store.test.ts): the darwin set command carries the secret via `stdin`, its args do NOT
 contain the secret, and the final arg is a bare `-w`. `verify_all` green — lint, typecheck, full suite,
 and build.
+
+## S22.15 — Validate the cloud refresh response before persisting the session
+
+Started/done: 2026-07-11. MEDIUM (verified). `cloud/api.ts` `refresh` returned
+`(await res.json()) as RefreshResponse` with no shape check — unlike `pollDevice`, which validates
+tokens at the source (S16.6). `session.ts` then trusted it: `accessToken: refreshed.access_token`,
+`expiresAt: now + refreshed.expires_in`. A 200 missing `access_token`/`expires_in` yielded an undefined
+access token (dropped by JSON.stringify, so `loadSession` later returned null and silently logged the
+user out) and a `NaN` expiry (defeating the still-valid check, so every call re-refreshed).
+
+**Fix.** `refresh` now validates the body at the source, mirroring `pollDevice`: `access_token` must be
+a non-empty string and `expires_in` a finite number; `refresh_token` is optional (the server may not
+rotate it) but must be a non-empty string when present. A malformed 200 throws a clear
+"malformed session" error before `session.ts` can `saveSession`, so nothing corrupt is persisted.
+
+Tests (cloud.test.ts, new refresh-validation block): a well-formed 200 (rotated or not) returns the
+validated response; a 200 missing the access token, a non-finite `expires_in`, or an empty rotated
+refresh token each reject. `verify_all` green — lint, typecheck, full suite, and build.

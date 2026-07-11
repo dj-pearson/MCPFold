@@ -5212,7 +5212,7 @@
       "epic": "E22",
       "order": 15,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Validate the cloud refresh response before persisting the session",
       "user_story": "As a user, I want a malformed token-refresh response to surface an error rather than silently log me out, so my session state stays consistent.",
