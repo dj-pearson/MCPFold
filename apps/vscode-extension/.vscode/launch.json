@@ -1,0 +1,31 @@
+{
+  // Press F5 to launch the extension in a fresh Extension Development Host.
+  // The preLaunchTask runs the esbuild watch build first, so edits to src/ rebuild
+  // automatically — reload the host window (Cmd/Ctrl+R) to pick them up.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run mcpfold extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "npm: watch",
+      "sourceMaps": true
+    },
+    {
+      "name": "Run mcpfold extension (open a config workspace)",
+      "type": "extensionHost",
+      "request": "launch",
+      // Opens the bundled fixture folder so the status bar has a real mcp.config.jsonc
+      // to check drift against on launch. Point this at your own project to smoke-test live.
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "${workspaceFolder}/fixtures/smoke-workspace"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "npm: watch",
+      "sourceMaps": true
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+# Client files that `mcpfold sync` writes during a smoke test — generated, never committed.
+.vscode/
+.cursor/
+.mcp.json

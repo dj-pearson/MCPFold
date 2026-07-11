@@ -1,0 +1,60 @@
+name: VS Code extension
+
+# Verifies the mcpfold VS Code extension typechecks, builds, and packages to a valid .vsix.
+# The monorepo's `pnpm -r build` / `typecheck` already cover the first two on every push; this
+# workflow adds the `vsce package` step (which the others don't run) and guards against the
+# packaged icon regressing back to the multi-hundred-KB source. It does NOT publish — publishing
+# is a deliberate, PAT-gated manual step (see apps/vscode-extension/PUBLISHING.md).
+on:
+  pull_request:
+    paths:
+      - 'apps/vscode-extension/**'
+      - '.github/workflows/vscode-extension.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/vscode-extension/**'
+      - '.github/workflows/vscode-extension.yml'
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Guard the Marketplace icon size
+        # The listing icon must stay ~128px. A re-committed 1024px source (~500 KB) is the
+        # regression this catches — vsce also warns, but a warning doesn't fail the build.
+        run: |
+          icon="apps/vscode-extension/media/icon.png"
+          bytes=$(wc -c < "$icon")
+          echo "icon.png is $bytes bytes"
+          if [ "$bytes" -gt 51200 ]; then
+            echo "::error file=$icon::icon.png is ${bytes} bytes (> 50 KB) — downsize it to ~128px before publishing."
+            exit 1
+          fi
+
+      - name: Typecheck
+        run: pnpm --filter mcpfold-vscode typecheck
+
+      - name: Build
+        run: pnpm --filter mcpfold-vscode build
+
+      - name: Package (.vsix)
+        run: pnpm --filter mcpfold-vscode package
+
+      - name: Upload the .vsix
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcpfold-vscode-vsix
+          path: apps/vscode-extension/*.vsix
+          if-no-files-found: error

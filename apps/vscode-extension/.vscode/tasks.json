@@ -1,0 +1,54 @@
+{
+  // Tasks backing the F5 dev loop. `npm: watch` is the preLaunchTask in launch.json;
+  // it starts esbuild in watch mode and uses a background problem matcher so VS Code
+  // knows the build is "ready" and launches the host without waiting for the task to exit.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "watch",
+      "label": "npm: watch",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "esbuild",
+        "pattern": {
+          "regexp": "^(?:.*)$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "\\[mcpfold\\] watching for changes",
+          "endsPattern": "watching for changes"
+        }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "group": "watch"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "type": "npm",
+      "script": "build",
+      "label": "npm: build",
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "type": "npm",
+      "script": "typecheck",
+      "label": "npm: typecheck",
+      "problemMatcher": ["$tsc"],
+      "group": "build"
+    },
+    {
+      "type": "npm",
+      "script": "package",
+      "label": "npm: package (.vsix)",
+      "problemMatcher": [],
+      "group": "build"
+    }
+  ]
+}

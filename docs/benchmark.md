@@ -10,8 +10,9 @@ with and without curation.
   with a realistic `inputSchema`. Curated via `tools: { mode: "allow", list: [...] }` down
   to 3 tools per server (9 total).
 - **Measurement:** the serialized `tools/list` payload, before vs after the proxy filter.
-- **Tokenizer:** approximation of **1 token ≈ 4 characters** of JSON (the common GPT rule
-  of thumb). Exact counts vary by model tokenizer, but the *relative* reduction is stable
+- **Tokenizer:** the headline uses an approximation of **1 token ≈ 4 characters** of JSON
+  (the common GPT rule of thumb); [exact per-model counts](#exact-per-model-token-counts)
+  are reported alongside it below. The *relative* reduction is stable across every tokenizer
   because both sides are measured identically. Reproduce with
   `pnpm --filter @mcpfold/proxy bench`.
 
@@ -30,6 +31,40 @@ by loading only the 9 of 45 tools actually needed.
 > The headline: curation turns "connect every server" from a context-window tax into a
 > cheap, fast, focused toolset — with zero extra config, because the shim already in the
 > launch path does the filtering.
+
+## Exact per-model token counts
+
+The 1-token≈4-chars figure above is an approximation. Below are the same before/after
+payloads counted with real model tokenizers — GPT via `tiktoken` (`o200k_base` for the
+GPT-4o/4.1 family, `cl100k_base` for GPT-4/3.5-turbo) and Claude via
+`@anthropic-ai/tokenizer`:
+
+| Tokenizer | Tokens before | Tokens after | Reduction |
+| --------- | ------------: | -----------: | --------: |
+| Approximation (1 tok ≈ 4 chars) | 7476 | 1497 | ~80% |
+| GPT-4o / 4.1 (o200k_base) | 7576 | 1521 | ~80% |
+| GPT-4 / 3.5-turbo (cl100k_base) | 7444 | 1497 | ~80% |
+| Claude (@anthropic-ai/tokenizer) | 7266 | 1464 | ~80% |
+
+The approximation lands within a few percent of the exact counts, and the reduction holds at
+**~80%** across every real tokenizer — so the headline is not an artifact of the
+4-chars rule. These counts are deterministic; a snapshot test fails if they move.
+
+## At scale (~100 tools)
+
+The 45-tool fixture is deliberately small and reproducible. Real setups run larger, where the
+*absolute* savings are what bite. A 7-server / 101-tool fixture, curated to
+21 tools, using the same method:
+
+| Tokenizer | Tokens before | Tokens after | Reduction |
+| --------- | ------------: | -----------: | --------: |
+| Approximation (1 tok ≈ 4 chars) | 16732 | 3480 | ~79% |
+| GPT-4o / 4.1 (o200k_base) | 16912 | 3527 | ~79% |
+| GPT-4 / 3.5-turbo (cl100k_base) | 16486 | 3444 | ~79% |
+| Claude (@anthropic-ai/tokenizer) | 16146 | 3371 | ~79% |
+
+That is **16,732 → 3,480** approximate tokens (~79%) reclaimed from tool-schema JSON before the
+agent reads a single word — every turn.
 
 ## How this reads against native tool-search
 
@@ -59,13 +94,11 @@ full approach comparison (curation, compression, code execution, tool-search).
 
 ## Scale and tokenizer notes (honest boundaries)
 
-- **Fixture scale.** The 45-tool fixture is deliberately modest and reproducible. Real setups
-  are often larger — a handful of busy servers can reach tens of thousands of tool-definition
-  tokens — so the *absolute* savings in practice are typically larger than the fixture's, while
-  the *relative* ~80% is representative of trimming to the tools actually used.
-- **Tokenizer.** The 1-token≈4-chars approximation is used because it is tokenizer-independent
-  and both sides are measured identically, so the reduction ratio is stable. A follow-up
-  (tracked in [the token-query plan](./token-query-geo-plan.md)) is to also report exact
-  per-model counts via `tiktoken` / `@anthropic-ai/tokenizer` for headline credibility — a
-  coordinated change because the ~80%/7,476→1,497 figures are asserted by the site and its
-  end-to-end tests.
+- **Fixture scale.** The 45-tool headline fixture is deliberately modest and reproducible; the
+  [at-scale fixture](#at-scale-100-tools) above shows how the *absolute* savings grow — a
+  handful of busy servers can reach tens of thousands of tool-definition tokens — while the
+  *relative* ~80% stays representative of trimming to the tools actually used.
+- **Tokenizer.** The 1-token≈4-chars approximation is tokenizer-independent and both sides are
+  measured identically, so the reduction ratio is stable. Exact per-model counts (`tiktoken` /
+  `@anthropic-ai/tokenizer`) are now reported alongside it above and confirm the headline; the
+  site calculator keeps the approximation for instant, dependency-free interactivity.

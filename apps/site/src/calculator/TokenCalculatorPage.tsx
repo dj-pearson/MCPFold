@@ -392,8 +392,13 @@ export function TokenCalculatorPage() {
         <a href="https://github.com/dj-pearson/MCPFold/blob/main/docs/benchmark.md">
           reproducible benchmark
         </a>
-        . Real cost depends on each tool’s actual schema, so treat the tool counts as editable
-        estimates. The relative reduction is stable regardless of tokenizer. See{' '}
+        , which also publishes{' '}
+        <a href="https://github.com/dj-pearson/MCPFold/blob/main/docs/benchmark.md#exact-per-model-token-counts">
+          exact per-model counts
+        </a>{' '}
+        (GPT and Claude tokenizers) that land within a few percent of this approximation. Real cost
+        depends on each tool’s actual schema, so treat the tool counts as editable estimates. The
+        relative reduction is stable regardless of tokenizer. See{' '}
         <Link to="/compare/reduce-mcp-token-usage">how to reduce MCP token usage</Link> for every
         approach compared.
       </p>
