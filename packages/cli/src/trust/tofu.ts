@@ -18,6 +18,21 @@ export interface ExecutableEntry {
   command?: string;
   args?: string[];
   pin?: string;
+  /**
+   * The server's environment (S22.4). env is a first-class code-execution channel — `NODE_OPTIONS`,
+   * `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_*`, `PYTHONSTARTUP`/`PYTHONPATH`, `BROWSER` all run code
+   * behind the launch command — so it MUST be part of the signed surface. Values may be secret refs
+   * (`${env:X}`); we sign the config form, not the resolved values.
+   */
+  env?: Record<string, string>;
+}
+
+/** A stable, order-independent representation of a server's env for hashing. */
+function canonicalEnv(env?: Record<string, string>): Array<[string, string]> {
+  if (!env) return [];
+  return Object.keys(env)
+    .sort()
+    .map((k) => [k, env[k]!] as [string, string]);
 }
 
 export type TrustStatus = 'trusted' | 'new' | 'changed';
@@ -29,12 +44,16 @@ export function isExecutable(server: Pick<ServerConfig, 'transport' | 'command'>
 
 /** A stable hash of exactly the fields that determine what code runs. */
 export function executableSignature(entry: ExecutableEntry): string {
-  const stable = JSON.stringify({
+  const stable: Record<string, unknown> = {
     command: entry.command ?? null,
     args: entry.args ?? [],
     pin: entry.pin ?? null,
-  });
-  return createHash('sha256').update(stable).digest('hex');
+  };
+  // Only add `env` when it has entries, so a server with no env keeps its pre-S22.4 signature (its
+  // existing trust survives). A server that carries env re-gates once — env was previously unsigned.
+  const env = canonicalEnv(entry.env);
+  if (env.length > 0) stable.env = env;
+  return createHash('sha256').update(JSON.stringify(stable)).digest('hex');
 }
 
 /** A trusted server's pinned tool surface (S18.1) recorded alongside its executable signature. */
@@ -150,7 +169,12 @@ export function untrustedServers(config: Config, gate: TrustGate): UntrustedServ
   const out: UntrustedServer[] = [];
   for (const [name, server] of Object.entries(config.servers)) {
     if (!isExecutable(server)) continue;
-    const entry: ExecutableEntry = { command: server.command, args: server.args, pin: server.pin };
+    const entry: ExecutableEntry = {
+      command: server.command,
+      args: server.args,
+      pin: server.pin,
+      env: server.env,
+    };
     const status = gate.status(name, entry);
     if (status !== 'trusted') out.push({ name, status, entry });
   }

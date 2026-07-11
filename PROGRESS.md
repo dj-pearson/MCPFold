@@ -1278,3 +1278,29 @@ scan across the whole workspace.
 **Follow-ups:** the scan rejects these three keys anywhere, including inside free-form `env`/`headers`
 records — a pathological but theoretically-legitimate env var named `constructor` would be refused.
 Accepted as a security-over-flexibility tradeoff per the story's DoD.
+
+## S22.4 — Include env in the TOFU executable signature (NODE_OPTIONS/LD_PRELOAD)
+
+Started/done: 2026-07-11. HIGH (verified). `executableSignature` (trust/tofu.ts) hashed only
+command/args/pin, but `run` spawns the child with `{ ...process.env, ...server.env }`. env is a
+first-class code-execution channel — `NODE_OPTIONS=--require /evil.js` (any node/npx server),
+`LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_*`, `PYTHONSTARTUP`/`PYTHONPATH`, `BROWSER`. Because env was
+outside the signed surface, a synced/tampered config could change a trusted server's env and it ran
+with no CHANGED / re-approve gate.
+
+**Fix.** `ExecutableEntry` gains `env`, and `executableSignature` now folds a canonicalized
+(key-sorted) form of env into the hash. env is threaded into every entry construction — the run gate
+(run.ts), the trust command (trust.ts), and `untrustedServers` (which pull.ts consumes). To preserve
+existing trust, env is only added to the hashed object when non-empty: an env-less server keeps its
+pre-S22.4 signature (still trusted after upgrade); a server that carries env re-gates once (env was
+previously unsigned — desired). We sign the config form of env (secret refs), not resolved values.
+
+Tests (trust.test.ts): adding `NODE_OPTIONS` to a previously-trusted server flips its status to
+`changed`; an env value change / env presence changes the signature while key-order does not; an
+empty/absent env is byte-identical to the old signature; and `run` refuses to spawn (CHANGED) a
+server whose pulled config added `NODE_OPTIONS`, with the spawner never called. `verify_all` green —
+lint, typecheck, full suite (cli 283 incl. 14 trust), and build.
+
+**Follow-ups:** none for the DoD. pull's auto-approve of pulled launch commands stays gated behind
+integrity verification (a signed config, or explicit --allow-unsigned), so a tampered unsigned config
+is refused rather than auto-trusted; the run-path re-gate is the enforcement point.

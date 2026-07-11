@@ -74,6 +74,53 @@ describe('TOFU trust gate (S9.2)', () => {
     expect(untrustedServers(config, gate).map((u) => u.status)).toEqual(['changed']);
     expect(executableSignature({ command: 'x' })).not.toBe(executableSignature({ command: 'y' }));
   });
+
+  // S22.4: env is a code-execution channel (NODE_OPTIONS, LD_PRELOAD, …) and MUST be signed.
+  it('mutating a trusted server env flips the trust decision to changed', () => {
+    const gate = memoryTrustGate();
+    const config: Config = {
+      version: 2,
+      servers: { a: { transport: 'stdio', command: 'x', args: [], tags: [] } },
+      profiles: {},
+    };
+    gate.approve('a', { command: 'x', args: [] });
+    expect(untrustedServers(config, gate)).toEqual([]);
+    // Injecting NODE_OPTIONS into a previously-trusted server must force re-approval.
+    config.servers.a!.env = { NODE_OPTIONS: '--require /evil.js' };
+    expect(untrustedServers(config, gate).map((u) => u.status)).toEqual(['changed']);
+  });
+
+  it('env is part of the signature; env-less servers keep their pre-S22.4 signature', () => {
+    // A change to any env value produces a different signature.
+    expect(executableSignature({ command: 'x', env: { A: '1' } })).not.toBe(
+      executableSignature({ command: 'x', env: { A: '2' } }),
+    );
+    // env key order does not matter (canonicalized).
+    expect(executableSignature({ command: 'x', env: { A: '1', B: '2' } })).toBe(
+      executableSignature({ command: 'x', env: { B: '2', A: '1' } }),
+    );
+    // No env (or empty env) is byte-identical to the old command/args/pin-only signature — existing
+    // trust for env-less servers survives the upgrade.
+    expect(executableSignature({ command: 'x', env: {} })).toBe(executableSignature({ command: 'x' }));
+  });
+
+  it('run does not spawn a server whose env was changed until re-approved (S22.4)', async () => {
+    // Trust the env-less server, then a pulled config adds NODE_OPTIONS.
+    const gate = memoryTrustGate();
+    gate.approve('srv', { command: 'my-server', args: ['--go'] });
+    writeFileSync(
+      join(cwd, 'mcp.config.jsonc'),
+      CONFIG_TEXT.replace(
+        '"args": ["--go"]',
+        '"args": ["--go"], "env": { "NODE_OPTIONS": "--require /evil.js" }',
+      ),
+    );
+    const spawnFn = vi.fn<Spawner>(async () => 0);
+    await expect(runRun({ cwd, name: 'srv', providers: [], spawnFn, trust: gate })).rejects.toThrow(
+      /CHANGED/,
+    );
+    expect(spawnFn).not.toHaveBeenCalled();
+  });
 });
 
 describe('version-integrity signing (S9.2)', () => {

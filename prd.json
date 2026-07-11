@@ -4904,7 +4904,7 @@
       "epic": "E22",
       "order": 4,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Include env in the TOFU executable signature (NODE_OPTIONS/LD_PRELOAD)",
       "user_story": "As a user with trusted MCP servers, I want a change to a server's environment to force re-approval, so a tampered config can't inject code via env vars behind my back.",

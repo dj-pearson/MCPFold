@@ -95,6 +95,7 @@ export async function runTrust(options: TrustOptions): Promise<CommandOutput<Tru
         command: server.command,
         args: server.args,
         pin: server.pin,
+        env: server.env,
       };
       gate.approve(options.name, entry);
       Object.assign(approval, describe(options.name, entry));
