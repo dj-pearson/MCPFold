@@ -5319,7 +5319,7 @@
       "epic": "E22",
       "order": 19,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Fix policy package matching (segment boundary) and glob ReDoS",
       "user_story": "As an org admin, I want allow/deny policy rules to match exactly the packages I name and evaluate in linear time, so governance isn't silently over/under-applied or hung by a glob.",

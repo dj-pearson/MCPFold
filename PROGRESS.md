@@ -1612,3 +1612,25 @@ Tests: registry times out a non-responding mirror (signal-aware fetch + 20ms tim
 oversized response body (real Response + 256-byte cap); mcpb reads a normal bundle, rejects a manifest
 past a tiny cap, and rejects a 2-entry archive with `maxEntries:1`. `verify_all` green — lint,
 typecheck, full suite, and build.
+
+## S22.19 — Fix policy package matching (segment boundary) and glob ReDoS
+
+Started/done: 2026-07-11. MEDIUM + LOW (verified). `policy.ts` matched a rule's `package` with
+`stripVersion(pkg).startsWith(rule.package) || pkg.startsWith(rule.package)` — a raw `startsWith` with
+no boundary, so a rule for `@modelcontextprotocol/server-git` matched `@modelcontextprotocol/server-github`
+and `foo` matched `foo-bar` (over/under-matching for a deny-wins control). And `globToRe` mapped each
+`*` to `.*` with no collapsing, so a `url` glob with `**` compiled to adjacent `.*.*` — catastrophic
+backtracking (ReDoS) against a long `server.url`.
+
+**Fix.** New `packageMatchesRule` requires a name boundary: exact versionless-spec equality, or the
+character after the prefix is `/` or `@` (so `server-git` no longer matches `server-github`, `foo` no
+longer matches `foo-bar`, while `foo@1.2.3` and sub-paths still match). `globToRe` collapses runs of
+`*` (`/\*+/g → *`) before compiling, so `**` becomes a single `.*` and evaluation is linear.
+
+Tests (policy.test.ts): a `server-git` rule matches `server-git` but not the sibling `server-github`;
+`foo` doesn't match `foo-bar` but matches `foo` and `foo@1.2.3`; and a `https://**...**` glob against a
+50k-char non-matching URL resolves in < 200ms (linear, not exponential). The prior test that asserted
+prefix over-matching was corrected to the boundary behavior. `verify_all` green — lint, typecheck, full
+suite, and build.
+
+**All E22 p2 stories (S22.13–S22.19) complete.**
