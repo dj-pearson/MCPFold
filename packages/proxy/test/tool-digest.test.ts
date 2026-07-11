@@ -48,6 +48,17 @@ describe('tool-definitions digest (S18.1)', () => {
     expect(toolDefinitionsDigest(a)).not.toBe(toolDefinitionsDigest(b));
   });
 
+  // S22.23: a `__proto__` schema key (as it would arrive over JSON-RPC) must be part of the digest —
+  // otherwise a server could mutate it to poison the surface while the digest stayed stable, evading
+  // pinning-drift detection. Built via JSON.parse so `__proto__` is an OWN key, not the prototype.
+  it('reflects a __proto__ schema key so it cannot evade drift detection', () => {
+    const plain = JSON.parse('{"type":"object"}') as unknown;
+    const withProto = JSON.parse('{"type":"object","__proto__":{"evil":true}}') as unknown;
+    expect(toolDefinitionsDigest([tool('x', 'd', plain)])).not.toBe(
+      toolDefinitionsDigest([tool('x', 'd', withProto)]),
+    );
+  });
+
   it('digestOfCanonical matches toolDefinitionsDigest for the same surface', () => {
     const tools = [tool('a', 'aa'), tool('b', 'bb')];
     expect(digestOfCanonical(canonicalizeTools(tools))).toBe(toolDefinitionsDigest(tools));

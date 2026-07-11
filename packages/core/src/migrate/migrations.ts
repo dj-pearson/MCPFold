@@ -23,15 +23,22 @@ export const MIGRATIONS: Migration[] = [
     to: 2,
     description: 'v1→v2: canonicalize the `http` transport to `streamable-http`',
     migrate: (config) => {
-      const servers = config.servers as Record<string, Record<string, unknown>> | undefined;
-      // Object.create(null) so a server literally named `__proto__` can't pollute the record via the
-      // bracket assignment below (S22.3); loadConfig already rejects such a config upstream.
-      const migratedServers = Object.create(null) as Record<string, unknown>;
-      for (const [name, server] of Object.entries(servers ?? {})) {
-        migratedServers[name] =
-          server.transport === 'http' ? { ...server, transport: 'streamable-http' } : server;
+      const result: Record<string, unknown> = { ...config, version: 2 };
+      // S22.23: preserve the ABSENCE of `servers`. Synthesizing `servers: {}` for a v1 file that
+      // omitted it would mask the schema's required-field error, so only rebuild the record when the
+      // source actually had one.
+      if (config.servers && typeof config.servers === 'object') {
+        const servers = config.servers as Record<string, Record<string, unknown>>;
+        // Object.create(null) so a server literally named `__proto__` can't pollute the record via
+        // the bracket assignment below (S22.3/S22.23); loadConfig also rejects such a config.
+        const migratedServers = Object.create(null) as Record<string, unknown>;
+        for (const [name, server] of Object.entries(servers)) {
+          migratedServers[name] =
+            server.transport === 'http' ? { ...server, transport: 'streamable-http' } : server;
+        }
+        result.servers = migratedServers;
       }
-      return { ...config, version: 2, servers: migratedServers };
+      return result;
     },
   },
 ];

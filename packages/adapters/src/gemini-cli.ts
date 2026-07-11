@@ -68,7 +68,7 @@ export const geminiCliAdapter: ClientAdapter = {
   },
 
   render(servers, ctx: OsContext = realOsContext(), existing?: string): RenderedFile {
-    const mcpServers: Record<string, GeminiEntry> = {};
+    const mcpServers = Object.create(null) as Record<string, GeminiEntry>;
     for (const server of [...servers].sort((a, b) => a.name.localeCompare(b.name))) {
       mcpServers[server.name] = toGeminiEntry(server);
     }
@@ -89,7 +89,7 @@ export const geminiCliAdapter: ClientAdapter = {
     const canon = envRefCanonicalizer(geminiCliAdapter.envInterpolation!);
     const mapVals = (r: Record<string, string>): Record<string, string> =>
       Object.fromEntries(Object.entries(r).map(([k, v]) => [k, canon(v)]));
-    const servers: Record<string, ServerConfig> = {};
+    const servers = Object.create(null) as Record<string, ServerConfig>;
     for (const [name, value] of Object.entries(raw.mcpServers ?? {})) {
       if (!value || typeof value !== 'object') continue;
       const entry = value as Record<string, unknown>;

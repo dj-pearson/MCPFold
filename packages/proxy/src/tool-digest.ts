@@ -27,7 +27,11 @@ export interface CanonicalTool {
 function sortDeep(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortDeep);
   if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
+    // Object.create(null) so a `__proto__` key in a tool's schema creates an OWN property (and is
+    // therefore included in the digest) instead of invoking the prototype setter and silently
+    // vanishing — otherwise a server could mutate its `__proto__` schema key to evade drift
+    // detection (S22.23 / S18.1 pinning).
+    const out = Object.create(null) as Record<string, unknown>;
     for (const key of Object.keys(value as Record<string, unknown>).sort()) {
       out[key] = sortDeep((value as Record<string, unknown>)[key]);
     }

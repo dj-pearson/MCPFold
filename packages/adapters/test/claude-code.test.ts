@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ResolvedServer } from '@mcpfold/core';
 import { claudeCodeAdapter } from '../src/claude-code.js';
 import { sampleServers } from './fixtures/servers.js';
 import type { OsContext } from '../src/types.js';
@@ -88,5 +89,38 @@ describe('claudeCodeAdapter (S2.4)', () => {
     const doc = JSON.parse(file.contents) as { mcpServers: Record<string, unknown> };
     expect(Object.keys(doc)).toEqual(['mcpServers']);
     expect(Object.keys(doc.mcpServers).sort()).toEqual(['github', 'playwright']);
+  });
+
+  // S22.23: a type-carrying client preserves the sse transport across export→import.
+  it('preserves sse transport on an export→import round-trip', () => {
+    const sse: ResolvedServer = {
+      name: 'sse-srv',
+      transport: 'sse',
+      url: 'https://s.test/sse',
+      tags: [],
+      client: 'claude-code',
+      scope: 'user',
+    };
+    const file = claudeCodeAdapter.render([sse], linux);
+    expect(file.contents).toContain('"type": "sse"');
+    const parsed = claudeCodeAdapter.parse(file.contents);
+    expect(parsed.servers?.['sse-srv']?.transport).toBe('sse');
+  });
+
+  // S22.23: a server literally named __proto__ becomes an own key, never corrupting the render map.
+  it('neutralizes a __proto__-named server (own key, no prototype pollution)', () => {
+    const proto: ResolvedServer = {
+      name: '__proto__',
+      transport: 'stdio',
+      command: 'evil',
+      tags: [],
+      client: 'claude-code',
+      scope: 'user',
+    };
+    const file = claudeCodeAdapter.render([proto], linux);
+    const doc = JSON.parse(file.contents) as { mcpServers: Record<string, unknown> };
+    // The name is preserved as an own key of mcpServers, and the object's prototype is untouched.
+    expect(Object.prototype.hasOwnProperty.call(doc.mcpServers, '__proto__')).toBe(true);
+    expect(Object.getPrototypeOf(doc.mcpServers)).toBe(Object.prototype);
   });
 });

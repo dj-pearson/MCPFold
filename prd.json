@@ -5428,7 +5428,7 @@
       "epic": "E22",
       "order": 23,
       "priority": "p3",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Fix adapter/migration round-trip fidelity and residual __proto__ handling",
       "user_story": "As a user, I want import/export round-trips to preserve transports and my configs, and hostile keys to be neutralized everywhere they're rebuilt, so fidelity and pinning integrity hold.",

@@ -98,7 +98,7 @@ export const vscodeAdapter: ClientAdapter = {
   },
 
   render(servers, ctx: OsContext = realOsContext(), existing?: string): RenderedFile {
-    const serversObj: Record<string, VscodeServerEntry> = {};
+    const serversObj = Object.create(null) as Record<string, VscodeServerEntry>;
     const inputsById = new Map<string, VscodeInput>();
     for (const server of [...servers].sort((a, b) => a.name.localeCompare(b.name))) {
       const { entry, inputs } = toVscodeEntry(server);
@@ -123,7 +123,7 @@ export const vscodeAdapter: ClientAdapter = {
 
   parse(contents): Partial<Config> {
     const raw = parseClientJsonc(contents) as { servers?: Record<string, unknown> };
-    const servers: Record<string, ServerConfig> = {};
+    const servers = Object.create(null) as Record<string, ServerConfig>;
     for (const [name, value] of Object.entries(raw.servers ?? {})) {
       if (!value || typeof value !== 'object') continue;
       const entry = value as Record<string, unknown>;

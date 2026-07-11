@@ -1711,3 +1711,25 @@ already excludes `}`, so all three agree on the brace boundary (documented).
 Tests: `maskTokens` masks `github_pat_` and `sk_live_`/`sk_test_`; whole-string and embedded parsing
 agree on `${env:a}b}` (not-a-whole-ref; embedded finds `${env:a}` path `a`). `verify_all` green — lint,
 typecheck, full suite, and build.
+
+## S22.23 — Fix adapter/migration round-trip fidelity and residual __proto__ handling
+
+Started/done: 2026-07-11. LOW, several (verified). Three round-trip/hostile-key issues: (1) for
+url-shape clients (Cursor/Zed/Cline/Warp/LM Studio) an `sse` remote was written as a bare `url` with no
+transport marker, so `fromMcpServersShape` re-read it as `streamable-http` (transport lost on
+export→import). (2) The v1→v2 migration synthesized `servers: {}` when a v1 file omitted servers,
+masking the required-field error. (3) Adapter server maps (shared factory + vscode/gemini/opencode/
+codex/goose) and proxy `tool-digest.ts` `sortDeep` were built with plain-object assignment, so a
+server named `__proto__` or a `__proto__` schema key was mishandled — corrupting the map or evading the
+S18.1 pinning `schemaDigest`.
+
+**Fix.** (1) Documented the `sse`→`streamable-http` coercion for bare-url clients (they can't carry a
+type marker); type-carrying clients (Claude Code, VS Code) already round-trip `sse` via their `type`
+field. (2) The migration now only rebuilds `servers` when the source had one, preserving its absence so
+the schema error fires. (3) All those maps and `sortDeep` now use `Object.create(null)`, so a
+`__proto__` key becomes an own property (included in the digest; never pollutes the map).
+
+Tests: an `sse` server survives claude-code export→import; a `__proto__`-named server renders as an own
+key with an untouched prototype; the migration preserves `servers` absence (and loadConfig then rejects
+it); a `__proto__` schema key changes the tool digest (can't evade drift). `verify_all` green — lint,
+typecheck, full suite, and build.

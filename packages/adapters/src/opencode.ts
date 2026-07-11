@@ -76,7 +76,7 @@ export const opencodeAdapter: ClientAdapter = {
   },
 
   render(servers, ctx: OsContext = realOsContext(), existing?: string): RenderedFile {
-    const mcp: Record<string, OpencodeEntry> = {};
+    const mcp = Object.create(null) as Record<string, OpencodeEntry>;
     for (const server of [...servers].sort((a, b) => a.name.localeCompare(b.name))) {
       mcp[server.name] = toOpencodeEntry(server);
     }
@@ -102,7 +102,7 @@ export const opencodeAdapter: ClientAdapter = {
     const canon = envRefCanonicalizer(opencodeAdapter.envInterpolation!);
     const mapVals = (r: Record<string, string>): Record<string, string> =>
       Object.fromEntries(Object.entries(r).map(([k, v]) => [k, canon(v)]));
-    const servers: Record<string, ServerConfig> = {};
+    const servers = Object.create(null) as Record<string, ServerConfig>;
     for (const [name, value] of Object.entries(raw.mcp ?? {})) {
       if (!value || typeof value !== 'object') continue;
       const entry = value as Record<string, unknown>;
