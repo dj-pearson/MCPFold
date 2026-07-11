@@ -1572,3 +1572,21 @@ Tests (import.test.ts): `--force` backs up the old config first (backup path ret
 preserved, one `.mcpfold.bak.` file) and writes a valid config; a client config that merges into a
 stdio server with an empty command is rejected ("would be invalid") and nothing is written.
 `verify_all` green — lint, typecheck, full suite, and build.
+
+## S22.17 — Make watchWithDebounce swallow onChange rejections (honor never-throws contract)
+
+Started/done: 2026-07-11. MEDIUM (verified). `io/watch.ts` invoked its async fold as `void fire()`
+(and re-invoked via `schedule()` in the finally re-run path). If `onChange` returned a rejected
+promise, `fire`'s promise rejected and — discarded with `void` — became an unhandled promise
+rejection, process-terminating on modern Node. The module's own doc promises the primitive never
+throws or dies; `runSyncWatch` happened to wrap its work in try/catch, but `watchWithDebounce` is a
+public export and the contract was unmet for any other caller.
+
+**Fix.** `fire` now wraps `await opts.onChange()` in try/catch (swallowing the rejection) so it can
+never escape as an unhandled rejection; the finally-based re-run/bookkeeping is unchanged. onChange
+errors remain the caller's to handle (as documented) — the primitive only guarantees the watch
+survives.
+
+Tests (watch.test.ts): a rejecting onChange registers no `unhandledRejection` and the watch keeps
+running (a second change still drives onChange). `verify_all` green — lint, typecheck, full suite,
+and build.

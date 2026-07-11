@@ -5266,7 +5266,7 @@
       "epic": "E22",
       "order": 17,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Make watchWithDebounce swallow onChange rejections (honor never-throws contract)",
       "user_story": "As a user running `mcpfold sync --watch`, I want a transient error in a change handler to be contained, so the watch keeps running instead of crashing the process.",
