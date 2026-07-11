@@ -24,7 +24,8 @@ export function sortKeysDeep(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortKeysDeep);
   if (value !== null && typeof value === 'object') {
     const source = value as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
+    // Object.create(null) so a `__proto__` own key can't invoke the prototype setter here (S22.3).
+    const out = Object.create(null) as Record<string, unknown>;
     for (const key of Object.keys(source).sort()) {
       out[key] = sortKeysDeep(source[key]);
     }

@@ -4875,7 +4875,7 @@
       "epic": "E22",
       "order": 3,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Reject __proto__/constructor keys in the core config parser",
       "user_story": "As a user, I want a malformed or hostile config to fail validation rather than silently validate as empty, so the strict schema can't be bypassed and my real servers can't vanish.",

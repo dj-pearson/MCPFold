@@ -23,6 +23,52 @@ describe('loadConfig (S1.2)', () => {
     }
   });
 
+  // S22.3: a body nested under __proto__ must NOT validate as an empty config (strict-schema bypass).
+  describe('prototype-pollution keys (S22.3)', () => {
+    it('rejects a config whose whole body is nested under __proto__', () => {
+      const text = `{
+  "__proto__": {
+    "version": 2,
+    "servers": { "github": { "transport": "stdio", "command": "npx" } }
+  }
+}`;
+      const res = loadConfig(text);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.errors[0]?.code).toBe('schema');
+        expect(res.errors[0]?.message).toMatch(/__proto__/);
+        expect(res.errors[0]?.line).toBe(2);
+      }
+    });
+
+    it('rejects a server literally named __proto__', () => {
+      const text = `{
+  "version": 2,
+  "servers": { "__proto__": { "transport": "stdio", "command": "x" } }
+}`;
+      const res = loadConfig(text);
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.errors[0]?.message).toMatch(/__proto__/);
+    });
+
+    it('rejects constructor and prototype keys anywhere', () => {
+      expect(loadConfig('{ "constructor": { "version": 2 } }').ok).toBe(false);
+      expect(loadConfig('{ "version": 2, "servers": { "prototype": {} } }').ok).toBe(false);
+    });
+
+    it('a normal config with no pollution keys is unaffected', () => {
+      const res = loadConfig(
+        '{ "version": 2, "servers": { "github": { "transport": "stdio", "command": "npx" } }, "profiles": {} }',
+      );
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        expect(Object.keys(res.config.servers)).toEqual(['github']);
+        // The loaded config is a normal object with a real prototype (not polluted).
+        expect(Object.getPrototypeOf(res.config)).toBe(Object.prototype);
+      }
+    });
+  });
+
   it('returns a pathed zod error for invalid-but-parseable config', () => {
     const text = `{
   "version": 1,

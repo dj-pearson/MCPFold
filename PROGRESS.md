@@ -1252,3 +1252,29 @@ cli 283, core, secrets, schema, proxy, e2e, security), and build.
 **Follow-ups:** none required for the DoD. VS Code's `inputs` array is treated as fully
 mcpfold-managed (replaced wholesale) — a user's hand-authored non-mcpfold input would not survive,
 but that matches the prior full-replace behavior and no such case is known.
+
+## S22.3 — Reject __proto__/constructor keys in the core config parser
+
+Started/done: 2026-07-11. HIGH (schema bypass, verified at runtime). `nodeToValue` (load.ts)
+reconstructed objects with `obj[key] = …`, so a `__proto__` key invoked the prototype setter instead
+of creating an own property. A document whose whole body was nested under `__proto__` loaded as
+`ok:true` with zero own keys — the `.strict()` schema fully bypassed and any real servers/profiles
+there silently vanished. `detectVersion` read `version` through the prototype chain, and a server
+literally named `__proto__` corrupted the servers record.
+
+**Fix.** `loadConfig` now walks the parsed JSONC tree (`findProtoPollutionKey`) for any literal
+`__proto__`/`constructor`/`prototype` property key BEFORE reconstruction/validation and returns a
+positioned `schema` error (line/column at the offending key). Defense in depth: `nodeToValue` builds
+objects with `Object.create(null)`, `serialize.ts` `sortKeysDeep` uses a null-proto accumulator, and
+the v1→v2 migration builds its servers record with `Object.create(null)` so a `__proto__`-named
+server can't pollute even if reached directly.
+
+Tests (load.test.ts): a `__proto__`-bodied document and a `__proto__`-named server both return
+`ok:false` with a `__proto__`-mentioning message; `constructor`/`prototype` keys anywhere are
+rejected; a normal config is unaffected and loads with a real (unpolluted) prototype. `verify_all`
+green — lint, typecheck, full suite (core 96, + all packages), and build; no false positives from the
+scan across the whole workspace.
+
+**Follow-ups:** the scan rejects these three keys anywhere, including inside free-form `env`/`headers`
+records — a pathological but theoretically-legitimate env var named `constructor` would be refused.
+Accepted as a security-over-flexibility tradeoff per the story's DoD.

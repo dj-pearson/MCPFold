@@ -20,6 +20,35 @@ import type { Config } from './types.js';
 
 export type ConfigErrorCode = 'jsonc-parse' | 'schema';
 
+/**
+ * Keys that mutate an object's prototype instead of creating an own property (S22.3). `__proto__`
+ * invokes the prototype setter under bracket assignment; `constructor`/`prototype` are the classic
+ * pollution pivots. None is ever a legitimate key in a canonical config, so a literal occurrence is
+ * a hard schema error — otherwise a body nested under `__proto__` validates as an empty config and
+ * silently bypasses the strict schema (real servers/profiles vanish).
+ */
+const PROTO_POLLUTION_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** Walk a parsed JSONC tree for the first property key that could pollute a prototype. */
+function findProtoPollutionKey(node: JsoncNode): JsoncNode | undefined {
+  if (node.type === 'object') {
+    for (const child of node.children ?? []) {
+      if (child.type === 'property' && child.children && child.children.length === 2) {
+        const keyNode = child.children[0]!;
+        if (PROTO_POLLUTION_KEYS.has(keyNode.value as string)) return keyNode;
+        const nested = findProtoPollutionKey(child.children[1]!);
+        if (nested) return nested;
+      }
+    }
+  } else if (node.type === 'array') {
+    for (const child of node.children ?? []) {
+      const nested = findProtoPollutionKey(child);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
 export interface PositionedError {
   code: ConfigErrorCode;
   message: string;
@@ -105,6 +134,25 @@ export function loadConfig(text: string): LoadResult {
     };
   }
 
+  // Reject prototype-pollution keys BEFORE reconstruction/validation (S22.3). A `__proto__`-bodied
+  // document would otherwise validate as an empty config, bypassing the strict schema.
+  const polluted = findProtoPollutionKey(tree);
+  if (polluted) {
+    const { line, column } = offsetToLineCol(text, polluted.offset);
+    return {
+      ok: false,
+      errors: [
+        {
+          code: 'schema',
+          message: `Illegal key "${String(polluted.value)}" — __proto__, constructor, and prototype are not allowed in a config.`,
+          line,
+          column,
+          hint: 'Remove this key; it is reserved and cannot appear anywhere in a config.',
+        },
+      ],
+    };
+  }
+
   // Parse the concrete value from the same text (tree gives us positions; value gives us data).
   const value = nodeToValue(tree);
 
@@ -177,7 +225,10 @@ export function loadConfigOrThrow(text: string): Config {
 function nodeToValue(node: JsoncNode): unknown {
   switch (node.type) {
     case 'object': {
-      const obj: Record<string, unknown> = {};
+      // Object.create(null) so a `__proto__` key (if one ever reached here) creates an own property
+      // via [[Set]] instead of invoking the prototype setter — defense in depth behind the
+      // findProtoPollutionKey gate (S22.3).
+      const obj = Object.create(null) as Record<string, unknown>;
       for (const child of node.children ?? []) {
         if (child.type === 'property' && child.children && child.children.length === 2) {
           const key = child.children[0]!.value as string;
