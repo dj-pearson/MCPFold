@@ -1,10 +1,5 @@
-import {
-  serialize,
-  isSecretRef,
-  type Config,
-  type ResolvedServer,
-  type ServerConfig,
-} from '@mcpfold/core';
+import { isSecretRef, type Config, type ResolvedServer, type ServerConfig } from '@mcpfold/core';
+import { mergeManagedKeys } from './shared.js';
 import { joinFor, realOsContext, userConfigDir } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
@@ -102,10 +97,10 @@ export const vscodeAdapter: ClientAdapter = {
     return joinFor(ctx, userConfigDir(ctx), 'Code', 'User', 'mcp.json');
   },
 
-  render(servers, ctx: OsContext = realOsContext()): RenderedFile {
+  render(servers, ctx: OsContext = realOsContext(), existing?: string): RenderedFile {
     const serversObj: Record<string, VscodeServerEntry> = {};
     const inputsById = new Map<string, VscodeInput>();
-    for (const server of servers) {
+    for (const server of [...servers].sort((a, b) => a.name.localeCompare(b.name))) {
       const { entry, inputs } = toVscodeEntry(server);
       serversObj[server.name] = entry;
       for (const input of inputs) inputsById.set(input.id, input);
@@ -114,9 +109,14 @@ export const vscodeAdapter: ClientAdapter = {
     const scope = servers[0]?.scope ?? 'user';
     const projectPath = servers[0]?.projectPath;
     // NOTE the root key is "servers", not "mcpServers".
+    // S22.2: mcp.json may carry other keys/comments; merge — replacing only the mcpfold-managed
+    // `servers` + `inputs` keys — so unrelated top-level keys and comments survive.
     return {
       path: this.resolvePath(scope, projectPath, ctx),
-      contents: serialize({ servers: serversObj, inputs }),
+      contents: mergeManagedKeys(existing, [
+        { path: ['servers'], value: serversObj },
+        { path: ['inputs'], value: inputs },
+      ]),
       needsRestart: false,
     };
   },

@@ -1,5 +1,5 @@
-import { serialize, type Config, type ResolvedServer, type ServerConfig } from '@mcpfold/core';
-import { envRefCanonicalizer } from './shared.js';
+import type { Config, ResolvedServer, ServerConfig } from '@mcpfold/core';
+import { envRefCanonicalizer, mergeManagedKeys } from './shared.js';
 import { expandHome, joinFor, realOsContext } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
@@ -67,14 +67,18 @@ export const geminiCliAdapter: ClientAdapter = {
     return joinFor(ctx, ctx.home, '.gemini', 'settings.json');
   },
 
-  render(servers, ctx: OsContext = realOsContext()): RenderedFile {
+  render(servers, ctx: OsContext = realOsContext(), existing?: string): RenderedFile {
     const mcpServers: Record<string, GeminiEntry> = {};
-    for (const server of servers) mcpServers[server.name] = toGeminiEntry(server);
+    for (const server of [...servers].sort((a, b) => a.name.localeCompare(b.name))) {
+      mcpServers[server.name] = toGeminiEntry(server);
+    }
     const scope = servers[0]?.scope ?? 'user';
     const projectPath = servers[0]?.projectPath;
+    // S22.2: `~/.gemini/settings.json` also holds auth type, theme, etc. Merge — replacing only
+    // `mcpServers` — so we never drop the user's other Gemini settings.
     return {
       path: this.resolvePath(scope, projectPath, ctx),
-      contents: serialize({ mcpServers }),
+      contents: mergeManagedKeys(existing, [{ path: ['mcpServers'], value: mcpServers }]),
       needsRestart: false,
     };
   },

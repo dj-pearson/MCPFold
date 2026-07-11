@@ -4842,7 +4842,7 @@
       "epic": "E22",
       "order": 2,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Merge into shared-state client files instead of overwriting them",
       "user_story": "As a user of Claude Code, Zed, Gemini CLI, or VS Code, I want `mcpfold sync` to update only the MCP-servers section of my client config and preserve everything else, so folding my servers never wipes my login, editor settings, or history.",

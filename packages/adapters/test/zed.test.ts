@@ -41,4 +41,29 @@ describe('zedAdapter (S2.7)', () => {
     const file = zedAdapter.render(sampleServers('zed'), linux);
     expect(zedAdapter.parse(file.contents).servers?.playwright?.command).toBe('npx');
   });
+
+  // S22.2 (BLOCKER): ~/.config/zed/settings.json is ALL of the user's editor settings; a sync must
+  // replace only `context_servers` and preserve theme, fonts, keymap, and comments.
+  it('merges into settings.json — preserves editor settings and comments', () => {
+    const existing = [
+      '{',
+      '  // my editor',
+      '  "theme": "One Dark",',
+      '  "buffer_font_size": 15,',
+      '  "context_servers": { "stale": { "command": "old" } }',
+      '}',
+      '',
+    ].join('\n');
+    const file = zedAdapter.render(sampleServers('zed'), linux, existing);
+    expect(file.contents).toContain('// my editor');
+    const doc = JSON.parse(file.contents.replace(/^\s*\/\/.*$/gm, '')) as {
+      theme: string;
+      buffer_font_size: number;
+      context_servers: Record<string, unknown>;
+    };
+    expect(doc.theme).toBe('One Dark');
+    expect(doc.buffer_font_size).toBe(15);
+    expect(Object.keys(doc.context_servers).sort()).toEqual(['github', 'playwright']);
+    expect(doc.context_servers.stale).toBeUndefined();
+  });
 });

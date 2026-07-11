@@ -50,4 +50,31 @@ describe('vscodeAdapter (S2.5)', () => {
     });
     expect(parsed.servers?.github?.transport).toBe('streamable-http');
   });
+
+  // S22.2 (BLOCKER): mcp.json can carry other top-level keys and comments; merge, don't overwrite.
+  it('merges into mcp.json — preserves unrelated top-level keys and comments', () => {
+    const existing = [
+      '{',
+      '  // vs code mcp',
+      '  "$schema": "https://example.test/mcp.schema.json",',
+      '  "custom": { "keep": true },',
+      '  "servers": { "stale": { "type": "stdio", "command": "old" } }',
+      '}',
+      '',
+    ].join('\n');
+    const file = vscodeAdapter.render(sampleServers('vscode'), linux, existing);
+    expect(file.contents).toContain('// vs code mcp');
+    const doc = JSON.parse(file.contents.replace(/^\s*\/\/.*$/gm, '')) as {
+      $schema: string;
+      custom: { keep: boolean };
+      servers: Record<string, unknown>;
+      inputs: unknown[];
+    };
+    expect(doc.$schema).toBe('https://example.test/mcp.schema.json');
+    expect(doc.custom).toEqual({ keep: true });
+    expect(Object.keys(doc.servers).sort()).toEqual(['github', 'playwright']);
+    expect(doc.servers.stale).toBeUndefined();
+    // The bearer github server contributes a prompted input.
+    expect(Array.isArray(doc.inputs)).toBe(true);
+  });
 });

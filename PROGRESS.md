@@ -1218,3 +1218,37 @@ schema 9, adapters 151, proxy 54, cli 283, e2e, security), and build all pass.
 **Follow-ups:** unify the two secret-ref grammars — `secret-ref.ts`'s loose parsing regexes
 (`WHOLE_REF_RE`/`EMBEDDED_REF_RE`) still accept the broader path; converging them with the tightened
 `SECRET_REF_RE` is S22.22's scope. The provider is injection-proof independent of that regex.
+
+## S22.2 — Merge into shared-state client files instead of overwriting them
+
+Started/done: 2026-07-11. BLOCKER (data loss). `mcpfold sync` read the target file and passed it as
+`existing` to `adapter.render`, but the shared `createMcpServersAdapter` factory and the custom
+gemini-cli/vscode renders ignored it and emitted a full replacement. Since claude-code user scope is
+`~/.claude.json` (Claude Code's ENTIRE user state — OAuth account, project history, numStartups), zed
+is `~/.config/zed/settings.json` (all editor settings), and gemini-cli is `~/.gemini/settings.json`
+(auth type, theme), the first sync destroyed every non-MCP key. claude_desktop_config.json can also
+hold non-MCP keys (globalShortcut).
+
+**Fix.** New `mergeManagedKeys(existing, keys)` helper in shared.ts does a jsonc-parser
+`modify`/`applyEdits` structural edit — replacing only the mcpfold-owned root key(s) and preserving
+every other top-level key plus comments/formatting (the same technique opencode/goose/codex already
+used). The shared factory (Cursor, Claude Code, Claude Desktop, Zed, + all other mcpServers-style
+clients), gemini-cli (`mcpServers`), and vscode (`servers` + `inputs`) now render through it.
+
+**Idempotency.** `sync` decides "unchanged" by byte identity, so first-write and re-fold must use the
+same formatter. Rather than a split serialize-vs-merge path (which drifted on the second sync), every
+render now always goes through `mergeManagedKeys` (from `{}` when there's no existing file) — and
+jsonc-parser `modify` is a fixed point on its own output, so a second sync is byte-identical and
+reports `unchanged`. Servers are sorted by name for deterministic output; entry fields are emitted in
+construction order (regenerated the 21 mcpServers-style fixture snapshots + the shared.test.ts inline
+golden accordingly).
+
+Tests: per-adapter round-trips seeded with real-world extra keys survive a write — claude-code
+(numStartups/oauthAccount/projects), zed (theme/buffer_font_size + comments), gemini-cli
+(selectedAuthType/theme), vscode ($schema/custom + comments), claude-desktop (globalShortcut); plus a
+claude-code idempotence check. `verify_all` green — lint, typecheck, full suite (adapters 158,
+cli 283, core, secrets, schema, proxy, e2e, security), and build.
+
+**Follow-ups:** none required for the DoD. VS Code's `inputs` array is treated as fully
+mcpfold-managed (replaced wholesale) — a user's hand-authored non-mcpfold input would not survive,
+but that matches the prior full-replace behavior and no such case is known.
