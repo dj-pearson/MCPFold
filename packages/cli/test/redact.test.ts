@@ -65,6 +65,12 @@ describe('maskTokens (S9.3)', () => {
     expect(maskTokens('use ghp_abcdef1234567890ABCDEF here')).toBe('use *** here');
     expect(maskTokens('Bearer sk-ant-api03-xyz123456789')).toContain('***');
   });
+  // S22.22: GitHub fine-grained PATs and Stripe secret keys must be masked by the known-prefix rule.
+  it('masks github_pat_ and Stripe sk_live_/sk_test_ prefixes', () => {
+    expect(maskTokens('key github_pat_11ABCDE0123456789_abcdefXYZ end')).toBe('key *** end');
+    expect(maskTokens('stripe sk_live_abcdEFGH12345678 done')).toBe('stripe *** done');
+    expect(maskTokens('stripe sk_test_abcdEFGH12345678 done')).toBe('stripe *** done');
+  });
   it('masks a high-entropy blob with letters + digits', () => {
     expect(maskTokens('token=aB3xK9mZ2pQ7wL5nR8tV4jH6')).toBe('token=***');
   });

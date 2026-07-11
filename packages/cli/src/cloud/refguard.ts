@@ -1,4 +1,5 @@
 import { isSecretRef, type Config, UsageError } from '@mcpfold/core';
+import { TOKEN_PREFIX_ALTERNATION, TOKEN_SUFFIX } from '../util/token-prefixes.js';
 
 /**
  * Client-side ref-only guard (S6.6) — the mirror of the server's push guard (S6.4) and the DB
@@ -7,8 +8,8 @@ import { isSecretRef, type Config, UsageError } from '@mcpfold/core';
  * gives a clear local error instead of relying on the server to reject the payload.
  */
 
-const RAW_SECRET =
-  /(ghp_[A-Za-z0-9]{20,})|(github_pat_[A-Za-z0-9_]{20,})|(sk-[A-Za-z0-9]{20,})|(xox[baprs]-[A-Za-z0-9-]{10,})|(AKIA[0-9A-Z]{16})/;
+// S22.22: single-sourced from token-prefixes.ts so the push guard and the redactor stay aligned.
+const RAW_SECRET = new RegExp(`(?:${TOKEN_PREFIX_ALTERNATION})${TOKEN_SUFFIX}`);
 
 /** Every raw-secret-looking string value anywhere in the config, plus any literal auth.token. */
 export function findRawSecrets(config: Config): string[] {

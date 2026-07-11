@@ -5399,7 +5399,7 @@
       "epic": "E22",
       "order": 22,
       "priority": "p3",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Tighten redaction prefixes and unify the secret-ref grammar",
       "user_story": "As a user, I want all common token formats reliably redacted and secret references parsed consistently, so a secret can't slip into logs and doctor/resolver agree on a ref's path.",

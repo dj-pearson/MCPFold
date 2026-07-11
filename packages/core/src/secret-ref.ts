@@ -25,11 +25,21 @@ export interface LocatedSecretRef extends ParsedSecretRef {
   location: string;
 }
 
+/**
+ * The path character class, single-sourced (S22.22): `[^}]+` — every character up to the closing
+ * brace. Used by BOTH the whole-string and embedded matchers so they agree on an ambiguous ref like
+ * `${env:a}b}` (both stop the path at the first `}` → path `a`), instead of the whole matcher's old
+ * greedy `.+` yielding `a}b` while the embedded matcher yielded `a`. `SECRET_REF_RE` in schema.ts is
+ * the stricter VALIDATION grammar (S22.1) — it further forbids shell/quote metacharacters — but it
+ * likewise excludes `}`, so all three agree that a path never contains a brace.
+ */
+const REF_PATH_CLASS = '[^}]+';
+
 /** Whole-string ref: the ENTIRE input must be a single `${scheme:path}`. */
-const WHOLE_REF_RE = /^\$\{([a-z0-9_-]+):(.+)\}$/;
+const WHOLE_REF_RE = new RegExp(`^\\$\\{([a-z0-9_-]+):(${REF_PATH_CLASS})\\}$`);
 
 /** Embedded refs: find every `${scheme:path}` occurrence anywhere in a string. */
-const EMBEDDED_REF_RE = /\$\{([a-z0-9_-]+):([^}]+)\}/g;
+const EMBEDDED_REF_RE = new RegExp(`\\$\\{([a-z0-9_-]+):(${REF_PATH_CLASS})\\}`, 'g');
 
 function isKnownScheme(scheme: string): scheme is SecretScheme {
   return (SECRET_SCHEMES as readonly string[]).includes(scheme);

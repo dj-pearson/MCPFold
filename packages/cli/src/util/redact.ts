@@ -1,4 +1,5 @@
 import { isSecretRef, type Config } from '@mcpfold/core';
+import { TOKEN_PREFIX_ALTERNATION, TOKEN_SUFFIX } from './token-prefixes.js';
 
 /**
  * Redaction module (S0.6) — shared by the diagnostic bundle, `--debug` logs (S0.6),
@@ -26,8 +27,10 @@ export function redactRefPaths(input: string): string {
  * References (`${scheme:path}`) are left alone — they are handled by {@link redactRefPaths}
  * and are not secret values.
  */
-const KNOWN_TOKEN_RE =
-  /\b(?:gh[pousr]_|sk-|xox[baprs]-|AKIA|ya29\.|glpat-|pk_live_|rk_live_)[A-Za-z0-9_\-./]{6,}/g;
+const KNOWN_TOKEN_RE = new RegExp(
+  `\\b(?:${TOKEN_PREFIX_ALTERNATION})${TOKEN_SUFFIX}`,
+  'g',
+);
 // A long URL-safe run that contains BOTH a letter and a digit (avoids masking prose, plain
 // URLs, and `KEY=` separators — the class excludes `=`/`+`/`/` so it stops at delimiters).
 const HIGH_ENTROPY_RE =

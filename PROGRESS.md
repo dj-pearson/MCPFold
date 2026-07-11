@@ -1692,3 +1692,22 @@ value) or an `=` in the key, drops every existing assignment to the key before a
 Tests: `parseIntFlag` accepts `20`/undefined and rejects `abc`/`-3`/`1.5`; dotenv upserts (one
 `TOKEN=` line, old value gone), preserves other keys, rejects a newline-injection value, and allows
 `=` in the value but not the key. `verify_all` green — lint, typecheck, full suite, and build.
+
+## S22.22 — Tighten redaction prefixes and unify the secret-ref grammar
+
+Started/done: 2026-07-11. LOW x2 (verified). `redact.ts` `KNOWN_TOKEN_RE` omitted GitHub fine-grained
+PATs (`github_pat_`) and Stripe secret keys (`sk_live_`/`sk_test_`; note `sk-` needs a hyphen, Stripe
+uses `_`), leaving them to the fragile high-entropy heuristic — while `refguard.ts` `RAW_SECRET` already
+covered `github_pat_`, so the two lists were inconsistent. And `secret-ref.ts` `WHOLE_REF_RE` used a
+greedy `(.+)` while `EMBEDDED_REF_RE` used `([^}]+)`, so `${env:a}b}` parsed to path `a}b` vs `a`.
+
+**Fix.** New single-sourced `util/token-prefixes.ts` exports the known-prefix alternation + suffix;
+both the redactor's `KNOWN_TOKEN_RE` and the push guard's `RAW_SECRET` are now built from it, so they
+cover the same set (incl. `github_pat_` and `sk_(live|test)_`) and can't drift. In `secret-ref.ts` both
+matchers now share a `REF_PATH_CLASS = [^}]+`, so whole-string and embedded parsing agree that a path
+never contains a brace. `SECRET_REF_RE` (schema.ts) — the stricter validation grammar from S22.1 —
+already excludes `}`, so all three agree on the brace boundary (documented).
+
+Tests: `maskTokens` masks `github_pat_` and `sk_live_`/`sk_test_`; whole-string and embedded parsing
+agree on `${env:a}b}` (not-a-whole-ref; embedded finds `${env:a}` path `a`). `verify_all` green — lint,
+typecheck, full suite, and build.
