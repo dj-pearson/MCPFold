@@ -1,4 +1,4 @@
-import { appendFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSecretRef, UsageError, type ResolvedServer } from '@mcpfold/core';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
@@ -81,7 +81,7 @@ export function runSecretSet(options: SecretSetOptions): CommandOutput<SecretSet
 
   if (parsed.scheme === 'dotenv') {
     const envPath = join(options.cwd, '.env');
-    appendFileSync(envPath, `${parsed.path}=${options.value}\n`, { encoding: 'utf8', mode: 0o600 });
+    upsertDotenv(envPath, parsed.path, options.value);
     return {
       data: { scheme: parsed.scheme, path: parsed.path, stored: true },
       human: `✓ Stored ${parsed.path} in ${envPath} (value hidden). Ensure .env is gitignored.`,
@@ -97,4 +97,27 @@ export function runSecretSet(options: SecretSetOptions): CommandOutput<SecretSet
   throw new UsageError(`\`secret set\` for scheme "${parsed.scheme}" is not implemented yet.`, {
     hint: 'Supported now: dotenv (stores to .env). env/keychain/op arrive with their providers.',
   });
+}
+
+/**
+ * Safely upsert `KEY=value` into a `.env` (S22.21). Rejects a newline (which would inject extra
+ * `KEY=VALUE` lines) or an `=` in the key; replaces any existing lines for the same key rather than
+ * blind-appending a duplicate (so a re-set doesn't leave a stale masked value); and re-applies 0600
+ * on POSIX so a pre-existing world-readable `.env` is tightened.
+ */
+function upsertDotenv(envPath: string, key: string, value: string): void {
+  if (/[\n\r]/.test(key) || /[\n\r]/.test(value) || key.includes('=')) {
+    throw new UsageError(
+      'A dotenv key/value cannot contain a newline, and the key cannot contain "=".',
+      { hint: 'Use a plain KEY name and a single-line value.' },
+    );
+  }
+  const keyPrefix = `${key}=`;
+  const existing = existsSync(envPath) ? readFileSync(envPath, 'utf8') : '';
+  const lines = existing.length > 0 ? existing.replace(/\r?\n$/, '').split('\n') : [];
+  // Drop every existing assignment to this key (dedupe stale duplicates), then append the fresh one.
+  const kept = lines.filter((line) => !line.startsWith(keyPrefix));
+  kept.push(`${key}=${value}`);
+  writeFileSync(envPath, `${kept.join('\n')}\n`, { encoding: 'utf8', mode: 0o600 });
+  if (process.platform !== 'win32') chmodSync(envPath, 0o600);
 }

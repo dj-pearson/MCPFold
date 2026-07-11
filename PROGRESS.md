@@ -1673,3 +1673,22 @@ no temp remnant); init `--force` writes through a symlinked config. Both symlink
 
 **Note:** all canonical-config writers (sync, pull, migrate, add, import, export, init) now go through
 the hardened atomicWrite.
+
+## S22.21 — Validate numeric CLI flags and harden dotenv secret set
+
+Started/done: 2026-07-11. LOW x2 (verified). `cli.ts` coerced `--limit` and `--config-version` with a
+bare `Number()` and never rejected NaN/negative/non-integer, forwarding garbage to the registry/cloud
+client (`--limit abc` → NaN; `--config-version 1.5` stayed non-integer). `commands/secret.ts` did
+`appendFileSync(envPath, ${path}=${value}\n, { mode: 0o600 })` unconditionally: `path`/`value` were
+unescaped (a newline injects extra `KEY=VALUE` lines), duplicate keys accumulated (last-wins masks
+stale values), and `mode 0o600` only applied on file CREATE — a pre-existing 0644 `.env` stayed
+world-readable.
+
+**Fix.** New exported `parseIntFlag(name, raw, {min})` rejects NaN/`< min`/non-integer with a
+`UsageError`; `--limit` and `--config-version` use it. New `upsertDotenv` rejects a newline (in key or
+value) or an `=` in the key, drops every existing assignment to the key before appending the fresh one
+(dedupe + upsert), and `chmodSync(0o600)` after writing on POSIX (tightening a pre-existing file).
+
+Tests: `parseIntFlag` accepts `20`/undefined and rejects `abc`/`-3`/`1.5`; dotenv upserts (one
+`TOKEN=` line, old value gone), preserves other keys, rejects a newline-injection value, and allows
+`=` in the value but not the key. `verify_all` green — lint, typecheck, full suite, and build.

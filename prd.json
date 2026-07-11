@@ -5372,7 +5372,7 @@
       "epic": "E22",
       "order": 21,
       "priority": "p3",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Validate numeric CLI flags and harden dotenv secret set",
       "user_story": "As a user, I want bad numeric flags to be rejected and `mcpfold secret set` to write .env safely, so flags don't silently misbehave and secrets don't leak or duplicate.",
