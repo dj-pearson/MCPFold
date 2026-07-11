@@ -10,8 +10,7 @@ import {
 
 // `pnpm --filter @mcpfold/proxy bench` (WRITE_BENCH=1) regenerates docs/benchmark.md.
 const docPath = fileURLToPath(new URL('../../../docs/benchmark.md', import.meta.url));
-const renderDoc = (): string =>
-  formatMarkdown(runBenchmark(), runBenchmark(AT_SCALE_SERVERS));
+const renderDoc = (): string => formatMarkdown(runBenchmark(), runBenchmark(AT_SCALE_SERVERS));
 
 beforeAll(() => {
   if (process.env.WRITE_BENCH === '1') writeFileSync(docPath, renderDoc());
