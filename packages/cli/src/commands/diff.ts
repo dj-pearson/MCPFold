@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
 import {
-  diffRendered,
   resolveProfile,
   UnknownProfileError,
   type ConfigDiff,
@@ -9,6 +8,7 @@ import {
 import { realOsContext, registerAll, requireAdapter, type OsContext } from '@mcpfold/adapters';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import { loadConfigFromDisk } from '../util/config.js';
+import { diffRenderedSafe } from '../util/safe-diff.js';
 import { renderWithStrategy } from '../sync/strategy.js';
 import { Redactor } from '../util/redact.js';
 import { EXIT } from '../output/exit-codes.js';
@@ -64,7 +64,7 @@ export async function runDiff(options: DiffOptions): Promise<CommandOutput<DiffD
       resolve,
     });
     const onDisk = existsSync(file.path) ? readFileSync(file.path, 'utf8') : undefined;
-    const diff = diffRendered(file, onDisk, adapter);
+    const diff = diffRenderedSafe(file, onDisk, adapter);
     if (diff.hasDrift) drift = true;
     clients.push({ profile: name, client: profile.client, path: file.path, diff });
   }

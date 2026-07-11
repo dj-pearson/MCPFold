@@ -88,23 +88,24 @@ describe('createMcpServersAdapter (S2.1)', () => {
     expect(file.path).toBe('/home/dev/.cursor/mcp.json');
     expect(file.needsRestart).toBe(false);
     expect(file.contents.endsWith('\n')).toBe(true);
-    // Keys sorted deterministically (github before playwright, mcpServers root).
+    // Deterministic: servers sorted by name (github before playwright); each entry in construction
+    // order (S22.2 renders via the jsonc-parser merge so first-write and re-fold are byte-identical).
     expect(file.contents).toBe(
       [
         '{',
         '  "mcpServers": {',
         '    "github": {',
+        '      "url": "https://api.githubcopilot.com/mcp/",',
         '      "headers": {',
         '        "X-Extra": "v"',
-        '      },',
-        '      "url": "https://api.githubcopilot.com/mcp/"',
+        '      }',
         '    },',
         '    "playwright": {',
+        '      "command": "npx",',
         '      "args": [',
         '        "-y",',
         '        "@playwright/mcp@latest"',
         '      ],',
-        '      "command": "npx",',
         '      "env": {',
         '        "HEADLESS": "true"',
         '      }',

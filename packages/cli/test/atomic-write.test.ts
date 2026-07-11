@@ -1,10 +1,12 @@
 import {
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -85,6 +87,25 @@ describe('atomicWrite (S3.5, S16.7)', () => {
     expect(tempFiles(dir)).toHaveLength(0);
     expect(statSync(target).isDirectory()).toBe(true);
     expect(readFileSync(join(target, 'inner'), 'utf8')).toBe('x');
+  });
+
+  // S22.20: a symlinked config is FOLLOWED — the write goes through the link, preserving it.
+  // Skipped on win32 where symlinkSync needs elevated privileges.
+  it.skipIf(process.platform === 'win32')('follows a symlinked target and preserves the link', () => {
+    dir = mkdtempSync(join(tmpdir(), 'mcpfold-aw-'));
+    const real = join(dir, 'real.json');
+    const link = join(dir, 'config.json');
+    writeFileSync(real, '{"old":true}');
+    symlinkSync(real, link);
+
+    atomicWrite(link, '{"new":true}');
+
+    // The link is still a symlink (not replaced by a regular file)...
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    // ...and its real target received the new content.
+    expect(readFileSync(real, 'utf8')).toBe('{"new":true}');
+    expect(readFileSync(link, 'utf8')).toBe('{"new":true}');
+    expect(tempFiles(dir)).toHaveLength(0);
   });
 });
 

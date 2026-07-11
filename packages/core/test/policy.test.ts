@@ -45,7 +45,9 @@ describe('policy matchers (S18.3)', () => {
     const fs = stdio('fs', 'npx', ['-y', '@modelcontextprotocol/server-filesystem']);
     expect(ruleMatches({ name: 'fs' }, fs)).toBe(true);
     expect(ruleMatches({ name: 'other' }, fs)).toBe(false);
-    expect(ruleMatches({ package: '@modelcontextprotocol/server-file' }, fs)).toBe(true); // prefix
+    // Exact versionless-spec match; a sibling PREFIX does not match (name boundary — S22.19).
+    expect(ruleMatches({ package: '@modelcontextprotocol/server-filesystem' }, fs)).toBe(true);
+    expect(ruleMatches({ package: '@modelcontextprotocol/server-file' }, fs)).toBe(false);
     expect(ruleMatches({ namespace: '@modelcontextprotocol' }, fs)).toBe(true);
     expect(ruleMatches({ namespace: '@evil' }, fs)).toBe(false);
 
@@ -58,6 +60,29 @@ describe('policy matchers (S18.3)', () => {
     const fs = stdio('fs', 'npx', ['-y', '@modelcontextprotocol/server-filesystem']);
     expect(ruleMatches({ namespace: '@modelcontextprotocol', name: 'fs' }, fs)).toBe(true);
     expect(ruleMatches({ namespace: '@modelcontextprotocol', name: 'nope' }, fs)).toBe(false);
+  });
+
+  // S22.19: package matching must respect a name boundary, and url globs must be ReDoS-free.
+  it('a server-git rule does not match a sibling server-github package', () => {
+    const git = stdio('git', 'npx', ['-y', '@modelcontextprotocol/server-git']);
+    const github = stdio('github', 'npx', ['-y', '@modelcontextprotocol/server-github']);
+    const rule = { package: '@modelcontextprotocol/server-git' };
+    expect(ruleMatches(rule, git)).toBe(true); // exact
+    expect(ruleMatches(rule, github)).toBe(false); // sibling — boundary, not prefix
+    // Unscoped sibling: `foo` must not match `foo-bar`.
+    expect(ruleMatches({ package: 'foo' }, stdio('a', 'npx', ['-y', 'foo-bar']))).toBe(false);
+    expect(ruleMatches({ package: 'foo' }, stdio('b', 'npx', ['-y', 'foo']))).toBe(true);
+    // Version and sub-path boundaries still match.
+    expect(ruleMatches({ package: 'foo' }, stdio('c', 'npx', ['-y', 'foo@1.2.3']))).toBe(true);
+  });
+
+  it('a ** url glob evaluates in bounded time against a long non-matching url', () => {
+    // `**` previously compiled to adjacent `.*.*` — catastrophic backtracking on a long input.
+    const longUrl = `https://${'a'.repeat(50_000)}.example/path`;
+    const server = remote('x', longUrl);
+    const start = performance.now();
+    expect(ruleMatches({ url: 'https://**.githubcopilot.com/**' }, server)).toBe(false);
+    expect(performance.now() - start).toBeLessThan(200); // linear, not exponential
   });
 });
 

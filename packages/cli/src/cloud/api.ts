@@ -113,7 +113,26 @@ export function httpCloudApi(endpoint: string, fetchImpl: FetchLike = fetch): Cl
     async refresh(refreshToken) {
       const res = await post('/auth-device/refresh', { refresh_token: refreshToken });
       if (!res.ok) throw new Error(`token refresh failed (${res.status})`);
-      return (await res.json()) as RefreshResponse;
+      // Validate the shape at the source (S22.15), like pollDevice: a malformed 200 must fail fast
+      // here rather than persisting an undefined access token (→ silent logout on the next read) or a
+      // NaN expiry (→ every call re-refreshes). refresh_token is optional (the server may not rotate
+      // it) but, if present, must be a non-empty string.
+      const body = (await res.json()) as Record<string, unknown>;
+      const { access_token, refresh_token, expires_in } = body;
+      if (!isNonEmptyString(access_token)) {
+        throw new Error('token refresh returned a malformed session (missing access token)');
+      }
+      if (typeof expires_in !== 'number' || !Number.isFinite(expires_in)) {
+        throw new Error('token refresh returned a malformed session (invalid expires_in)');
+      }
+      if (refresh_token !== undefined && !isNonEmptyString(refresh_token)) {
+        throw new Error('token refresh returned a malformed session (invalid refresh token)');
+      }
+      return {
+        access_token,
+        expires_in,
+        ...(refresh_token !== undefined ? { refresh_token } : {}),
+      };
     },
 
     async push(accessToken, body) {

@@ -22,6 +22,13 @@ export interface ExecOptions {
   signal?: AbortSignal;
   /** Grace period after SIGTERM before escalating to SIGKILL. Default 2000ms. */
   killGraceMs?: number;
+  /**
+   * Extra environment variables merged over `process.env` for the child. Used to pass untrusted
+   * lookup keys (e.g. a `${keychain:...}` account) out-of-band so they are never interpolated into
+   * a shell/`-Command` script string where they could execute (S22.1). Env values are plain data —
+   * the child never parses them as code.
+   */
+  env?: Record<string, string>;
 }
 
 export type CommandExec = (
@@ -32,14 +39,17 @@ export type CommandExec = (
 
 export const defaultExec: CommandExec = (command, args, options = {}) =>
   new Promise<ExecResult>((resolve, reject) => {
-    const { signal, killGraceMs = 2000 } = options;
+    const { signal, killGraceMs = 2000, env } = options;
     if (signal?.aborted) {
       reject(new Error('aborted before start'));
       return;
     }
     let child;
     try {
-      child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(command, args, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: env ? { ...process.env, ...env } : process.env,
+      });
     } catch (error) {
       reject(error);
       return;

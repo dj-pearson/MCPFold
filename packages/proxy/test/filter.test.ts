@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolsDirective } from '@mcpfold/core';
-import { filterTools, isToolAllowed } from '../src/filter.js';
+import { compileDirective, filterTools, isToolAllowed } from '../src/filter.js';
 import { connectProxy } from '../src/proxy.js';
 import { MemoryTransport } from '../src/transport/memory.js';
 import type { JsonRpcMessage } from '../src/jsonrpc.js';
@@ -35,6 +35,28 @@ describe('filterTools (S5.2)', () => {
     expect(isToolAllowed('x', { mode: 'allow', list: ['x'] })).toBe(true);
     expect(isToolAllowed('y', { mode: 'allow', list: ['x'] })).toBe(false);
     expect(isToolAllowed('x', { mode: 'deny', list: ['x'] })).toBe(false);
+  });
+
+  // S22.12: matching is case/whitespace-normalized so a spelling variant can't slip past the filter.
+  it('normalizes case and whitespace so a variant is treated per the policy', () => {
+    const deny: ToolsDirective = { mode: 'deny', list: ['foo'] };
+    expect(isToolAllowed('FOO', deny)).toBe(false);
+    expect(isToolAllowed(' foo ', deny)).toBe(false);
+    expect(isToolAllowed('Foo', deny)).toBe(false);
+    const allow: ToolsDirective = { mode: 'allow', list: ['Foo'] };
+    expect(isToolAllowed('foo', allow)).toBe(true);
+    expect(isToolAllowed('bar', allow)).toBe(false);
+  });
+
+  // S22.24: the directive precompiles into a Set for O(1) membership, honoring mode + normalization.
+  it('compileDirective gives O(1) Set-based membership consistent with isToolAllowed', () => {
+    const deny = compileDirective({ mode: 'deny', list: ['a', 'B'] });
+    expect(deny.allows('a')).toBe(false);
+    expect(deny.allows('b')).toBe(false); // normalized
+    expect(deny.allows('c')).toBe(true);
+    const allow = compileDirective({ mode: 'allow', list: ['x'] });
+    expect(allow.allows('X')).toBe(true);
+    expect(allow.allows('y')).toBe(false);
   });
 });
 

@@ -46,21 +46,37 @@ export interface MapOptions {
   secretScheme?: SecretScheme;
 }
 
-/** The default stdio runner for a registry package type. */
+/**
+ * The whitelist of runners a registry package may resolve to (S22.11). `runtimeHint` is
+ * server-controlled data from `server.json` and flows into `server.command` — the process the client
+ * will spawn — so it MUST map to a known-safe runner. An unrecognized hint is rejected, never passed
+ * through as the command, so a malicious registry mirror can't make mcpfold write an arbitrary
+ * launch command into a client config.
+ */
+const RUNNER_WHITELIST: Readonly<Record<string, string>> = {
+  npm: 'npx',
+  npx: 'npx',
+  pypi: 'uvx',
+  uvx: 'uvx',
+  oci: 'docker',
+  docker: 'docker',
+};
+
+/** The stdio runner for a registry package type, restricted to the whitelist. */
 function runnerFor(pkg: RegistryPackage): string {
-  switch (pkg.runtimeHint ?? pkg.registryType) {
-    case 'npm':
-    case 'npx':
-      return 'npx';
-    case 'pypi':
-    case 'uvx':
-      return 'uvx';
-    case 'oci':
-    case 'docker':
-      return 'docker';
-    default:
-      return pkg.runtimeHint ?? 'npx';
+  const requested = pkg.runtimeHint ?? pkg.registryType;
+  const runner = RUNNER_WHITELIST[requested];
+  if (!runner) {
+    throw new UsageError(
+      `Registry package "${pkg.identifier}" requests an unsupported runtime "${requested}".`,
+      {
+        hint:
+          'mcpfold only launches a known-safe set of runners (npx, uvx, docker). For an .mcpb ' +
+          'bundle use `mcpfold add --from-mcpb`; otherwise report this listing to the registry.',
+      },
+    );
   }
+  return runner;
 }
 
 /** Hex (64 chars) → SRI `sha256-<base64>`; pass an already-SRI string through; else null. */
@@ -119,6 +135,14 @@ function mapPackage(pkg: RegistryPackage, options: MapOptions): ServerConfig {
 }
 
 function mapRemote(remote: RegistryRemote, options: MapOptions): ServerConfig {
+  // S22.11: the remote URL is server-controlled and gets written into client configs; require https
+  // so a registry can't point a client at a plaintext (interceptable) or otherwise-hostile endpoint.
+  if (!/^https:\/\//i.test(remote.url)) {
+    throw new UsageError(
+      `Registry remote endpoint "${remote.url}" is not an https URL.`,
+      { hint: 'mcpfold refuses to write a non-https remote endpoint into a client config.' },
+    );
+  }
   const scheme = options.secretScheme ?? 'env';
   const transport = remote.type === 'sse' ? 'sse' : 'streamable-http';
   const server: ServerConfig = { transport, url: remote.url, tags: [] };

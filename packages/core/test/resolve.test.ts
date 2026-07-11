@@ -36,6 +36,15 @@ describe('resolveProfile (S1.4)', () => {
     });
   });
 
+  // S22.9: a server's SRI integrity must survive resolution so it can reach the fetch/install layer.
+  it('carries a server integrity hash through resolution', () => {
+    const cfg = loadConfigOrThrow(
+      '{ "version": 2, "servers": { "s": { "transport": "stdio", "command": "npx", "pin": "1.0.0", "integrity": "sha512-abc123", "tags": ["t"] } }, "profiles": { "p": { "client": "cursor", "scope": "user", "include": ["t"] } } }',
+    );
+    const [s] = resolveProfile(cfg, 'p');
+    expect(s?.integrity).toBe('sha512-abc123');
+  });
+
   it('keeps secrets as references (not resolved at this stage)', () => {
     const [github] = resolveProfile(config, 'work-cursor');
     expect(github?.auth?.token).toBe('${infisical:dev/mcp/GITHUB_PAT}');

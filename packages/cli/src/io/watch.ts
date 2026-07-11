@@ -58,6 +58,11 @@ export function watchWithDebounce(opts: {
     running = true;
     try {
       await opts.onChange();
+    } catch {
+      // Never-throws contract (S22.17): `fire` is invoked as `void fire()`, so a rejected
+      // onChange would become an unhandled rejection and terminate the process on modern Node.
+      // onChange errors are the caller's to handle (see doc above); we only guarantee the watch
+      // survives, so swallow here and keep watching.
     } finally {
       running = false;
       if (pending && !stopped) {

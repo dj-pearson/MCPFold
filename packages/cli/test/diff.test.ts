@@ -63,4 +63,27 @@ describe('runDiff (S3.6)', () => {
     // playwright lost its args on disk → changed.
     expect(serverDiffs.find((s) => s.name === 'playwright')?.status).toBe('changed');
   });
+
+  // S22.8: a JSONC on-disk client file (comments/trailing commas) must diff cleanly, not crash.
+  it('handles a JSONC on-disk client file with comments and trailing commas', async () => {
+    const target = join(home, '.cursor', 'mcp.json');
+    mkdirSync(join(home, '.cursor'), { recursive: true });
+    writeFileSync(
+      target,
+      ['{', '  // pinned', '  "mcpServers": {', '    "playwright": { "command": "npx", },', '  },', '}'].join(
+        '\n',
+      ),
+    );
+    const result = await runDiff({ cwd, osContext: ctx });
+    // Parsed fine — playwright is recognized (its args differ, so it's a change, not a crash).
+    const diffs = result.data.clients[0]?.diff.servers ?? [];
+    expect(diffs.find((s) => s.name === 'playwright')).toBeDefined();
+  });
+
+  it('a corrupt on-disk client file yields a UsageError naming the file, not a raw SyntaxError', async () => {
+    const target = join(home, '.cursor', 'mcp.json');
+    mkdirSync(join(home, '.cursor'), { recursive: true });
+    writeFileSync(target, '{ "mcpServers": { totally broken not json');
+    await expect(runDiff({ cwd, osContext: ctx })).rejects.toThrow(/Could not read.*\.cursor/s);
+  });
 });

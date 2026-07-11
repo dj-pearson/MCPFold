@@ -23,6 +23,98 @@ describe('loadConfig (S1.2)', () => {
     }
   });
 
+  // S22.3: a body nested under __proto__ must NOT validate as an empty config (strict-schema bypass).
+  describe('prototype-pollution keys (S22.3)', () => {
+    it('rejects a config whose whole body is nested under __proto__', () => {
+      const text = `{
+  "__proto__": {
+    "version": 2,
+    "servers": { "github": { "transport": "stdio", "command": "npx" } }
+  }
+}`;
+      const res = loadConfig(text);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.errors[0]?.code).toBe('schema');
+        expect(res.errors[0]?.message).toMatch(/__proto__/);
+        expect(res.errors[0]?.line).toBe(2);
+      }
+    });
+
+    it('rejects a server literally named __proto__', () => {
+      const text = `{
+  "version": 2,
+  "servers": { "__proto__": { "transport": "stdio", "command": "x" } }
+}`;
+      const res = loadConfig(text);
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.errors[0]?.message).toMatch(/__proto__/);
+    });
+
+    it('rejects constructor and prototype keys anywhere', () => {
+      expect(loadConfig('{ "constructor": { "version": 2 } }').ok).toBe(false);
+      expect(loadConfig('{ "version": 2, "servers": { "prototype": {} } }').ok).toBe(false);
+    });
+
+    it('a normal config with no pollution keys is unaffected', () => {
+      const res = loadConfig(
+        '{ "version": 2, "servers": { "github": { "transport": "stdio", "command": "npx" } }, "profiles": {} }',
+      );
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        expect(Object.keys(res.config.servers)).toEqual(['github']);
+        // The loaded config is a normal object with a real prototype (not polluted).
+        expect(Object.getPrototypeOf(res.config)).toBe(Object.prototype);
+      }
+    });
+  });
+
+  // S22.7: a malformed version must be a clean ok:false, never an uncaught MigrationError.
+  describe('malformed version numbers (S22.7)', () => {
+    for (const bad of [0, -1, 1.5]) {
+      it(`version ${bad} returns ok:false instead of throwing`, () => {
+        let res;
+        expect(() => (res = loadConfig(`{ "version": ${bad}, "servers": {}, "profiles": {} }`))).not.toThrow();
+        expect(res!.ok).toBe(false);
+        if (!res!.ok) {
+          expect(res!.errors[0]?.code).toBe('schema');
+          expect(res!.errors[0]?.path).toBe('version');
+        }
+      });
+    }
+
+    it('a valid v1 config still auto-migrates and loads', () => {
+      const res = loadConfig(
+        '{ "version": 1, "servers": { "g": { "transport": "stdio", "command": "x" } }, "profiles": {} }',
+      );
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.config.version).toBe(2);
+    });
+  });
+
+  // S22.6: a pathologically nested document must be a clean ok:false, never an uncaught RangeError.
+  describe('recursion-depth limit (S22.6)', () => {
+    it('returns a positioned error (not a throw) for deeply nested input', () => {
+      const depth = 500; // well past the 64-level cap
+      const text = '['.repeat(depth) + ']'.repeat(depth);
+      let res;
+      expect(() => (res = loadConfig(text))).not.toThrow();
+      expect(res!.ok).toBe(false);
+      if (!res!.ok) {
+        expect(res!.errors[0]?.message).toMatch(/too deep/i);
+        expect(res!.errors[0]?.line).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it('does not throw a RangeError even on ~200k levels of nesting', () => {
+      const depth = 200_000;
+      const text = '['.repeat(depth) + ']'.repeat(depth);
+      let res;
+      expect(() => (res = loadConfig(text))).not.toThrow();
+      expect(res!.ok).toBe(false);
+    });
+  });
+
   it('returns a pathed zod error for invalid-but-parseable config', () => {
     const text = `{
   "version": 1,

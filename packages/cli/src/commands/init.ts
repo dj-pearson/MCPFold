@@ -1,9 +1,10 @@
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig, UsageError } from '@mcpfold/core';
 import { realOsContext, type OsContext } from '@mcpfold/adapters';
 import { detectClients, type DetectedClient } from '../util/detect-clients.js';
 import { CONFIG_FILENAMES } from '../util/config.js';
+import { atomicWrite } from '../io/atomic-write.js';
 import type { CommandOutput } from '../output/render.js';
 
 /**
@@ -87,7 +88,7 @@ export function runInit(options: InitOptions): CommandOutput<InitData> {
     };
   }
 
-  writeFileSync(configPath, contents, { encoding: 'utf8' });
+  atomicWrite(configPath, contents);
   return {
     data: { configPath, created: true, detected },
     human: renderHuman(configPath, true, detected, contents),

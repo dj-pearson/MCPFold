@@ -15,6 +15,7 @@ import { loadSigningKey, verifyConfig } from '../trust/signing.js';
 import { fileTrustGate, type TrustGate, untrustedServers } from '../trust/tofu.js';
 import { CONFIG_FILENAMES, findConfigPath } from '../util/config.js';
 import { atomicWrite } from '../io/atomic-write.js';
+import { backupIfExists } from '../io/backup.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
 
@@ -51,6 +52,8 @@ export interface PullData {
   drift: boolean;
   version?: number;
   diff?: ConfigDiff;
+  /** Path to the timestamped backup of the pre-existing canonical config, if one was made (S22.5). */
+  backup?: string | null;
 }
 
 const identityParser = { parse: (contents: string): Partial<Config> => JSON.parse(contents) };
@@ -162,6 +165,10 @@ export async function runPull(opts: PullOptions): Promise<CommandOutput<PullData
   }
 
   const target = findConfigPath(opts.cwd) ?? join(opts.cwd, CONFIG_FILENAMES[0]);
+  // S22.5: back up the local canonical config BEFORE clobbering it, mirroring migrate/sync — a pull
+  // can otherwise wipe uncommitted local edits with no way to recover (restore never targets the
+  // canonical file). No-ops (returns null) when there is no local config yet.
+  const backup = backupIfExists(target, opts.now ? new Date(opts.now()) : undefined);
   atomicWrite(target, `${serialize(remote.config)}\n`);
   // Confirmed (`--yes`) AND integrity-cleared (verified or --allow-unsigned) → pre-approve the
   // pulled launch commands in the trust store (S9.2). Auto-approval never rides in on an
@@ -169,8 +176,10 @@ export async function runPull(opts: PullOptions): Promise<CommandOutput<PullData
   for (const u of untrusted) gate.approve(u.name, u.entry);
 
   return {
-    data: { applied: true, drift: true, version: remote.version, diff },
-    human: `${summary}\n\n✓ Applied version ${remote.version} to ${target}.`,
+    data: { applied: true, drift: true, version: remote.version, diff, backup },
+    human:
+      `${summary}\n\n✓ Applied version ${remote.version} to ${target}.` +
+      (backup ? `\n  Backed up the previous config to ${backup}.` : ''),
     warnings,
   };
 }

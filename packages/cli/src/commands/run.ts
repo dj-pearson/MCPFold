@@ -211,7 +211,7 @@ export async function runRun(options: RunOptions): Promise<number> {
 
   // Config-as-code TOFU gate (S9.2): never exec a launch command that hasn't been trusted.
   if (isExecutable(server)) {
-    const entry = { command: server.command, args: server.args, pin: server.pin };
+    const entry = { command: server.command, args: server.args, pin: server.pin, env: server.env };
     if (!trust.isTrusted(options.name, entry)) {
       const st = trust.status(options.name, entry);
       throw new UsageError(

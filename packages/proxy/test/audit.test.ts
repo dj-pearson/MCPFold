@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -178,17 +178,46 @@ describe('fileAuditSink (S18.4)', () => {
     expect(JSON.parse(lines[1]!)).toMatchObject({ tool: 't2' });
   });
 
-  it('rotates to <path>.1 when the log reaches maxBytes', () => {
+  it('rotates to a unique per-process file when the log reaches maxBytes (S22.24)', () => {
     dir = mkdtempSync(join(tmpdir(), 'mcpfold-audit-'));
     const path = join(dir, 'audit.jsonl');
     const sink = fileAuditSink(path, { maxBytes: 40 });
     sink(event(1)); // writes > 40 bytes
-    sink(event(2)); // sees oversized file → rotates, then writes fresh
-    expect(statSync(`${path}.1`).isFile()).toBe(true);
+    sink(event(2)); // counter over the cap → rotates, then writes fresh
+    // A rotated file (unique per-process name, so concurrent proxies can't clobber) exists and holds
+    // the earlier event.
+    const rotated = readdirSync(dir).filter((f) => f.startsWith('audit.jsonl.'));
+    expect(rotated).toHaveLength(1);
+    expect(JSON.parse(readFileSync(join(dir, rotated[0]!), 'utf8').trim())).toMatchObject({
+      tool: 't1',
+    });
     // The current file holds only the latest event.
     const current = readFileSync(path, 'utf8').trim().split('\n');
     expect(current).toHaveLength(1);
     expect(JSON.parse(current[0]!)).toMatchObject({ tool: 't2' });
+  });
+
+  it('two writers sharing a path never lose records across rotation (S22.24)', () => {
+    dir = mkdtempSync(join(tmpdir(), 'mcpfold-audit-'));
+    const path = join(dir, 'audit.jsonl');
+    const a = fileAuditSink(path, { maxBytes: 40 });
+    const b = fileAuditSink(path, { maxBytes: 40 });
+    // Interleave so both instances rotate the shared path; unique rotated names avoid clobber.
+    for (let i = 0; i < 8; i++) {
+      a(event(i));
+      b(event(100 + i));
+    }
+    // Collect every record across the live file + all rotated files.
+    const tools = new Set<string>();
+    for (const f of readdirSync(dir).filter((f) => f.startsWith('audit.jsonl'))) {
+      for (const l of readFileSync(join(dir, f), 'utf8').trim().split('\n').filter(Boolean)) {
+        tools.add((JSON.parse(l) as { tool: string }).tool);
+      }
+    }
+    for (let i = 0; i < 8; i++) {
+      expect(tools.has(`t${i}`)).toBe(true);
+      expect(tools.has(`t${100 + i}`)).toBe(true);
+    }
   });
 
   it('is best-effort: an unwritable path warns once and never throws', () => {
@@ -204,5 +233,24 @@ describe('fileAuditSink (S18.4)', () => {
     }).not.toThrow();
     expect(warnings).toHaveLength(1); // warns once, not per event
     expect(warnings[0]).toContain('audit log write failed');
+  });
+});
+
+describe('audit in-flight map is bounded (S22.13)', () => {
+  it('evicts the oldest tracked call once the cap is exceeded, so unmatched ids do not accumulate', () => {
+    const events: AuditEvent[] = [];
+    let t = 1_000;
+    const rec = createAuditRecorder({
+      server: 'gh',
+      sink: (e) => events.push(e),
+      now: () => (t += 5),
+      maxInflight: 2,
+    });
+    rec.callStart(1, 'a', {});
+    rec.callStart(2, 'b', {});
+    rec.callStart(3, 'c', {}); // over the cap → evicts id 1 (oldest)
+    rec.callEnd(1, 'ok'); // id 1 was evicted → emits nothing
+    rec.callEnd(3, 'ok'); // id 3 still tracked → emits
+    expect(events.map((e) => e.tool)).toEqual(['c']);
   });
 });

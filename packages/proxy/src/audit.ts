@@ -1,4 +1,5 @@
 import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';
 import type { JsonRpcId } from './jsonrpc.js';
 
@@ -80,8 +81,11 @@ export function createAuditRecorder(opts: {
   sink: AuditSink;
   /** Injectable clock (ms since epoch) for deterministic tests. */
   now?: () => number;
+  /** Max concurrently-tracked in-flight calls before the oldest are evicted (S22.13). Default 1024. */
+  maxInflight?: number;
 }): AuditRecorder {
   const now = opts.now ?? (() => Date.now());
+  const maxInflight = opts.maxInflight ?? 1024;
   const iso = (ms: number) => new Date(ms).toISOString();
   const inflight = new Map<
     JsonRpcId,
@@ -90,6 +94,13 @@ export function createAuditRecorder(opts: {
 
   return {
     callStart(id, tool, params) {
+      // Bound the map: a server that never sends a matching response would otherwise leak one entry
+      // per call. Evict the oldest tracked calls (Map keeps insertion order) once over the cap (S22.13).
+      while (inflight.size >= maxInflight) {
+        const oldest = inflight.keys().next().value;
+        if (oldest === undefined) break;
+        inflight.delete(oldest);
+      }
       inflight.set(id, { tool, argShape: argumentShape(params), at: now() });
     },
     callEnd(id, outcome) {
@@ -123,10 +134,16 @@ export function createAuditRecorder(opts: {
   };
 }
 
+/** Module-level counter so two rotations from the same process still get distinct filenames. */
+let rotateSeq = 0;
+
 /**
- * A file-backed JSONL sink with size-based rotation. When the log reaches `maxBytes` it is rolled
- * to `${path}.1` (single generation) and a fresh file is started. Every failure is swallowed after
- * one stderr note so the proxied session is never interrupted.
+ * A file-backed JSONL sink with size-based rotation. Low-overhead (S22.24): the directory is created
+ * ONCE and a running byte counter avoids a `statSync` per write. When the log reaches `maxBytes` it
+ * is rotated to a UNIQUE per-process filename (`${path}.<pid>.<seq>.<rand>`), so concurrent proxies
+ * sharing a log path can't clobber each other's rotated records; appends use O_APPEND (atomic), so
+ * interleaved writers don't corrupt or drop lines. Every failure is swallowed after one stderr note
+ * so the proxied session is never interrupted.
  */
 export function fileAuditSink(
   path: string,
@@ -135,16 +152,31 @@ export function fileAuditSink(
   const maxBytes = opts.maxBytes ?? 5 * 1024 * 1024;
   const warn = opts.warn ?? ((m: string) => process.stderr.write(`${m}\n`));
   let warned = false;
+  let dirEnsured = false;
+  let bytes = -1; // -1 until initialized once from the file's current size
 
   return (event) => {
     try {
-      mkdirSync(dirname(path), { recursive: true });
-      try {
-        if (statSync(path).size >= maxBytes) renameSync(path, `${path}.1`);
-      } catch {
-        // No existing log yet (or stat failed) — nothing to rotate.
+      if (!dirEnsured) {
+        mkdirSync(dirname(path), { recursive: true });
+        dirEnsured = true;
       }
-      appendFileSync(path, `${JSON.stringify(event)}\n`, { encoding: 'utf8', mode: 0o600 });
+      const line = `${JSON.stringify(event)}\n`;
+      if (bytes < 0) {
+        // Seed the running counter from the current size ONCE (avoids a stat per write).
+        try {
+          bytes = statSync(path).size;
+        } catch {
+          bytes = 0;
+        }
+      }
+      if (bytes >= maxBytes) {
+        const rotated = `${path}.${process.pid}.${(rotateSeq++).toString(36)}.${randomBytes(4).toString('hex')}`;
+        renameSync(path, rotated);
+        bytes = 0;
+      }
+      appendFileSync(path, line, { encoding: 'utf8', mode: 0o600 });
+      bytes += Buffer.byteLength(line);
     } catch (error) {
       if (!warned) {
         warned = true;

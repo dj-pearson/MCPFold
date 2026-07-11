@@ -1,19 +1,19 @@
 {
   "mcpServers": {
     "github": {
-      "type": "http",
-      "url": "https://api.githubcopilot.com/mcp/"
+      "url": "https://api.githubcopilot.com/mcp/",
+      "type": "http"
     },
     "playwright": {
+      "command": "npx",
+      "type": "stdio",
       "args": [
         "-y",
         "@playwright/mcp@latest"
       ],
-      "command": "npx",
       "env": {
         "HEADLESS": "true"
-      },
-      "type": "stdio"
+      }
     }
   }
 }

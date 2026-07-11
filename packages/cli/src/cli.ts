@@ -85,6 +85,28 @@ function addGlobalFlags(cmd: Command): Command {
     .option('--debug', 'verbose, still-redacted debug logging to stderr', false);
 }
 
+/**
+ * Parse a numeric CLI flag, rejecting garbage instead of forwarding NaN/negatives to the
+ * registry/cloud client (S22.21). `Number('abc')` is NaN and `Number('1.5')` is non-integer; both
+ * used to pass through silently. Exported for unit testing.
+ * @internal
+ */
+export function parseIntFlag(
+  name: string,
+  raw: string | undefined,
+  opts: { min?: number } = {},
+): number | undefined {
+  if (raw === undefined) return undefined;
+  const n = Number(raw);
+  const min = opts.min ?? 1;
+  if (!Number.isInteger(n) || n < min) {
+    throw new UsageError(`${name} must be an integer ${min > 0 ? `≥ ${min}` : ''}(got "${raw}").`, {
+      hint: `Pass a whole number for ${name}.`,
+    });
+  }
+  return n;
+}
+
 export function buildProgram(writer?: Writer): { program: Command; getExitCode: () => ExitCode } {
   let exitCode: ExitCode = EXIT.SUCCESS;
   const setExit = (code: ExitCode): void => {
@@ -527,7 +549,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       await runCommand(
         'search',
         ctx.json,
-        () => runSearch({ query, limit: opts.limit ? Number(opts.limit) : undefined }),
+        () => runSearch({ query, limit: parseIntFlag('--limit', opts.limit) }),
         writer,
       ),
     );
@@ -636,7 +658,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
               yes: opts.yes,
               allowUnsigned: opts.allowUnsigned,
               teamId: opts.team,
-              version: opts.configVersion !== undefined ? Number(opts.configVersion) : undefined,
+              version: parseIntFlag('--config-version', opts.configVersion),
             }),
           writer,
         ),

@@ -67,7 +67,10 @@ export function keychainCommands(
       return {
         set: (secret) => ({
           command: 'security',
-          args: ['add-generic-password', '-U', '-s', SERVICE, '-a', account, '-w', secret],
+          // -w with NO inline value: the password is read from stdin, so it never appears in argv
+          // (S22.14) — matching the Linux/Windows branches. `security` reads a piped stdin password.
+          args: ['add-generic-password', '-U', '-s', SERVICE, '-a', account, '-w'],
+          stdin: secret,
         }),
         get: {
           command: 'security',

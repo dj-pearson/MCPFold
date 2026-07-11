@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { run } from '../src/cli.js';
+import { run, parseIntFlag } from '../src/cli.js';
+import { UsageError } from '@mcpfold/core';
 import { EXIT } from '../src/output/exit-codes.js';
 import type { Writer } from '../src/output/render.js';
 import type { JsonEnvelope } from '../src/output/envelope.js';
@@ -69,5 +70,19 @@ describe('run() — real arg parsing (guards option placement)', () => {
     ]) {
       expect(help).toContain(name);
     }
+  });
+});
+
+describe('parseIntFlag (S22.21)', () => {
+  it('accepts a valid positive integer and undefined', () => {
+    expect(parseIntFlag('--limit', '20')).toBe(20);
+    expect(parseIntFlag('--limit', undefined)).toBeUndefined();
+  });
+
+  it('rejects NaN, negatives, and non-integers with a UsageError', () => {
+    expect(() => parseIntFlag('--limit', 'abc')).toThrow(UsageError);
+    expect(() => parseIntFlag('--limit', '-3')).toThrow(UsageError);
+    expect(() => parseIntFlag('--config-version', '1.5')).toThrow(/integer/);
+    expect(() => parseIntFlag('--limit', '3.0e2')).not.toThrow(); // 300 is an integer
   });
 });

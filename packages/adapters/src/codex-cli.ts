@@ -66,7 +66,7 @@ export const codexCliAdapter: ClientAdapter = {
       existing && existing.trim().length > 0
         ? (parseToml(existing) as Record<string, unknown>)
         : {};
-    const mcpServers: Record<string, CodexEntry> = {};
+    const mcpServers = Object.create(null) as Record<string, CodexEntry>;
     for (const server of [...servers].sort((a, b) => a.name.localeCompare(b.name))) {
       mcpServers[server.name] = toCodexEntry(server);
     }
@@ -84,7 +84,7 @@ export const codexCliAdapter: ClientAdapter = {
 
   parse(contents): Partial<Config> {
     const root = (parseToml(contents) ?? {}) as { mcp_servers?: Record<string, unknown> };
-    const servers: Record<string, ServerConfig> = {};
+    const servers = Object.create(null) as Record<string, ServerConfig>;
     for (const [name, value] of Object.entries(root.mcp_servers ?? {})) {
       if (!value || typeof value !== 'object') continue;
       const entry = value as Record<string, unknown>;

@@ -49,6 +49,8 @@ function toResolved(name: string, server: ServerConfig, profile: ProfileConfig):
     auth: server.auth,
     env: server.env,
     pin: server.pin,
+    // S22.9: carry the SRI integrity through resolution so it can reach the fetch/install layer.
+    integrity: server.integrity,
     tools: server.tools,
     tags: server.tags,
     client: profile.client,

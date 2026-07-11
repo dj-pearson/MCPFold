@@ -99,8 +99,27 @@ export function namespaceOf(pkg: string | null): string | null {
 
 /** Compile a glob (`*` wildcard) to a whole-string, case-insensitive matcher. */
 function globToRe(glob: string): RegExp {
-  const escaped = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+  // S22.19: collapse runs of `*` FIRST. A `**` would otherwise compile to adjacent `.*.*`, whose
+  // ambiguity backtracks catastrophically (ReDoS) against a long non-matching input.
+  const collapsed = glob.replace(/\*+/g, '*');
+  const escaped = collapsed.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
   return new RegExp(`^${escaped}$`, 'i');
+}
+
+/**
+ * Does a versionless package spec match a rule's `package` at a NAME BOUNDARY (S22.19)? A raw
+ * `startsWith` over/under-matches for a deny-wins control — `server-git` would match
+ * `server-github`, `foo` would match `foo-bar`. A prefix only counts when it is the whole spec or is
+ * immediately followed by `/` or `@`.
+ */
+function packageMatchesRule(pkg: string, rulePackage: string): boolean {
+  const spec = stripVersion(pkg);
+  if (spec === rulePackage) return true;
+  if (spec.startsWith(rulePackage)) {
+    const next = spec.charAt(rulePackage.length);
+    return next === '/' || next === '@';
+  }
+  return false;
 }
 
 /** Does one rule match this server? (AND over the matchers the rule specifies.) */
@@ -112,9 +131,7 @@ export function ruleMatches(
   const conditions: boolean[] = [];
   if (rule.name !== undefined) conditions.push(rule.name === server.name);
   if (rule.package !== undefined) {
-    conditions.push(
-      pkg !== null && (stripVersion(pkg).startsWith(rule.package) || pkg.startsWith(rule.package)),
-    );
+    conditions.push(pkg !== null && packageMatchesRule(pkg, rule.package));
   }
   if (rule.namespace !== undefined) conditions.push(namespaceOf(pkg) === rule.namespace);
   if (rule.url !== undefined)

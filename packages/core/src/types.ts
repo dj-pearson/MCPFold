@@ -45,6 +45,9 @@ export interface ResolvedServer {
   auth?: AuthConfig;
   env?: Record<string, string>;
   pin?: string;
+  /** SRI integrity hash for the pinned package (S9.2/S22.9); carried through so the fetch/install
+   * layer can verify the fetched bytes against it. */
+  integrity?: string;
   tools?: ToolsDirective;
   tags: string[];
   /** From the resolving profile. */

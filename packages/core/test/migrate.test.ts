@@ -70,6 +70,14 @@ describe('migrateConfig (S0.7)', () => {
   it('throws when a migration step is missing', () => {
     expect(() => migrateConfig({ version: 1 }, 3, [])).toThrow(/no migration registered/);
   });
+
+  // S22.23: migrating a v1 that OMITS `servers` must NOT synthesize `servers: {}` — that would mask
+  // the schema's required-field error.
+  it('preserves the absence of servers so the required-field error still fires', () => {
+    const migrated = migrateConfig({ version: 1, profiles: {} }, 2).config;
+    expect('servers' in migrated).toBe(false);
+    expect(loadConfig('{ "version": 1, "profiles": {} }').ok).toBe(false);
+  });
 });
 
 describe('loadConfig newer-version detection (S0.7)', () => {

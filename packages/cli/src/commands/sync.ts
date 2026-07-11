@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  diffRendered,
   resolveProfile,
   UnknownProfileError,
   checkRendered,
@@ -25,6 +24,7 @@ import { atomicWrite } from '../io/atomic-write.js';
 import { backupIfExists } from '../io/backup.js';
 import { type FsWatcher, watchWithDebounce, type WatchHandle } from '../io/watch.js';
 import { renderWithStrategy } from '../sync/strategy.js';
+import { diffRenderedSafe } from '../util/safe-diff.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
 
@@ -146,7 +146,7 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
     });
 
     if (preview) {
-      const diff = diffRendered(file, onDisk, adapter);
+      const diff = diffRenderedSafe(file, onDisk, adapter);
       if (diff.hasDrift) drift = true;
       results.push({
         profile: name,

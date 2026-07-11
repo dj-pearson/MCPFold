@@ -17,16 +17,27 @@ export interface SerializeOptions {
 }
 
 /**
+ * Cap on traversal depth (S22.6). A validated config nests only a few levels, so a value deeper
+ * than this is pathological — bail with a clear Error instead of recursing into a RangeError. Also
+ * bounds `diff`'s `semanticEqual`, which compares values through `serialize`.
+ */
+const MAX_SERIALIZE_DEPTH = 64;
+
+/**
  * Recursively sort object keys (stable, ascending) while preserving array order.
  * Returns a structurally-cloned value safe to stringify deterministically.
  */
-export function sortKeysDeep(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortKeysDeep);
+export function sortKeysDeep(value: unknown, depth = 0): unknown {
+  if (depth > MAX_SERIALIZE_DEPTH) {
+    throw new Error(`serialize: value nests deeper than the ${MAX_SERIALIZE_DEPTH}-level limit`);
+  }
+  if (Array.isArray(value)) return value.map((v) => sortKeysDeep(v, depth + 1));
   if (value !== null && typeof value === 'object') {
     const source = value as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
+    // Object.create(null) so a `__proto__` own key can't invoke the prototype setter here (S22.3).
+    const out = Object.create(null) as Record<string, unknown>;
     for (const key of Object.keys(source).sort()) {
-      out[key] = sortKeysDeep(source[key]);
+      out[key] = sortKeysDeep(source[key], depth + 1);
     }
     return out;
   }

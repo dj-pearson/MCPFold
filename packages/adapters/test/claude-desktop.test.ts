@@ -36,4 +36,22 @@ describe('claudeDesktopAdapter (S2.3)', () => {
     await expect(file.contents).toMatchFileSnapshot('fixtures/claude-desktop/config.json');
     expect(claudeDesktopAdapter.parse(file.contents).servers?.playwright?.command).toBe('npx');
   });
+
+  // S22.2 (audit): claude_desktop_config.json can hold non-MCP keys (e.g. globalShortcut), so it
+  // merges too — replacing only `mcpServers` and preserving the rest.
+  it('merges into claude_desktop_config.json — preserves globalShortcut and other keys', () => {
+    const existing = JSON.stringify(
+      { globalShortcut: 'Cmd+Shift+Space', mcpServers: { stale: { command: 'old' } } },
+      null,
+      2,
+    );
+    const file = claudeDesktopAdapter.render(sampleServers('claude-desktop'), mac, existing);
+    const doc = JSON.parse(file.contents) as {
+      globalShortcut: string;
+      mcpServers: Record<string, unknown>;
+    };
+    expect(doc.globalShortcut).toBe('Cmd+Shift+Space');
+    expect(Object.keys(doc.mcpServers).sort()).toEqual(['github', 'playwright']);
+    expect(doc.mcpServers.stale).toBeUndefined();
+  });
 });

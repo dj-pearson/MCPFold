@@ -61,4 +61,37 @@ describe('secret set (S4.8)', () => {
     expect(result.human).toContain('export X=');
     expect(result.human).not.toContain(SECRET_VALUE);
   });
+
+  // S22.21: dotenv writes must be injection-safe and idempotent.
+  it('upserts an existing key instead of appending a duplicate', () => {
+    runSecretSet({ cwd, ref: '${dotenv:TOKEN}', value: 'old' });
+    runSecretSet({ cwd, ref: '${dotenv:TOKEN}', value: 'new' });
+    const env = readFileSync(join(cwd, '.env'), 'utf8');
+    expect(env).toContain('TOKEN=new');
+    expect(env).not.toContain('TOKEN=old');
+    // Exactly one assignment to TOKEN (no stale duplicate masking).
+    expect(env.match(/^TOKEN=/gm)?.length).toBe(1);
+  });
+
+  it('preserves other keys when upserting', () => {
+    runSecretSet({ cwd, ref: '${dotenv:A}', value: '1' });
+    runSecretSet({ cwd, ref: '${dotenv:B}', value: '2' });
+    runSecretSet({ cwd, ref: '${dotenv:A}', value: '11' });
+    const env = readFileSync(join(cwd, '.env'), 'utf8');
+    expect(env).toContain('A=11');
+    expect(env).toContain('B=2');
+  });
+
+  it('rejects a value containing a newline (line injection)', () => {
+    expect(() =>
+      runSecretSet({ cwd, ref: '${dotenv:TOKEN}', value: 'x\nEVIL=injected' }),
+    ).toThrow(/newline/i);
+  });
+
+  it('a value may contain = but the key may not', () => {
+    // A value with `=` is fine (dotenv splits on the first `=`).
+    const result = runSecretSet({ cwd, ref: '${dotenv:TOKEN}', value: 'a=b=c' });
+    expect(result.data.stored).toBe(true);
+    expect(readFileSync(join(cwd, '.env'), 'utf8')).toContain('TOKEN=a=b=c');
+  });
 });

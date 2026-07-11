@@ -75,6 +75,41 @@ describe('watchWithDebounce (S10.2)', () => {
     handle.stop(); // idempotent — no throw
     expect(fw.isStopped()).toBe(true);
   });
+
+  // S22.17: a rejecting onChange must not become an unhandled rejection (which would crash the
+  // process) — the watch swallows it and keeps running.
+  it('swallows a rejecting onChange without an unhandled rejection, and keeps watching', async () => {
+    const fw = fakeWatcher();
+    const rejections: unknown[] = [];
+    const onUnhandled = (r: unknown): void => {
+      rejections.push(r);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      let calls = 0;
+      const handle = watchWithDebounce({
+        path: 'x',
+        debounceMs: 5,
+        watcher: fw.watcher,
+        onChange: () => {
+          calls++;
+          return Promise.reject(new Error('boom'));
+        },
+      });
+      fw.fire();
+      await delay(30);
+      expect(calls).toBe(1);
+      // The watch is still alive — a second change still drives onChange.
+      fw.fire();
+      await delay(30);
+      expect(calls).toBe(2);
+      await delay(10); // let any stray microtask surface as an unhandled rejection
+      expect(rejections).toHaveLength(0);
+      handle.stop();
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
 });
 
 describe('runSyncWatch (S10.2)', () => {

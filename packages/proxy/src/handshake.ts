@@ -149,9 +149,30 @@ export async function handshake(
       clientInfo: { name: opts.clientName ?? 'mcpfold', version: '1' },
     })) as { protocolVersion?: string } | null;
 
+    // S22.13: the initialize result must be a non-null object — a null/garbage response is not a
+    // usable handshake.
+    if (init === null || typeof init !== 'object') {
+      return { reachable: false, error: 'server returned a non-object initialize response' };
+    }
+
     // Per spec: the server echoes our version if it supports it, else counter-offers one it does.
     // We accept that negotiated version and, on HTTP, echo it as MCP-Protocol-Version henceforth.
-    const negotiated = init?.protocolVersion ?? offeredVersion;
+    const negotiated = init.protocolVersion ?? offeredVersion;
+
+    // S22.13: do not speak a version we don't support. Stop the handshake BEFORE sending
+    // notifications/initialized or tools/list (and before echoing the attacker-chosen version as the
+    // MCP-Protocol-Version header), returning a clear unsupported result instead.
+    if (!isSupportedProtocolVersion(negotiated)) {
+      return {
+        reachable: true,
+        protocolVersion: negotiated,
+        offeredVersion,
+        protocolSupported: false,
+        toolCount: 0,
+        tools: [],
+      };
+    }
+
     transport.setProtocolVersion?.(negotiated);
 
     // MCP requires the client to confirm initialization before other requests.

@@ -127,7 +127,7 @@ export const gooseAdapter: ClientAdapter = {
 
   parse(contents): Partial<Config> {
     const raw = (YAML.parse(contents) ?? {}) as { extensions?: Record<string, unknown> };
-    const servers: Record<string, ServerConfig> = {};
+    const servers = Object.create(null) as Record<string, ServerConfig>;
     for (const [name, value] of Object.entries(raw.extensions ?? {})) {
       if (!value || typeof value !== 'object') continue;
       const ext = value as Record<string, unknown>;

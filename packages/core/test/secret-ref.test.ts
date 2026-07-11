@@ -45,6 +45,18 @@ describe('parseSecretRef (S1.3)', () => {
     expect(isSecretRef('${env:X}')).toBe(true);
     expect(isSecretRef('Bearer ${env:X}')).toBe(false);
   });
+
+  // S22.22: whole-string and embedded parsing use the same non-`}` path class, so they agree that a
+  // path never contains a brace — previously the whole matcher's greedy `.+` yielded `a}b`.
+  it('whole-string and embedded parsing agree on the ambiguous ${env:a}b}', () => {
+    // The whole string is NOT a single clean ref (the trailing `b}` disqualifies it).
+    expect(isSecretRef('${env:a}b}')).toBe(false);
+    expect(parseSecretRef('${env:a}b}')).toBeNull();
+    // Embedded scan finds `${env:a}` with path `a` (never `a}b`).
+    const refs = findSecretRefsInString('${env:a}b}');
+    expect(refs.map((r) => r.raw)).toEqual(['${env:a}']);
+    expect(refs[0]?.path).toBe('a');
+  });
 });
 
 describe('findSecretRefsInString (S1.3)', () => {

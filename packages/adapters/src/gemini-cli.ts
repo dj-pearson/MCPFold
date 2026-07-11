@@ -1,5 +1,5 @@
-import { serialize, type Config, type ResolvedServer, type ServerConfig } from '@mcpfold/core';
-import { envRefCanonicalizer } from './shared.js';
+import type { Config, ResolvedServer, ServerConfig } from '@mcpfold/core';
+import { envRefCanonicalizer, mergeManagedKeys, parseClientJsonc } from './shared.js';
 import { expandHome, joinFor, realOsContext } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
@@ -67,25 +67,29 @@ export const geminiCliAdapter: ClientAdapter = {
     return joinFor(ctx, ctx.home, '.gemini', 'settings.json');
   },
 
-  render(servers, ctx: OsContext = realOsContext()): RenderedFile {
-    const mcpServers: Record<string, GeminiEntry> = {};
-    for (const server of servers) mcpServers[server.name] = toGeminiEntry(server);
+  render(servers, ctx: OsContext = realOsContext(), existing?: string): RenderedFile {
+    const mcpServers = Object.create(null) as Record<string, GeminiEntry>;
+    for (const server of [...servers].sort((a, b) => a.name.localeCompare(b.name))) {
+      mcpServers[server.name] = toGeminiEntry(server);
+    }
     const scope = servers[0]?.scope ?? 'user';
     const projectPath = servers[0]?.projectPath;
+    // S22.2: `~/.gemini/settings.json` also holds auth type, theme, etc. Merge — replacing only
+    // `mcpServers` — so we never drop the user's other Gemini settings.
     return {
       path: this.resolvePath(scope, projectPath, ctx),
-      contents: serialize({ mcpServers }),
+      contents: mergeManagedKeys(existing, [{ path: ['mcpServers'], value: mcpServers }]),
       needsRestart: false,
     };
   },
 
   parse(contents): Partial<Config> {
-    const raw = JSON.parse(contents) as { mcpServers?: Record<string, unknown> };
+    const raw = parseClientJsonc(contents) as { mcpServers?: Record<string, unknown> };
     // S19.4: reverse Gemini's `${NAME}` env dialect back to the canonical `${env:NAME}` on parse.
     const canon = envRefCanonicalizer(geminiCliAdapter.envInterpolation!);
     const mapVals = (r: Record<string, string>): Record<string, string> =>
       Object.fromEntries(Object.entries(r).map(([k, v]) => [k, canon(v)]));
-    const servers: Record<string, ServerConfig> = {};
+    const servers = Object.create(null) as Record<string, ServerConfig>;
     for (const [name, value] of Object.entries(raw.mcpServers ?? {})) {
       if (!value || typeof value !== 'object') continue;
       const entry = value as Record<string, unknown>;
