@@ -1634,3 +1634,20 @@ prefix over-matching was corrected to the boundary behavior. `verify_all` green 
 suite, and build.
 
 **All E22 p2 stories (S22.13–S22.19) complete.**
+
+## S21.7 / S21.8 — BLOCKED (E21 marketing/growth, need product decisions + live measurement)
+
+2026-07-11. Like the S21.4-6 cluster, these two E21 p3 stories are blocked for autonomous completion;
+the loop moves on to the completable E22 p3 security backlog.
+
+- **S21.7 (homepage message A/B test)** explicitly requires running GEO/rank + SEO measurement for both
+  message clusters over a defined window and letting the DATA pick the H1 emphasis ("do NOT rewrite on
+  a hunch"). That needs live SEO-measurement infrastructure, a time window, and a maintainer copy
+  decision — not an autonomous code change.
+- **S21.8 (contributor growth loop)** needs product/marketing framing (which framing, which highest-demand
+  missing adapters), GitHub good-first-issue label curation (issue-management access), and ongoing,
+  visible contributor acknowledgment. The mechanical part (a `/community` on-ramp section) can't be done
+  faithfully without those product decisions and repo/social actions.
+
+Unblock with a focused product/marketing session (SEO tooling + copy decision for S21.7; framing +
+GitHub labels + acknowledgment plan for S21.8).
