@@ -239,6 +239,47 @@ describe('pull (S6.6)', () => {
     expect(gate.approved).toContain('extra');
   });
 
+  // S22.5: a pull must back up the pre-existing canonical config before clobbering it.
+  it('backs up the local canonical config before applying, and surfaces the backup path', async () => {
+    // Seed a canonical config with an uncommitted local edit that the pull would overwrite.
+    const local = CONFIG_TEXT.replace('"gh"', '"my-local-edit"');
+    writeFileSync(join(cwd, 'mcp.config.jsonc'), local);
+    const backend = inMemoryBackend();
+    await saveSession(futureSession(), backend);
+    const key = await getOrCreateSigningKey(backend);
+    const api = fakeApi({ pull: async () => signedRemote(key) });
+
+    const out = await runPull({
+      cwd,
+      api,
+      backend,
+      yes: true,
+      gate: recordingGate(),
+      now: () => Date.parse('2026-07-11T00:00:00Z'),
+    });
+    expect(out.data.applied).toBe(true);
+    // The backup path is returned and surfaced in the human output.
+    expect(out.data.backup).toBeTruthy();
+    expect(out.human).toContain('Backed up');
+    // The backup preserves the ORIGINAL local contents (the overwritten edit is recoverable).
+    expect(readFileSync(out.data.backup!, 'utf8')).toBe(local);
+    // And the target now holds the pulled config.
+    expect(readFileSync(join(cwd, 'mcp.config.jsonc'), 'utf8')).toContain('"extra"');
+  });
+
+  it('does not create a backup when there is no local config to overwrite (S22.5)', async () => {
+    // No mcp.config.jsonc seeded — a first-time pull has nothing to back up.
+    const backend = inMemoryBackend();
+    await saveSession(futureSession(), backend);
+    const key = await getOrCreateSigningKey(backend);
+    const api = fakeApi({ pull: async () => signedRemote(key) });
+
+    const out = await runPull({ cwd, api, backend, yes: true, gate: recordingGate() });
+    expect(out.data.applied).toBe(true);
+    expect(out.data.backup).toBeNull();
+    expect(out.human).not.toContain('Backed up');
+  });
+
   it('refuses an unsigned config under --yes alone; --allow-unsigned applies it (S16.5)', async () => {
     writeFileSync(join(cwd, 'mcp.config.jsonc'), CONFIG_TEXT);
     const backend = inMemoryBackend();

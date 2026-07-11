@@ -4932,7 +4932,7 @@
       "epic": "E22",
       "order": 5,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Back up the canonical config before pull --yes overwrites it",
       "user_story": "As a user, I want `mcpfold pull` to back up my local canonical config before applying a remote version, so I can recover uncommitted local edits if I pull the wrong thing.",

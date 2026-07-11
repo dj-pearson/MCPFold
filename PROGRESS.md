@@ -1304,3 +1304,26 @@ lint, typecheck, full suite (cli 283 incl. 14 trust), and build.
 **Follow-ups:** none for the DoD. pull's auto-approve of pulled launch commands stays gated behind
 integrity verification (a signed config, or explicit --allow-unsigned), so a tampered unsigned config
 is refused rather than auto-trusted; the run-path re-gate is the enforcement point.
+
+## S22.5 — Back up the canonical config before pull --yes overwrites it
+
+Started/done: 2026-07-11. HIGH (data loss, verified). `pull` called
+`atomicWrite(target, serialize(remote.config))` with no prior `backupIfExists` — unlike every other
+canonical-config writer (`migrate.ts`, `sync.ts`, which both back up first). Since `restore` only
+enumerates client files via `adapter.resolvePath` per profile and never targets the canonical
+`mcp.config.jsonc`, a clobbered canonical config with uncommitted local edits was unrecoverable.
+
+**Fix.** `runPull` now calls `backupIfExists(target, …)` immediately before the `atomicWrite`,
+mirroring migrate/sync. The backup path is added to `PullData.backup` and surfaced in the human
+output ("Backed up the previous config to …"). The existing injectable `now` clock is reused for a
+deterministic backup timestamp. No-ops (backup `null`, no message) on a first-time pull with no local
+config.
+
+Tests (cloud.test.ts): a pull over a config carrying an uncommitted local edit writes a backup that
+preserves the ORIGINAL contents and surfaces its path; a first-time pull with no local config makes
+no backup. `verify_all` green — lint, typecheck, full suite (cli 283 incl. 20 cloud), and build.
+
+**Follow-ups:** AC #3 (teach `restore` to enumerate the canonical file so a pulled overwrite can be
+undone in-tool) is explicitly optional and was deferred — it needs a new non-profile target concept
+and selection UX. The backup itself uses the standard `.mcpfold.bak.` format and is manually
+restorable today; the DoD (never overwrite without a timestamped backup) is met.
