@@ -1187,3 +1187,34 @@ build clean.
 **Follow-ups:** per-team IdP selection (this ships deployment-level OIDC config, not per-team) and a
 web view of the audit-event log (the `team-events` endpoint exists; the console shows config-version
 audit today).
+
+## S22.1 — Fix PowerShell command injection in the Windows keychain provider
+
+Started/done: 2026-07-11. BLOCKER security fix. The win32 keychain provider built its PowerShell
+`-Command` string by interpolating the untrusted `account` (and `service`) straight into a
+single-quoted `Get-StoredCredential -Target '${service}:${account}'`. A `${keychain:...}` ref such
+as `${keychain:x'); Start-Process calc; ('}` closed the quote and executed injected statements —
+reachable via a tampered/synced config even on an otherwise-trusted server, since env-channel refs
+aren't behind the TOFU gate and secrets resolve at run/test time.
+
+**Fix (out-of-band, injection-proof by construction).** The win32 `-Command` script is now a
+CONSTANT that reads the target from env vars: `Get-StoredCredential -Target ($env:MCPFOLD_KC_SERVICE
++ ':' + $env:MCPFOLD_KC_ACCOUNT)`. PowerShell treats env values as opaque string data (never parsed
+as code), so the account/service never enter the command text. `keychainCommand` gained an optional
+`env` field; the provider threads it through `exec`, and `defaultExec`/`ExecOptions` grew an `env`
+option that merges over `process.env` for the child (undefined on POSIX, which already passed the
+account as an argv element). Added `-NonInteractive` so a malformed value can never block on a prompt.
+
+**Defense in depth (AC #4).** Tightened core `SECRET_REF_RE` (schema.ts) so a ref path forbids
+shell/quote metacharacters — quotes, backtick, `$`, `;`, parentheses, braces, backslash, whitespace
+— rejecting an injection payload at schema-validation time. Regenerated the committed
+`packages/schema/mcp.config.schema.json` (the `token` pattern) to match.
+
+Tests: win32 argv is a constant regardless of account; an injection-laden account carries no trace
+into the executed argv (only into env) and runs exactly one command; a normal account still resolves
+on win32 (behavior parity). `verify_all` green — lint, typecheck, full suite (secrets 39, core 92,
+schema 9, adapters 151, proxy 54, cli 283, e2e, security), and build all pass.
+
+**Follow-ups:** unify the two secret-ref grammars — `secret-ref.ts`'s loose parsing regexes
+(`WHOLE_REF_RE`/`EMBEDDED_REF_RE`) still accept the broader path; converging them with the tightened
+`SECRET_REF_RE` is S22.22's scope. The provider is injection-proof independent of that regex.

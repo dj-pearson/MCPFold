@@ -64,8 +64,12 @@ export const SCOPES = ['user', 'project', 'workspace'] as const;
  * The value is resolved at fold time; the reference is the only thing ever committed.
  * This regex intentionally accepts any lowercase scheme so an unknown scheme surfaces
  * as a *doctor warning* (S1.3), not a hard schema failure.
+ *
+ * Defense in depth (S22.1/S22.22): the path forbids shell/quote metacharacters — quotes,
+ * backtick, `$`, `;`, parentheses, braces, backslash, and whitespace/control chars — so a ref
+ * can never carry a command-injection payload into a provider backend even if one interpolates.
  */
-export const SECRET_REF_RE = /^\$\{[a-z0-9_-]+:.+\}$/;
+export const SECRET_REF_RE = /^\$\{[a-z0-9_-]+:[^\s'"`$;(){}\\]+\}$/;
 
 export const SecretRef = z.string().regex(SECRET_REF_RE, {
   message: 'secret reference must look like ${scheme:path}, e.g. ${env:GITHUB_PAT}',

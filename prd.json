@@ -4813,7 +4813,7 @@
       "epic": "E22",
       "order": 1,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Fix PowerShell command injection in the Windows keychain provider",
       "user_story": "As a Windows user, I want `${keychain:...}` references resolved without letting a config value execute arbitrary PowerShell, so a tampered or synced config can't run code on my machine.",
