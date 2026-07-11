@@ -1,5 +1,5 @@
 import { isSecretRef, type Config, type ResolvedServer, type ServerConfig } from '@mcpfold/core';
-import { mergeManagedKeys } from './shared.js';
+import { mergeManagedKeys, parseClientJsonc } from './shared.js';
 import { joinFor, realOsContext, userConfigDir } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
@@ -122,7 +122,7 @@ export const vscodeAdapter: ClientAdapter = {
   },
 
   parse(contents): Partial<Config> {
-    const raw = JSON.parse(contents) as { servers?: Record<string, unknown> };
+    const raw = parseClientJsonc(contents) as { servers?: Record<string, unknown> };
     const servers: Record<string, ServerConfig> = {};
     for (const [name, value] of Object.entries(raw.servers ?? {})) {
       if (!value || typeof value !== 'object') continue;

@@ -5015,7 +5015,7 @@
       "epic": "E22",
       "order": 8,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Parse client configs tolerantly (JSONC) and never crash on malformed input",
       "user_story": "As a user, I want `mcpfold import` and drift detection to handle a client config that has comments or a small mistake, so a valid JSONC file or a corrupt file gives a clear error instead of a raw crash.",

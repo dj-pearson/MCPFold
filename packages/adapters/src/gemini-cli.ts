@@ -1,5 +1,5 @@
 import type { Config, ResolvedServer, ServerConfig } from '@mcpfold/core';
-import { envRefCanonicalizer, mergeManagedKeys } from './shared.js';
+import { envRefCanonicalizer, mergeManagedKeys, parseClientJsonc } from './shared.js';
 import { expandHome, joinFor, realOsContext } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
@@ -84,7 +84,7 @@ export const geminiCliAdapter: ClientAdapter = {
   },
 
   parse(contents): Partial<Config> {
-    const raw = JSON.parse(contents) as { mcpServers?: Record<string, unknown> };
+    const raw = parseClientJsonc(contents) as { mcpServers?: Record<string, unknown> };
     // S19.4: reverse Gemini's `${NAME}` env dialect back to the canonical `${env:NAME}` on parse.
     const canon = envRefCanonicalizer(geminiCliAdapter.envInterpolation!);
     const mapVals = (r: Record<string, string>): Record<string, string> =>

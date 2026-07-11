@@ -77,4 +77,22 @@ describe('vscodeAdapter (S2.5)', () => {
     // The bearer github server contributes a prompted input.
     expect(Array.isArray(doc.inputs)).toBe(true);
   });
+
+  // S22.8: mcp.json is officially JSONC — comments and trailing commas must parse, not crash.
+  it('parses a JSONC file with comments and trailing commas', () => {
+    const jsonc = [
+      '{',
+      '  // my servers',
+      '  "servers": {',
+      '    "gh": { "type": "stdio", "command": "npx", },',
+      '  },',
+      '}',
+    ].join('\n');
+    const parsed = vscodeAdapter.parse(jsonc);
+    expect(parsed.servers?.gh?.command).toBe('npx');
+  });
+
+  it('throws a descriptive error (not a raw SyntaxError) on a corrupt file', () => {
+    expect(() => vscodeAdapter.parse('{ "servers": { not json')).toThrow(/malformed JSON/i);
+  });
 });

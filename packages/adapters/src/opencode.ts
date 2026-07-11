@@ -1,6 +1,6 @@
 import { applyEdits, modify } from 'jsonc-parser';
 import type { Config, ResolvedServer, ServerConfig } from '@mcpfold/core';
-import { envRefCanonicalizer } from './shared.js';
+import { envRefCanonicalizer, parseClientJsonc } from './shared.js';
 import { expandHome, joinFor, realOsContext } from './paths.js';
 import type { ClientAdapter, OsContext, RenderedFile } from './types.js';
 
@@ -97,7 +97,7 @@ export const opencodeAdapter: ClientAdapter = {
   },
 
   parse(contents): Partial<Config> {
-    const raw = JSON.parse(contents) as { mcp?: Record<string, unknown> };
+    const raw = parseClientJsonc(contents) as { mcp?: Record<string, unknown> };
     // S19.4: reverse opencode's single-brace `{env:NAME}` dialect back to canonical `${env:NAME}`.
     const canon = envRefCanonicalizer(opencodeAdapter.envInterpolation!);
     const mapVals = (r: Record<string, string>): Record<string, string> =>

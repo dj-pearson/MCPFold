@@ -1366,3 +1366,26 @@ any future missing-step gap.
 Tests (load.test.ts): version 0, -1, and 1.5 each return `ok:false` (never throw) with a `version`
 path; a valid v1 config still auto-migrates to v2 and loads. `verify_all` green — lint, typecheck,
 full suite, and build.
+
+## S22.8 — Parse client configs tolerantly (JSONC) and never crash on malformed input
+
+Started/done: 2026-07-11. HIGH (verified). Every adapter `parse()` used `JSON.parse` with no
+try/catch (shared factory, gemini-cli, opencode, vscode). VS Code/Cursor `mcp.json`, Claude Code, and
+Roo/Cline settings are officially JSONC (comments + trailing commas), so `JSON.parse` threw an uncaught
+`SyntaxError` on a valid file — silently skipping its servers on import (import already try/catches per
+adapter) and crashing drift detection (`diffRendered` → `parser.parse`).
+
+**Fix.** New `parseClientJsonc` helper (shared.ts) uses jsonc-parser (`allowTrailingComma`, comments
+tolerated) and throws a single descriptive `Error` on genuinely malformed input; it replaces
+`JSON.parse` in the shared factory + gemini-cli/opencode/vscode parses. New `diffRenderedSafe` util
+wraps `diffRendered` at the two client-file drift sites (diff.ts, sync.ts) so a parse failure becomes a
+`UsageError` naming the offending file — parser-agnostic, so it also covers codex (TOML) / goose (YAML).
+`pull`'s diffRendered compares canonical-vs-canonical (mcpfold-produced JSON), so it is not a
+client-file crash surface and was left as-is.
+
+Tests: vscode parses a commented + trailing-comma file and throws `/malformed JSON/` (not a raw
+SyntaxError) on corruption; `runDiff` handles a JSONC on-disk cursor file and turns a corrupt one into a
+`UsageError` naming `.cursor/...`. `verify_all` green — lint, typecheck, full suite, and build.
+
+**Follow-ups:** import's per-adapter sweep still silently skips a corrupt file (graceful, no crash) —
+intentional so one broken client config doesn't abort discovery of all the others.
