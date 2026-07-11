@@ -5102,7 +5102,7 @@
       "epic": "E22",
       "order": 11,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Validate registry-supplied runtime hints and remote URLs before writing configs",
       "user_story": "As a user, I want the launch command mcpfold writes into my client configs to come from a known-safe set, so a malicious registry mirror can't make me run an arbitrary command.",
