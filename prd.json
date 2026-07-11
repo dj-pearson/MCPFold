@@ -5239,7 +5239,7 @@
       "epic": "E22",
       "order": 16,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Back up and atomically write on import --force, and re-validate the merged config",
       "user_story": "As a user, I want `mcpfold import --force` to back up my existing config, write atomically, and refuse to persist an invalid result, so an import can't corrupt or silently break my canonical config.",

@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -93,6 +101,28 @@ describe('runImport (S3.3)', () => {
     expect(existsSync(join(cwd, 'mcp.config.jsonc'))).toBe(false);
     expect(result.data.wrote).toBe(false);
     expect(result.human).toContain('Would write');
+  });
+
+  // S22.16: --force must back up + atomically write, and never persist an invalid canonical config.
+  it('--force backs up the existing config before overwriting', () => {
+    const existing = '{ "version": 2, "servers": {}, "profiles": {} }';
+    writeFileSync(join(cwd, 'mcp.config.jsonc'), existing);
+    const result = runImport({ cwd, force: true, osContext: ctx });
+    expect(result.data.wrote).toBe(true);
+    // A timestamped backup of the OLD file was made before overwriting.
+    expect(result.data.backup).toBeTruthy();
+    expect(readFileSync(result.data.backup!, 'utf8')).toBe(existing);
+    expect(readdirSync(cwd).filter((f) => f.includes('.mcpfold.bak.'))).toHaveLength(1);
+    // The new config is valid.
+    expect(loadConfig(readFileSync(join(cwd, 'mcp.config.jsonc'), 'utf8')).ok).toBe(true);
+  });
+
+  it('rejects a merge that would be an invalid canonical config, writing nothing', () => {
+    // A client config that parses into a stdio server with an empty command — the canonical schema
+    // rejects it, so import must refuse rather than persist an invalid mcp.config.jsonc.
+    plant('.cursor/mcp.json', JSON.stringify({ mcpServers: { broken: { command: '' } } }));
+    expect(() => runImport({ cwd, osContext: ctx })).toThrow(/would be invalid/i);
+    expect(existsSync(join(cwd, 'mcp.config.jsonc'))).toBe(false);
   });
 });
 

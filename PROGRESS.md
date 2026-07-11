@@ -1555,3 +1555,20 @@ rotate it) but must be a non-empty string when present. A malformed 200 throws a
 Tests (cloud.test.ts, new refresh-validation block): a well-formed 200 (rotated or not) returns the
 validated response; a 200 missing the access token, a non-finite `expires_in`, or an empty rotated
 refresh token each reject. `verify_all` green — lint, typecheck, full suite, and build.
+
+## S22.16 — Back up and atomically write on import --force, and re-validate the merged config
+
+Started/done: 2026-07-11. MEDIUM + LOW (verified). `commands/import.ts` used
+`writeFileSync(configPath, contents)` for the `--force` overwrite — no `backupIfExists`, not atomic,
+unlike migrate/sync/add. It also wrote without a `loadConfig` round-trip (add.ts/init.ts validate;
+import didn't), so a client file that parses into a shape the canonical schema rejects yielded an
+invalid `mcp.config.jsonc` on disk.
+
+**Fix.** Before writing, import now re-validates the serialized merge with `loadConfig` and throws a
+clear `UsageError` (nothing written) when it is invalid; it then calls `backupIfExists` (surfaced as
+`data.backup`) and routes the write through `atomicWrite`. `writeFileSync` is gone from the module.
+
+Tests (import.test.ts): `--force` backs up the old config first (backup path returned, contents
+preserved, one `.mcpfold.bak.` file) and writes a valid config; a client config that merges into a
+stdio server with an empty command is rejected ("would be invalid") and nothing is written.
+`verify_all` green — lint, typecheck, full suite, and build.

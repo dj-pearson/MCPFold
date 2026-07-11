@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   isSecretRef,
+  loadConfig,
   serialize,
   UsageError,
   type Config,
@@ -16,6 +17,8 @@ import {
   type OsContext,
 } from '@mcpfold/adapters';
 import { CONFIG_FILENAMES, MCP_JSON_FILENAME } from '../util/config.js';
+import { atomicWrite } from '../io/atomic-write.js';
+import { backupIfExists } from '../io/backup.js';
 import type { CommandOutput } from '../output/render.js';
 
 /**
@@ -46,6 +49,8 @@ export interface ImportData {
   conflicts: ImportConflict[];
   flagged: FlaggedSecret[];
   sources: string[];
+  /** Path to the timestamped backup of the pre-existing config, when --force overwrote one (S22.16). */
+  backup?: string | null;
 }
 
 export interface ImportOptions {
@@ -243,9 +248,24 @@ export function runImport(options: ImportOptions): CommandOutput<ImportData> {
     return { data, human: renderHuman(data, contents, false) };
   }
 
-  writeFileSync(configPath, contents, { encoding: 'utf8' });
+  // S22.16: re-validate the merged result so a client file that parses into a shape the canonical
+  // schema rejects never lands on disk as an invalid mcp.config.jsonc.
+  const validated = loadConfig(contents);
+  if (!validated.ok) {
+    throw new UsageError(
+      `The imported config would be invalid and was not written: ${validated.errors[0]?.message}`,
+      {
+        hint: 'Exclude or fix the offending client server, then re-run `mcpfold import`.',
+      },
+    );
+  }
+
+  // Back up an existing canonical config before the --force overwrite, and write atomically —
+  // matching migrate/sync/add so an import can never corrupt or half-write the canonical file (S22.16).
+  const backup = backupIfExists(configPath);
+  atomicWrite(configPath, contents);
   return {
-    data: { ...data, wrote: true },
+    data: { ...data, wrote: true, backup },
     human: renderHuman({ ...data, wrote: true }, contents, true),
   };
 }
