@@ -1479,3 +1479,22 @@ Tests: filter.test.ts covers case/whitespace normalization for allow + deny; pas
 covers a notification-form denied call (not forwarded), a request-form denied call (error, not
 forwarded), a case/whitespace variant (blocked), and an allowed call still forwarding in both forms.
 `verify_all` green — lint, typecheck, full suite (proxy 68), and build.
+
+## S21.4 / S21.5 / S21.6 — BLOCKED (E21 web/marketing, autonomous sandbox limits)
+
+2026-07-11. These three E21 stories are blocked for autonomous completion in this environment; the
+loop moves past them to the completable E22 security backlog per the blocked-handling protocol.
+
+- **S21.4 (token-cost leaderboard)** requires COLLECTED (not estimated) tool-schema data — launching
+  each directory MCP server live via the proxy to capture `tools/list`. Many servers need credentials
+  and network/npm access that isn't available here, and the story explicitly warns that estimated or
+  fabricated numbers destroy the asset's credibility. Producing the leaderboard/JSON-LD/calculator
+  presets honestly needs a session with live-server + credential access. Not faking the data.
+- **S21.5 (web funnel instrumentation + channel attribution)** needs a production analytics backend
+  and attribution/config decisions (which provider, event taxonomy, consent) that are product/infra
+  calls, not autonomous code changes.
+- **S21.6 (e2e for the calculator + new comparison pages)** is coupled to the new pages S21.4 would
+  create; without them there is nothing new to e2e beyond the existing calculator.
+
+Unblock by running a focused session with live-server/credential access (S21.4), the site's analytics
+configuration (S21.5), then S21.6 once the new pages exist.
