@@ -187,4 +187,31 @@ describe('runAdd --from-mcpb (S17.8)', () => {
       }),
     ).rejects.toThrow(/integrity check failed/);
   });
+
+  // S22.9: the fetched bytes are verified against the declared integrity via the shared SRI verifier.
+  it('installs when the integrity matches the fetched bytes (hex or SRI)', async () => {
+    const bundle = buildBundle(MANIFEST);
+    const sri = `sha256-${createHash('sha256').update(bundle).digest('base64')}`;
+    const viaSri = await runAdd({
+      cwd,
+      name: 'bundle.mcpb',
+      fromMcpb: true,
+      mcpbIntegrity: sri,
+      loadBundle: () => Promise.resolve(bundle),
+    });
+    expect(viaSri.data.wrote).toBe(true);
+  });
+
+  it('rejects a malformed integrity value as a clear error (S22.9)', async () => {
+    const bundle = buildBundle(MANIFEST);
+    await expect(
+      runAdd({
+        cwd,
+        name: 'bundle.mcpb',
+        fromMcpb: true,
+        mcpbIntegrity: 'not-a-real-hash',
+        loadBundle: () => Promise.resolve(bundle),
+      }),
+    ).rejects.toThrow(/not a valid/i);
+  });
 });

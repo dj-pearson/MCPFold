@@ -5,15 +5,15 @@ import { isSecretRef, loadConfig, UsageError, type ServerConfig } from '@mcpfold
 import { realOsContext, type OsContext } from '@mcpfold/adapters';
 import { findConfigPath } from '../util/config.js';
 import { checkServer, describeViolation, loadPolicy } from '../util/policy.js';
-import { mapRegistryServer, type SecretScheme } from '../registry/map.js';
+import { mapRegistryServer, toSri, type SecretScheme } from '../registry/map.js';
 import { httpRegistryClient, type RegistryClient } from '../registry/client.js';
 import {
   inspectMcpbSignature,
   mapMcpbManifest,
   type McpbSignature,
   parseMcpbManifest,
-  verifyMcpbIntegrity,
 } from '../registry/mcpb.js';
+import { verifyPackageIntegrity } from '../trust/integrity.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import type { CommandOutput } from '../output/render.js';
 
@@ -132,13 +132,22 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
   let derivedName = options.name;
 
   if (options.fromMcpb) {
-    // S17.8: parse the .mcpb → a canonical, ref-only stdio server; verify integrity + surface signature.
+    // S17.8/S22.9: parse the .mcpb → a canonical, ref-only stdio server; verify integrity against the
+    // FETCHED BYTES (fail closed) + surface signature. Uses the shared SRI verifier (trust/integrity),
+    // accepting a registry `fileSha256` as hex or SRI.
     const bundle = await (options.loadBundle ?? loadMcpbBundle)(options.name);
-    if (options.mcpbIntegrity && !verifyMcpbIntegrity(bundle, options.mcpbIntegrity)) {
-      throw new UsageError(
-        `.mcpb integrity check failed — its SHA-256 does not match the expected ${options.mcpbIntegrity}.`,
-        { hint: 'The bundle may be corrupted or tampered with; do not install it.' },
-      );
+    if (options.mcpbIntegrity) {
+      const expected = toSri(options.mcpbIntegrity) ?? options.mcpbIntegrity;
+      const result = verifyPackageIntegrity(expected, bundle);
+      if (result !== 'match') {
+        throw new UsageError(
+          result === 'malformed'
+            ? `.mcpb integrity value "${options.mcpbIntegrity}" is not a valid SHA-256/384/512 hash.`
+            : `.mcpb integrity check failed — the fetched bytes do not match ${options.mcpbIntegrity}. ` +
+              `This is a supply-chain red flag; refusing to install.`,
+          { hint: 'The bundle may be corrupted or tampered with; do not install it.' },
+        );
+      }
     }
     const manifest = parseMcpbManifest(bundle);
     signature = inspectMcpbSignature(bundle);

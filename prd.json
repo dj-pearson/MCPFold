@@ -5044,7 +5044,7 @@
       "epic": "E22",
       "order": 9,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Wire package-integrity (SRI) verification end-to-end",
       "user_story": "As a user who pins an integrity hash on a stdio server, I want the fetched package's bytes actually verified against it, so the supply-chain control is real and not decorative.",

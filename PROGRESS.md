@@ -1389,3 +1389,26 @@ SyntaxError) on corruption; `runDiff` handles a JSONC on-disk cursor file and tu
 
 **Follow-ups:** import's per-adapter sweep still silently skips a corrupt file (graceful, no crash) —
 intentional so one broken client config doesn't abort discovery of all the others.
+
+## S22.9 — Wire package-integrity (SRI) verification end-to-end
+
+Started/done: 2026-07-11. MEDIUM (verified). `trust/integrity.ts` exported `verifyPackageIntegrity` /
+`computeIntegrity` but a grep showed they were never called — only `parseIntegrity`, and only to warn
+on malformed syntax. The supply-chain control was dead. Separately, `resolve.ts` `toResolved` never
+copied `server.integrity` onto `ResolvedServer` (the type lacked the field), so the hash couldn't reach
+a fetch/install layer even once verification was wired.
+
+**Fix.** (1) Propagation: `ResolvedServer` gains `integrity?` and `toResolved` sets it from
+`server.integrity`. (2) Enforcement: the `--from-mcpb` add path — the one place mcpfold fetches package
+bytes — now verifies the fetched bundle against the declared integrity via the shared
+`verifyPackageIntegrity` (accepting a registry `fileSha256` as hex or SRI via `toSri`), failing closed
+with a clear supply-chain error on a mismatch and a distinct error on a malformed hash. This replaces
+the ad-hoc `verifyMcpbIntegrity` call at the install site (the helper stays for its own unit tests).
+
+Tests: integrity survives resolution (resolve.test.ts); a matching hash installs, a mismatch refuses
+("integrity check failed"), and a malformed value errors ("not a valid …") — mcpb.test.ts.
+`verify_all` green — lint, typecheck, full suite, and build.
+
+**Follow-ups:** npm/pypi registry packages carry an `integrity` from the listing's `fileSha256`, but
+mcpfold doesn't fetch their tarballs (npm/uvx do at runtime), so their integrity is recorded for audit
+but not byte-verified here — the mcpb bundle path is where mcpfold actually holds the bytes.
