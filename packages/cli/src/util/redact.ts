@@ -27,10 +27,7 @@ export function redactRefPaths(input: string): string {
  * References (`${scheme:path}`) are left alone — they are handled by {@link redactRefPaths}
  * and are not secret values.
  */
-const KNOWN_TOKEN_RE = new RegExp(
-  `\\b(?:${TOKEN_PREFIX_ALTERNATION})${TOKEN_SUFFIX}`,
-  'g',
-);
+const KNOWN_TOKEN_RE = new RegExp(`\\b(?:${TOKEN_PREFIX_ALTERNATION})${TOKEN_SUFFIX}`, 'g');
 // A long URL-safe run that contains BOTH a letter and a digit (avoids masking prose, plain
 // URLs, and `KEY=` separators — the class excludes `=`/`+`/`/` so it stops at delimiters).
 const HIGH_ENTROPY_RE =

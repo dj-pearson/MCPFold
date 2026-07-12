@@ -70,9 +70,14 @@ describe('runDiff (S3.6)', () => {
     mkdirSync(join(home, '.cursor'), { recursive: true });
     writeFileSync(
       target,
-      ['{', '  // pinned', '  "mcpServers": {', '    "playwright": { "command": "npx", },', '  },', '}'].join(
-        '\n',
-      ),
+      [
+        '{',
+        '  // pinned',
+        '  "mcpServers": {',
+        '    "playwright": { "command": "npx", },',
+        '  },',
+        '}',
+      ].join('\n'),
     );
     const result = await runDiff({ cwd, osContext: ctx });
     // Parsed fine — playwright is recognized (its args differ, so it's a change, not a crash).

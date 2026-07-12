@@ -85,7 +85,11 @@ describe('geminiCliAdapter (S14.1, S17.3, S19.3)', () => {
   // S22.2 (BLOCKER): ~/.gemini/settings.json also stores auth type, theme, etc. Merge, don't wipe.
   it('merges into settings.json — preserves selectedAuthType and theme', () => {
     const existing = JSON.stringify(
-      { selectedAuthType: 'oauth-personal', theme: 'GitHub', mcpServers: { stale: { command: 'x' } } },
+      {
+        selectedAuthType: 'oauth-personal',
+        theme: 'GitHub',
+        mcpServers: { stale: { command: 'x' } },
+      },
       null,
       2,
     );

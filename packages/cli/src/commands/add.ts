@@ -144,7 +144,7 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
           result === 'malformed'
             ? `.mcpb integrity value "${options.mcpbIntegrity}" is not a valid SHA-256/384/512 hash.`
             : `.mcpb integrity check failed — the fetched bytes do not match ${options.mcpbIntegrity}. ` +
-              `This is a supply-chain red flag; refusing to install.`,
+                `This is a supply-chain red flag; refusing to install.`,
           { hint: 'The bundle may be corrupted or tampered with; do not install it.' },
         );
       }

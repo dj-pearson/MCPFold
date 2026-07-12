@@ -83,9 +83,9 @@ describe('secret set (S4.8)', () => {
   });
 
   it('rejects a value containing a newline (line injection)', () => {
-    expect(() =>
-      runSecretSet({ cwd, ref: '${dotenv:TOKEN}', value: 'x\nEVIL=injected' }),
-    ).toThrow(/newline/i);
+    expect(() => runSecretSet({ cwd, ref: '${dotenv:TOKEN}', value: 'x\nEVIL=injected' })).toThrow(
+      /newline/i,
+    );
   });
 
   it('a value may contain = but the key may not', () => {
