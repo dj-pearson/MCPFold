@@ -29,6 +29,14 @@ updates:
       types:
         patterns:
           - '@types/*'
+    # Major bumps are deliberate migrations (zod 4, eslint 9+, vite, TypeScript, react-router, …),
+    # not routine merges — they usually need code changes and fail CI as a bare version bump.
+    # Skip auto-PRs for majors so they don't flood the queue one-per-dep-per-directory; upgrade
+    # them by hand, one at a time, when we choose to. Minor/patch + @types still flow (grouped) above.
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
 
   # Keep workflow action versions (checkout, setup-node, pnpm, etc.) current.
   - package-ecosystem: github-actions
