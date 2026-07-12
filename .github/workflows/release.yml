@@ -19,11 +19,11 @@ jobs:
     name: publish dry-run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: pnpm
@@ -63,13 +63,13 @@ jobs:
       # keeps all packages in lockstep, so this is the single version to tag as `v<version>`.
       version: ${{ steps.product-version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: pnpm
@@ -138,11 +138,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           # pkg fetches a base binary matching the runner's exact Node version from its pkg-fetch
           # release (v3.6). Pin to 22.23.1 — a version v3.6 ships prebuilts for on every OS/arch —
@@ -156,7 +156,7 @@ jobs:
       # Upload as artifacts; a single downstream job attaches them all to the release. Attaching
       # directly from three parallel matrix jobs races on the same release (404 on asset update).
       - name: Upload binaries artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: binaries-${{ matrix.platform }}
           path: build/mcpfold-*
@@ -185,8 +185,8 @@ jobs:
     env:
       TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
       # On a manual Release the tag is the event's tag; on the automatic push path there is no
@@ -202,13 +202,13 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
       - name: Download all binary artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: build
           pattern: binaries-*
           merge-multiple: true
       - name: Create/attach the release (once, no race)
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # On the push path this tag doesn't exist yet: softprops creates the tag + Release at the
           # checked-out commit (main HEAD, which carries the version bump). On the manual path it
@@ -271,8 +271,8 @@ jobs:
     env:
       WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
       - name: Resolve release tag
@@ -288,7 +288,7 @@ jobs:
       # render-packaging.mjs reads the binaries' .sha256 sidecars to fill InstallerSha256, so pull the
       # same artifacts publish-assets used (still available in-run; retention-days: 1).
       - name: Download binary artifacts (for checksums)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: build
           pattern: binaries-*
@@ -333,15 +333,15 @@ jobs:
           else
             echo "version=${{ needs.release.outputs.version }}" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
