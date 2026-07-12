@@ -184,7 +184,6 @@ jobs:
       contents: write
     env:
       TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -247,18 +246,66 @@ jobs:
       - name: Note when skipped
         if: env.TAP_TOKEN == ''
         run: echo "HOMEBREW_TAP_TOKEN not set — rendered manifests but skipped the tap/bucket push."
-      # WinGet: submit the rendered manifests (dist-packaging/winget) to microsoft/winget-pkgs. Needs
-      # a one-time WINGET_TOKEN (a PAT that can fork repos + open PRs); without it we skip the submit.
-      # The FIRST-ever submission of PearsonMedia.mcpfold is manual (see packaging/winget/README.md);
-      # after that first accepted PR this keeps every release updated automatically.
+      # WinGet submission is NOT here — it needs `wingetcreate`, and Microsoft dropped the standalone
+      # Linux binary from winget-create releases (only `wingetcreate.exe` ships now). It runs in the
+      # `winget` job below on a Windows runner instead.
+
+  # WinGet: submit the rendered manifests (dist-packaging/winget) to microsoft/winget-pkgs. Split into
+  # its own Windows job because `wingetcreate` is Windows-only now (Microsoft removed the Linux binary
+  # from winget-create releases, so the old Linux `curl … wingetcreate-linux` 404s). Needs a one-time
+  # WINGET_TOKEN (a PAT that can fork repos + open PRs); without it the submit is skipped. The FIRST-ever
+  # submission of PearsonMedia.mcpfold is manual (see packaging/winget/README.md); after that first
+  # accepted PR this keeps every release updated automatically. Gated exactly like publish-assets, and
+  # the submit is non-fatal (continue-on-error) so a WinGet hiccup never fails an already-shipped release.
+  winget:
+    name: submit winget manifest
+    needs: [release, publish-assets]
+    if: >-
+      always() && needs.publish-assets.result == 'success' && (
+        github.event_name == 'release' ||
+        (github.event_name == 'push' && needs.release.result == 'success' && needs.release.outputs.published == 'true')
+      )
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="v${{ needs.release.outputs.version }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      # render-packaging.mjs reads the binaries' .sha256 sidecars to fill InstallerSha256, so pull the
+      # same artifacts publish-assets used (still available in-run; retention-days: 1).
+      - name: Download binary artifacts (for checksums)
+        uses: actions/download-artifact@v4
+        with:
+          path: build
+          pattern: binaries-*
+          merge-multiple: true
+      - name: Render WinGet manifests
+        shell: bash
+        run: node scripts/render-packaging.mjs "${{ steps.tag.outputs.tag }}"
       - name: Submit WinGet manifest update
         if: env.WINGET_TOKEN != ''
+        continue-on-error: true
+        shell: pwsh
         run: |
-          curl -fsSL https://github.com/microsoft/winget-create/releases/latest/download/wingetcreate-linux -o wingetcreate
-          chmod +x wingetcreate
-          ./wingetcreate submit --token "$WINGET_TOKEN" dist-packaging/winget
+          Invoke-WebRequest -Uri https://github.com/microsoft/winget-create/releases/latest/download/wingetcreate.exe -OutFile wingetcreate.exe
+          .\wingetcreate.exe submit --token $env:WINGET_TOKEN dist-packaging/winget
       - name: Note when WinGet skipped
         if: env.WINGET_TOKEN == ''
+        shell: bash
         run: echo "WINGET_TOKEN not set — rendered WinGet manifests but skipped the winget-pkgs submission."
 
   # Publish the CLI container image to GHCR (ghcr.io/dj-pearson/mcpfold). The image installs the
