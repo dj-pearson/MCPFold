@@ -1,0 +1,39 @@
+name: Greetings
+
+# Welcomes first-time contributors on their first issue or PR, pointing them at
+# the docs that make review smooth. Runs once per person, ever.
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  greeting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: >
+            👋 Thanks for opening your first issue in mcpfold! A maintainer will take
+            a look soon. If this is a security report, please close it and use the
+            private path in SECURITY.md instead.
+          pr-message: >
+            🎉 Thanks for your first pull request to mcpfold! A couple of things that
+            help it land fast:
+
+
+            - Make sure `pnpm verify_all` passes locally (lint + typecheck + test + build).
+
+            - Add a changeset (`pnpm changeset`) if this is a user-facing change.
+
+            - New adapters: register the id in `CLIENT_IDS` and `all.ts`, and include the golden fixture.
+
+
+            A maintainer needs to approve the CI run for first-time contributors, so
+            hang tight — we'll review shortly. Thanks for helping build mcpfold! 🙏

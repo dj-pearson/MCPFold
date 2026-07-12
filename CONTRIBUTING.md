@@ -3,6 +3,25 @@
 Thanks for helping build a portable, secret-safe MCP config layer. New client adapters,
 secret providers, and `doctor` checks are especially welcome.
 
+## Contribution workflow
+
+We use a standard **fork → branch → pull request** flow. You don't need any special
+access — a fork is all it takes.
+
+1. **Fork** the repo and clone your fork.
+2. **Branch** off `main`: `git checkout -b my-change` (one logical change per branch).
+3. **Make the change** with tests, following the ground rules below.
+4. **Verify** locally: `pnpm verify_all` must be green.
+5. **Add a changeset** for user-facing changes: `pnpm changeset`.
+6. **Open a PR** against `main`. CI runs the full ubuntu/macOS/windows matrix and a
+   Code Owner reviews. For a first-time contributor, a maintainer approves the CI run.
+7. **Address review**, keep the branch up to date with `main`, and a maintainer
+   squash-merges once checks pass.
+
+All changes — including maintainers' — land on `main` through a reviewed PR; direct
+pushes to `main` are reserved for the lead maintainer's release chores and hotfixes.
+See [GOVERNANCE.md](./GOVERNANCE.md) for how decisions and merges work.
+
 ## Setup
 
 Requires **Node 20+** and **pnpm 10+** (`corepack enable`).
