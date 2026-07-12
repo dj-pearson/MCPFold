@@ -15,6 +15,7 @@
   <a href="https://www.npmjs.com/package/mcpfold"><img alt="npm version" src="https://img.shields.io/npm/v/mcpfold?color=4F46E5&label=npm" /></a>
   <a href="https://www.npmjs.com/package/mcpfold"><img alt="downloads" src="https://img.shields.io/npm/dm/mcpfold?color=06B6D4" /></a>
   <a href="https://marketplace.visualstudio.com/items?itemName=PearsonMedia.mcpfold-vscode"><img alt="VS Code Marketplace" src="https://img.shields.io/badge/VS_Code-Marketplace-4F46E5?logo=visualstudiocode&logoColor=white" /></a>
+  <a href="https://open-vsx.org/extension/PearsonMedia/mcpfold-vscode"><img alt="Open VSX" src="https://img.shields.io/open-vsx/v/PearsonMedia/mcpfold-vscode?label=Open%20VSX&color=C160EF" /></a>
   <a href="https://github.com/dj-pearson/MCPFold/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/dj-pearson/MCPFold/ci.yml?branch=main&label=CI" /></a>
   <a href="./LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-green" /></a>
   <img alt="node" src="https://img.shields.io/node/v/mcpfold" />
