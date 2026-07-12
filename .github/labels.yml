@@ -1,0 +1,93 @@
+# Canonical label set, synced to the repo by .github/workflows/labels.yml.
+# Editing this file (and merging to main) is the source of truth for labels —
+# no more hand-clicking in the GitHub UI. Area labels here must stay in sync
+# with .github/labeler.yml so the auto-labeler always has a label to apply.
+
+# --- Contributor on-ramp ---
+- name: good first issue
+  color: '7057ff'
+  description: Good for newcomers — scoped, documented, low-context.
+- name: help wanted
+  color: '008672'
+  description: Extra attention is welcome; maintainers would love a hand here.
+
+# --- Type ---
+- name: bug
+  color: 'd73a4a'
+  description: Something isn't working.
+- name: enhancement
+  color: 'a2eeef'
+  description: New feature or request.
+- name: documentation
+  color: '0075ca'
+  description: Improvements or additions to docs.
+- name: question
+  color: 'd876e3'
+  description: Further information is requested.
+- name: adapter-request
+  color: 'c5def5'
+  description: Request for a new client adapter.
+
+# --- Triage / lifecycle ---
+- name: needs-triage
+  color: 'ededed'
+  description: Awaiting a maintainer's first look.
+- name: duplicate
+  color: 'cfd3d7'
+  description: This already exists elsewhere.
+- name: wontfix
+  color: 'ffffff'
+  description: This will not be worked on.
+- name: stale
+  color: 'fef2c0'
+  description: Inactive; will be closed if it stays quiet (see stale workflow).
+- name: pinned
+  color: 'fbca04'
+  description: Exempt from the stale bot.
+- name: roadmap
+  color: '1d76db'
+  description: Planned work tracked on the roadmap.
+- name: security
+  color: 'b60205'
+  description: Security-relevant — handle per SECURITY.md.
+- name: breaking-change
+  color: 'b60205'
+  description: Introduces a backwards-incompatible change.
+- name: dependencies
+  color: '0366d6'
+  description: Dependency updates (Dependabot).
+
+# --- Areas (keep in sync with .github/labeler.yml) ---
+- name: core
+  color: '5319e7'
+  description: 'packages/core — the pure, I/O-free engine.'
+- name: adapters
+  color: '5319e7'
+  description: 'packages/adapters — per-client config formats.'
+- name: secrets
+  color: '5319e7'
+  description: 'packages/secrets + security/ — secret handling.'
+- name: cli
+  color: '5319e7'
+  description: 'packages/cli — the command-line surface.'
+- name: proxy
+  color: '5319e7'
+  description: 'packages/proxy.'
+- name: schema
+  color: '5319e7'
+  description: 'packages/schema.'
+- name: site
+  color: '5319e7'
+  description: 'apps/site + apps/web — the website.'
+- name: vscode-extension
+  color: '5319e7'
+  description: 'apps/vscode-extension.'
+- name: docs
+  color: '5319e7'
+  description: Docs and Markdown content.
+- name: ci
+  color: '5319e7'
+  description: CI, workflows, and repo automation.
+- name: tests
+  color: '5319e7'
+  description: Test suites and fixtures.

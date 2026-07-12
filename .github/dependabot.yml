@@ -1,0 +1,47 @@
+# Dependabot keeps dependencies and GitHub Actions current with grouped,
+# low-noise PRs. Version bumps flow through the same CI + review gate as any
+# other PR, so nothing lands on `main` unreviewed.
+version: 2
+updates:
+  # JS/TS dependencies across the pnpm workspace (root + every package/app).
+  - package-ecosystem: npm
+    directories:
+      - '/'
+      - '/packages/*'
+      - '/apps/*'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # One PR per week for routine minor/patch bumps — reviewer fatigue killer.
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+      # Keep the type packages together; they move as a set.
+      types:
+        patterns:
+          - '@types/*'
+
+  # Keep workflow action versions (checkout, setup-node, pnpm, etc.) current.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - '*'

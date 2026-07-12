@@ -1,0 +1,55 @@
+# Path-based auto-labeling for PRs, consumed by .github/workflows/labeler.yml
+# (actions/labeler v5 syntax). Keeps triage cheap: a PR is tagged by the area it
+# touches so maintainers and Dependabot filters can find their work fast.
+core:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/core/**'
+
+adapters:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/adapters/**'
+
+secrets:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/secrets/**'
+          - 'security/**'
+
+cli:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/cli/**'
+
+proxy:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/proxy/**'
+
+schema:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/schema/**'
+
+site:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/site/**'
+          - 'apps/web/**'
+
+vscode-extension:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/vscode-extension/**'
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '**/*.md'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'e2e/**'
+          - '**/*.test.ts'
+          - '**/*.spec.ts'
