@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { realOsContext, userConfigDir, type OsContext } from '@mcpfold/adapters';
+import { style, symbols } from './util/style.js';
 
 /**
  * Update notifier (S11.3). A quiet, cached, opt-out-able heads-up when a newer mcpfold is
@@ -92,9 +93,14 @@ export function isNewer(latest: string, current: string): boolean {
   return false;
 }
 
-interface Cache {
+export interface Cache {
   latest: string;
   checkedAt: string;
+}
+
+/** Read the update-check cache (latest known version + when it was checked). null if absent/corrupt. */
+export function readUpdateCache(path: string): Cache | null {
+  return readCache(path);
 }
 
 export function defaultCachePath(ctx: OsContext = realOsContext()): string {
@@ -110,10 +116,12 @@ function readCache(path: string): Cache | null {
 }
 
 export function renderNotice(current: string, latest: string, command: string): string {
+  // Whole "current → latest" and the command are colored as single units so any substring
+  // assertion (and a copy-paste of the command) survives with color on.
   return [
     '',
-    `  ✨ Update available: ${current} → ${latest}`,
-    `     Run \`${command}\` to update.`,
+    `  ${style.cyan(symbols.spark)} Update available: ${style.bold(`${current} → ${latest}`)}`,
+    `     Run ${style.green(`\`${command}\``)} to update.`,
     '',
   ].join('\n');
 }
@@ -181,7 +189,8 @@ export function isRefreshDue(
   return now.getTime() - new Date(cache.checkedAt).getTime() >= intervalMs;
 }
 
-async function fetchLatestFromNpm(): Promise<string | null> {
+/** Fetch the latest published version from the npm registry (3s timeout, null on any failure). */
+export async function fetchLatestFromNpm(): Promise<string | null> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 3000);
