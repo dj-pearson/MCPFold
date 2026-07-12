@@ -4614,7 +4614,7 @@
       "epic": "E21",
       "order": 2,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": ["S21.1"],
       "title": "VS Code extension: inline tool-token-budget on the config file",
       "user_story": "As a developer editing mcp.config.jsonc, I want to see the estimated tool-schema token cost of each server (and the file total) inline, so the context-window tax is visible where I make config decisions.",

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { spawn } from 'node:child_process';
+import { MCP_CONFIG_SELECTOR, TokenBudgetLensProvider } from './tokenBudgetLens';
 
 /**
  * mcpfold VS Code extension. A thin front-end over the mcpfold CLI — it never reimplements CLI logic,
@@ -40,6 +41,15 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidSaveTextDocument((doc) => {
       if (!getConfig().get<boolean>('checkDriftOnSave', true)) return;
       if (/mcp\.config\.jsonc?$/.test(doc.fileName)) void refreshDrift();
+    }),
+  );
+
+  // Inline tool-token-budget CodeLens on MCP config files (S21.2).
+  const budgetLens = new TokenBudgetLensProvider();
+  context.subscriptions.push(
+    vscode.languages.registerCodeLensProvider(MCP_CONFIG_SELECTOR, budgetLens),
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('mcpfold.showTokenBudget')) budgetLens.refresh();
     }),
   );
 

@@ -103,6 +103,11 @@
           "type": "boolean",
           "default": true,
           "description": "Re-check whether your MCP clients are in sync when a config file is saved."
+        },
+        "mcpfold.showTokenBudget": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show an inline estimate of each server's tool-schema token cost (and a file total) above the entries in `mcp.config.jsonc`. Estimates are approximate until mcpfold collects real `tools/list` data."
         }
       }
     }
@@ -111,6 +116,7 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "vscode:prepublish": "node esbuild.mjs --minify",
     "package": "npx --yes @vscode/vsce package --no-dependencies",
     "publish": "npx --yes @vscode/vsce publish --no-dependencies"
