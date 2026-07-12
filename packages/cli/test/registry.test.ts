@@ -239,8 +239,7 @@ describe('httpRegistryClient (S17.7)', () => {
   // S22.18: an oversized response body is bounded and rejected rather than buffered unbounded.
   it('rejects an oversized response body', async () => {
     const big = `{"servers":[]}${'x'.repeat(4096)}`;
-    const oversized = (async () =>
-      new Response(big, { status: 200 })) as unknown as typeof fetch;
+    const oversized = (async () => new Response(big, { status: 200 })) as unknown as typeof fetch;
     const client = httpRegistryClient('https://reg.test', oversized, { maxResponseBytes: 256 });
     await expect(client.search('x')).rejects.toThrow(/too large/);
   });

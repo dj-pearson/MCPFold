@@ -410,7 +410,9 @@ describe('httpCloudApi.refresh response validation (S22.15)', () => {
     httpCloudApi('https://api.test', fetchReturning(status, body)).refresh('rt');
 
   it('returns a validated response for a well-formed 200 (rotated or not)', async () => {
-    expect(await refresh(200, { access_token: 'a2', expires_in: 3600, refresh_token: 'r2' })).toEqual({
+    expect(
+      await refresh(200, { access_token: 'a2', expires_in: 3600, refresh_token: 'r2' }),
+    ).toEqual({
       access_token: 'a2',
       expires_in: 3600,
       refresh_token: 'r2',

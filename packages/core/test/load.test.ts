@@ -74,7 +74,9 @@ describe('loadConfig (S1.2)', () => {
     for (const bad of [0, -1, 1.5]) {
       it(`version ${bad} returns ok:false instead of throwing`, () => {
         let res;
-        expect(() => (res = loadConfig(`{ "version": ${bad}, "servers": {}, "profiles": {} }`))).not.toThrow();
+        expect(
+          () => (res = loadConfig(`{ "version": ${bad}, "servers": {}, "profiles": {} }`)),
+        ).not.toThrow();
         expect(res!.ok).toBe(false);
         if (!res!.ok) {
           expect(res!.errors[0]?.code).toBe('schema');

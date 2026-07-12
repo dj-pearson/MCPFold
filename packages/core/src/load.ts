@@ -292,7 +292,8 @@ export function loadConfig(text: string): LoadResult {
         errors: [
           {
             code: 'schema',
-            message: err instanceof Error ? err.message : `Cannot migrate config version ${version}.`,
+            message:
+              err instanceof Error ? err.message : `Cannot migrate config version ${version}.`,
             path: 'version',
             line,
             column,

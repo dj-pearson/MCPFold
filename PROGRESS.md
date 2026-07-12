@@ -1199,11 +1199,10 @@ aren't behind the TOFU gate and secrets resolve at run/test time.
 
 **Fix (out-of-band, injection-proof by construction).** The win32 `-Command` script is now a
 CONSTANT that reads the target from env vars: `Get-StoredCredential -Target ($env:MCPFOLD_KC_SERVICE
-+ ':' + $env:MCPFOLD_KC_ACCOUNT)`. PowerShell treats env values as opaque string data (never parsed
-as code), so the account/service never enter the command text. `keychainCommand` gained an optional
-`env` field; the provider threads it through `exec`, and `defaultExec`/`ExecOptions` grew an `env`
-option that merges over `process.env` for the child (undefined on POSIX, which already passed the
-account as an argv element). Added `-NonInteractive` so a malformed value can never block on a prompt.
+
+- ':' + $env:MCPFOLD_KC_ACCOUNT)`. PowerShell treats env values as opaque string data (never parsed
+as code), so the account/service never enter the command text. `keychainCommand`gained an optional`env`field; the provider threads it through`exec`, and `defaultExec`/`ExecOptions`grew an`env`option that merges over`process.env`for the child (undefined on POSIX, which already passed the
+account as an argv element). Added`-NonInteractive` so a malformed value can never block on a prompt.
 
 **Defense in depth (AC #4).** Tightened core `SECRET_REF_RE` (schema.ts) so a ref path forbids
 shell/quote metacharacters — quotes, backtick, `$`, `;`, parentheses, braces, backslash, whitespace
@@ -1253,7 +1252,7 @@ cli 283, core, secrets, schema, proxy, e2e, security), and build.
 mcpfold-managed (replaced wholesale) — a user's hand-authored non-mcpfold input would not survive,
 but that matches the prior full-replace behavior and no such case is known.
 
-## S22.3 — Reject __proto__/constructor keys in the core config parser
+## S22.3 — Reject **proto**/constructor keys in the core config parser
 
 Started/done: 2026-07-11. HIGH (schema bypass, verified at runtime). `nodeToValue` (load.ts)
 reconstructed objects with `obj[key] = …`, so a `__proto__` key invoked the prototype setter instead
@@ -1712,7 +1711,7 @@ Tests: `maskTokens` masks `github_pat_` and `sk_live_`/`sk_test_`; whole-string 
 agree on `${env:a}b}` (not-a-whole-ref; embedded finds `${env:a}` path `a`). `verify_all` green — lint,
 typecheck, full suite, and build.
 
-## S22.23 — Fix adapter/migration round-trip fidelity and residual __proto__ handling
+## S22.23 — Fix adapter/migration round-trip fidelity and residual **proto** handling
 
 Started/done: 2026-07-11. LOW, several (verified). Three round-trip/hostile-key issues: (1) for
 url-shape clients (Cursor/Zed/Cline/Warp/LM Studio) an `sse` remote was written as a bare `url` with no

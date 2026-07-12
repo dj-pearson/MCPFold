@@ -138,10 +138,9 @@ function mapRemote(remote: RegistryRemote, options: MapOptions): ServerConfig {
   // S22.11: the remote URL is server-controlled and gets written into client configs; require https
   // so a registry can't point a client at a plaintext (interceptable) or otherwise-hostile endpoint.
   if (!/^https:\/\//i.test(remote.url)) {
-    throw new UsageError(
-      `Registry remote endpoint "${remote.url}" is not an https URL.`,
-      { hint: 'mcpfold refuses to write a non-https remote endpoint into a client config.' },
-    );
+    throw new UsageError(`Registry remote endpoint "${remote.url}" is not an https URL.`, {
+      hint: 'mcpfold refuses to write a non-https remote endpoint into a client config.',
+    });
   }
   const scheme = options.secretScheme ?? 'env';
   const transport = remote.type === 'sse' ? 'sse' : 'streamable-http';

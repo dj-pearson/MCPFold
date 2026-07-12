@@ -101,7 +101,9 @@ describe('TOFU trust gate (S9.2)', () => {
     );
     // No env (or empty env) is byte-identical to the old command/args/pin-only signature — existing
     // trust for env-less servers survives the upgrade.
-    expect(executableSignature({ command: 'x', env: {} })).toBe(executableSignature({ command: 'x' }));
+    expect(executableSignature({ command: 'x', env: {} })).toBe(
+      executableSignature({ command: 'x' }),
+    );
   });
 
   it('run does not spawn a server whose env was changed until re-approved (S22.4)', async () => {
