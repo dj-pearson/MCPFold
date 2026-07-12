@@ -6,9 +6,9 @@ requests) and the process in [GOVERNANCE.md](./GOVERNANCE.md).
 
 ## Lead maintainer
 
-| Name        | GitHub                                          | Areas                   |
-| ----------- | ----------------------------------------------- | ----------------------- |
-| Dan Pearson | [@dj-pearson](https://github.com/dj-pearson)    | Everything (default owner) |
+| Name        | GitHub                                       | Areas                      |
+| ----------- | -------------------------------------------- | -------------------------- |
+| Dan Pearson | [@dj-pearson](https://github.com/dj-pearson) | Everything (default owner) |
 
 ## Area maintainers
 
