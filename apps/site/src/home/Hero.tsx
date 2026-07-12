@@ -1,5 +1,6 @@
 import { Badge, Button, Container } from '../design/components';
 import { compute, FIXTURE_SERVERS } from '../benchmark/model';
+import { TheFold } from './TheFold';
 
 /** Homepage hero (S13.2, on-page SEO S15.3) — H1 leads with the focus keyword "MCP config" + the
  * brand; the first ~100 words name MCP config/servers, the supported clients, and the token savings,
@@ -68,7 +69,10 @@ export function Hero() {
         <code>npx mcpfold init</code>
       </p>
 
-      <div style={{ marginTop: 'var(--space-12)' }}>
+      {/* The animated hero centerpiece: one config unfolds into every client on scroll. */}
+      <TheFold result={headline} />
+
+      <div style={{ marginTop: 'var(--space-12)' }} data-reveal>
         <img
           src="/demo.svg"
           alt="mcpfold in the terminal: init, import, sync, and diff show one config folding out to every client"

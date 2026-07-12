@@ -1,0 +1,157 @@
+/* "The Fold" — the homepage hero centerpiece (marketing-hero-animation).
+ *
+ * Design intent: the product name *is* the animation. One canonical config sits at the
+ * centre and, as the user scrolls, physically unfolds into the six MCP clients mcpfold
+ * targets — each panel rendering that same config under its own native root key. An
+ * Apple-style pinned, scroll-scrubbed sequence drives it (see TheFold.tsx / GSAP).
+ *
+ * Progressive enhancement, in three layers, weakest-capability first:
+ *   1. No JS / crawler / SSG snapshot  → the DEFAULT styles below render the fully
+ *      unfolded grid: every client name + root key is real, readable text. SEO + the
+ *      home e2e assertions see complete content.
+ *   2. prefers-reduced-motion: reduce  → same static grid, zero motion. GSAP bails out.
+ *   3. Motion allowed                  → GSAP starts from the folded state and scrubs to
+ *      the natural unfolded layout as the section pins. The static layout is the timeline's
+ *      end state, so hydration never fights the DOM.
+ */
+
+.fold {
+  margin-top: var(--space-12);
+  position: relative;
+}
+
+/* The scroll "track": tall enough that pinning the stage gives the scrub room to play out.
+ * Height is JS-managed when pinned; this is the graceful static fallback. */
+.fold__stage {
+  position: relative;
+  min-height: 420px;
+  display: grid;
+  gap: var(--space-8);
+  place-items: center;
+}
+
+/* ---- Token-tax counter ------------------------------------------------------------------ */
+
+.fold__counter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--fg-muted);
+}
+.fold__counter b {
+  font-size: 1.35rem;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.fold__counter s {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* ---- The fold grid: one source config → six client panels ------------------------------- */
+
+.fold__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 760px;
+  perspective: 1600px; /* gives the unfold a touch of real 3-D depth */
+}
+
+/* The canonical config — the "one file" everything folds out of. Spans the top row. */
+.fold__source {
+  grid-column: 1 / -1;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+  text-align: left;
+  overflow: hidden;
+}
+
+.fold__panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  text-align: left;
+  transform-origin: top center;
+  overflow: hidden;
+}
+
+.fold__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.fold__dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #fff;
+  flex: none;
+}
+.fold__code {
+  margin: 0;
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--fg-muted);
+  white-space: pre;
+  overflow-x: auto;
+}
+.fold__code .k {
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .fold__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* When GSAP has taken over we hint the browser to promote panels to their own layer so the
+ * scrubbed transforms stay on the compositor (smooth, no layout thrash). Added by JS only. */
+.fold[data-animated='true'] .fold__panel,
+.fold[data-animated='true'] .fold__source {
+  will-change: transform, opacity;
+}
+
+/* ---- Reusable section-reveal layer (the "full-page treatment", CSS-only) ----------------
+ * Any element tagged data-reveal fades + rises into place as it enters the viewport, driven
+ * entirely by CSS scroll-driven animations — no JS, no Lighthouse cost. Gated behind @supports
+ * so unsupported browsers (today: Safari) simply show the content, never a blank section. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    [data-reveal] {
+      animation: fold-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 30%;
+    }
+  }
+}
+@keyframes fold-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
