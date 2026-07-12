@@ -8,6 +8,7 @@ import { detectClients } from '../util/detect-clients.js';
 import { loadSession, osKeychainBackend, type KeychainBackend } from '../cloud/token-store.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
+import { style, symbols } from '../util/style.js';
 
 /**
  * `mcpfold status` (S10.1) — the daily front door. Aggregates the existing read-only engines —
@@ -64,35 +65,43 @@ function identityOf(accessToken: string): string | undefined {
 }
 
 function renderHuman(data: StatusData): string {
-  const lines: string[] = ['Clients:'];
-  if (data.clients.length === 0) lines.push('  (none detected)');
+  const lines: string[] = [style.bold('Clients:')];
+  if (data.clients.length === 0) lines.push(style.dim('  (none detected)'));
   for (const c of data.clients) {
     const state = !c.managed
-      ? 'unmanaged'
+      ? style.dim('unmanaged')
       : c.inSync
-        ? 'in sync'
-        : `drift (+${c.added} ~${c.changed} -${c.unmanaged})`;
-    const restart = c.needsRestart && !c.inSync ? ' · needs restart' : '';
-    const mark = c.inSync ? '✓' : '•';
+        ? style.green('in sync')
+        : style.yellow(`drift (+${c.added} ~${c.changed} -${c.unmanaged})`);
+    const restart = c.needsRestart && !c.inSync ? style.dim(' · needs restart') : '';
+    const mark = c.inSync ? style.green(symbols.ok) : style.yellow(symbols.bullet);
     lines.push(`  ${mark} ${c.client} (${c.profile}): ${state}${restart}`);
   }
   if (data.installedUnconfigured.length > 0) {
     lines.push(
-      `  (installed, no profile yet: ${data.installedUnconfigured.join(', ')} — add a profile to fold to them)`,
+      style.dim(
+        `  (installed, no profile yet: ${data.installedUnconfigured.join(', ')} — add a profile to fold to them)`,
+      ),
     );
   }
   lines.push('');
   lines.push(
     data.health.errors === 0 && data.health.warnings === 0
-      ? 'Health: ✓ no problems'
-      : `Health: ${data.health.errors} error(s), ${data.health.warnings} warning(s) (run \`mcpfold doctor\`)`,
+      ? `${style.bold('Health:')} ${style.green(symbols.ok)} no problems`
+      : `${style.bold('Health:')} ${style.red(`${data.health.errors} error(s)`)}, ${style.yellow(
+          `${data.health.warnings} warning(s)`,
+        )} (run \`mcpfold doctor\`)`,
   );
   if (data.cloud) {
     const who = data.cloud.identity ? ` as ${data.cloud.identity}` : '';
-    lines.push(`Cloud: logged in${who} → ${data.cloud.endpoint}`);
+    lines.push(`${style.bold('Cloud:')} logged in${who} ${symbols.arrow} ${data.cloud.endpoint}`);
   }
   lines.push('');
-  lines.push(data.ok ? '✓ Everything looks good.' : '→ Some items need attention.');
+  lines.push(
+    data.ok
+      ? style.green(`${symbols.ok} Everything looks good.`)
+      : `${style.yellow(symbols.arrow)} Some items need attention.`,
+  );
   return lines.join('\n');
 }
 

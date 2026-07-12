@@ -8,6 +8,8 @@ import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
 import { runScan } from './commands/scan.js';
 import { runStatus } from './commands/status.js';
+import { runInfo } from './commands/info.js';
+import { runUpdate } from './commands/update.js';
 import { runTest } from './commands/test.js';
 import { runRestore } from './commands/restore.js';
 import {
@@ -308,6 +310,24 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   ).action(async (opts: GlobalFlags) => {
     const ctx = resolve(opts);
     setExit(await runCommand('status', ctx.json, () => runStatus({ cwd: ctx.cwd }), writer));
+  });
+
+  addGlobalFlags(
+    program
+      .command('info')
+      .description('environment snapshot: version, install channel, config, and diagnostic state'),
+  ).action(async (opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('info', ctx.json, () => runInfo({ cwd: ctx.cwd }), writer));
+  });
+
+  addGlobalFlags(
+    program
+      .command('update')
+      .description('check now for a newer mcpfold and print the upgrade command for your install'),
+  ).action(async (opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('update', ctx.json, () => runUpdate(), writer));
   });
 
   addGlobalFlags(
@@ -699,7 +719,9 @@ export async function run(argv: string[], writer?: Writer): Promise<ExitCode> {
  */
 function maybeNotifyUpdate(command: string | undefined, w: Writer): void {
   try {
+    // `update`/`info` already surface version state; a trailing cached notice would duplicate it.
     if (!command || command.startsWith('__') || command === 'completions') return;
+    if (command === 'update' || command === 'info') return;
     const notice = getUpdateNotice({ currentVersion: CLI_VERSION });
     if (notice) w.err(`${notice}\n`);
 

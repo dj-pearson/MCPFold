@@ -17,6 +17,7 @@ import type { Finding } from '../checks/types.js';
 import { EXIT } from '../output/exit-codes.js';
 import { UsageError } from '@mcpfold/core';
 import type { CommandOutput } from '../output/render.js';
+import { style, symbols } from '../util/style.js';
 
 /**
  * `mcpfold doctor` (S3.7) — the retention hook. Lints the canonical config and each on-disk
@@ -88,14 +89,24 @@ function renderHuman(
   warningCount: number,
 ): string {
   if (findings.length === 0) {
-    return `✓ doctor found no problems in ${configPath}.`;
+    return `${style.green(symbols.ok)} doctor found no problems in ${configPath}.`;
   }
-  const icon = { error: '✖', warning: '⚠', info: 'ℹ' } as const;
+  const icon = {
+    error: style.red(symbols.err),
+    warning: style.yellow(symbols.warn),
+    info: style.blue(symbols.info),
+  } as const;
   const lines = findings.map((f) => {
     const loc = f.where ? ` (${f.where})` : '';
-    return [`${icon[f.severity]} ${f.file}${loc}`, `    ${f.message}`, `    fix: ${f.fix}`].join(
-      '\n',
-    );
+    return [
+      `${icon[f.severity]} ${style.bold(`${f.file}${loc}`)}`,
+      `    ${f.message}`,
+      `    ${style.dim('fix:')} ${f.fix}`,
+    ].join('\n');
   });
-  return [...lines, '', `${errorCount} error(s), ${warningCount} warning(s).`].join('\n');
+  return [
+    ...lines,
+    '',
+    `${style.red(`${errorCount} error(s)`)}, ${style.yellow(`${warningCount} warning(s)`)}.`,
+  ].join('\n');
 }
