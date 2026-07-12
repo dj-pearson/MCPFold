@@ -1,6 +1,6 @@
 {
   "name": "mcpfold",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "One source of truth for your MCP servers — fold one config out to every client.",
   "license": "MIT",
   "type": "module",
