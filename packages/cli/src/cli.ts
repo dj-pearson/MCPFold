@@ -333,14 +333,21 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   addGlobalFlags(
     program
       .command('test [server]')
-      .description('connect to a server and confirm it initializes + lists tools'),
-  ).action(async (server: string | undefined, opts: GlobalFlags) => {
+      .description('connect to a server and confirm it initializes + lists tools')
+      .option('--timeout <ms>', 'per-server connect timeout in milliseconds (default: 10000)'),
+  ).action(async (server: string | undefined, opts: GlobalFlags & { timeout?: string }) => {
     const ctx = resolve(opts);
     setExit(
       await runCommand(
         'test',
         ctx.json,
-        () => runTest({ cwd: ctx.cwd, server, profile: ctx.profile }),
+        () =>
+          runTest({
+            cwd: ctx.cwd,
+            server,
+            profile: ctx.profile,
+            timeoutMs: parseIntFlag('--timeout', opts.timeout),
+          }),
         writer,
       ),
     );

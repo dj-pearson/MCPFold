@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '@mcpfold/core';
 import type { OsContext } from '@mcpfold/adapters';
 import { runImport } from '../src/commands/import.js';
+import { starterConfig } from '../src/commands/init.js';
 
 let cwd: string;
 let home: string;
@@ -115,6 +116,24 @@ describe('runImport (S3.3)', () => {
     expect(readdirSync(cwd).filter((f) => f.includes('.mcpfold.bak.'))).toHaveLength(1);
     // The new config is valid.
     expect(loadConfig(readFileSync(join(cwd, 'mcp.config.jsonc'), 'utf8')).ok).toBe(true);
+  });
+
+  // Papercut: the documented onboarding is `init` → `import`. An untouched init scaffold must be
+  // adopted without `--force` so the two-step flow works in one pass.
+  it('adopts an untouched init scaffold without --force', () => {
+    writeFileSync(join(cwd, 'mcp.config.jsonc'), starterConfig());
+    const result = runImport({ cwd, osContext: ctx });
+    expect(result.data.wrote).toBe(true);
+    expect(result.data.sources.sort()).toEqual(['cursor', 'vscode']);
+    expect(loadConfig(readFileSync(join(cwd, 'mcp.config.jsonc'), 'utf8')).ok).toBe(true);
+  });
+
+  // …but an edited or already-populated canonical config still requires an explicit --force.
+  it('still refuses an edited/populated config without --force', () => {
+    writeFileSync(join(cwd, 'mcp.config.jsonc'), '{ "version": 2, "servers": {}, "profiles": {} }');
+    expect(() => runImport({ cwd, osContext: ctx })).toThrow(/already exists/i);
+    // The user's file is left untouched.
+    expect(readFileSync(join(cwd, 'mcp.config.jsonc'), 'utf8')).toContain('"version": 2');
   });
 
   it('rejects a merge that would be an invalid canonical config, writing nothing', () => {

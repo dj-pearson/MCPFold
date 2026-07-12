@@ -17,6 +17,7 @@ import {
   type OsContext,
 } from '@mcpfold/adapters';
 import { CONFIG_FILENAMES, MCP_JSON_FILENAME } from '../util/config.js';
+import { starterConfig } from './init.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import { backupIfExists } from '../io/backup.js';
 import type { CommandOutput } from '../output/render.js';
@@ -162,9 +163,15 @@ export function runImport(options: ImportOptions): CommandOutput<ImportData> {
   const configPath = join(options.cwd, CONFIG_FILENAMES[0]);
 
   if (existsSync(configPath) && !options.force && !options.dryRun) {
-    throw new UsageError(`${configPath} already exists.`, {
-      hint: 'Pass --force to overwrite, or --dry-run to preview the merge.',
-    });
+    // The documented onboarding is `init` → `import`. `init` leaves an untouched scaffold; treat
+    // exactly that scaffold as safe to replace so the two-step flow works without `--force`. Any
+    // edited or already-populated canonical config still requires an explicit --force.
+    const current = readFileSync(configPath, 'utf8');
+    if (current.trim() !== starterConfig().trim()) {
+      throw new UsageError(`${configPath} already exists.`, {
+        hint: 'Pass --force to overwrite, or --dry-run to preview the merge.',
+      });
+    }
   }
 
   const acc: MergeAcc = {
