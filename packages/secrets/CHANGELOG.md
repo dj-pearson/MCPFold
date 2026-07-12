@@ -1,5 +1,28 @@
 # @mcpfold/secrets
 
+## 1.1.0
+
+### Patch Changes
+
+- 3731788: Add npm READMEs and richer package metadata (keywords, author, engines) for every published package,
+  and add WinGet (`winget install PearsonMedia.mcpfold`) + Docker (`ghcr.io/dj-pearson/mcpfold`) as
+  install channels alongside npm, Homebrew, and Scoop.
+- 6e68675: Fix a command-injection vulnerability in the Windows keychain secret provider: a `${keychain:...}`
+  account is now passed to PowerShell out-of-band via environment variables instead of being
+  interpolated into the `-Command` script, so a tampered or synced config can no longer execute code
+  during secret resolution. As defense in depth, the core secret-reference grammar now rejects paths
+  containing shell/quote metacharacters at schema-validation time.
+- Updated dependencies [3731788]
+- Updated dependencies [6e68675]
+- Updated dependencies [6e68675]
+- Updated dependencies [6e68675]
+- Updated dependencies [6e68675]
+- Updated dependencies [6e68675]
+- Updated dependencies [6e68675]
+- Updated dependencies [6e68675]
+- Updated dependencies [6e68675]
+  - @mcpfold/core@1.1.0
+
 ## 1.0.2
 
 ### Patch Changes
