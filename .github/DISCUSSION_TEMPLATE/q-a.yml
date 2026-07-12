@@ -1,0 +1,26 @@
+title: '[Question] '
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a usage question? Ask away. Please check the
+        [docs](../tree/main/docs) and existing discussions first — someone may have
+        already covered it. Never paste secret **values** into a public discussion.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: mcpfold version, the client(s) involved, OS, and what you've tried.
+      placeholder: |
+        - mcpfold: 0.x.y
+        - client(s): claude-desktop, cursor, ...
+        - OS: macOS 14 / Windows 11 / Ubuntu 24.04
+    validations:
+      required: false

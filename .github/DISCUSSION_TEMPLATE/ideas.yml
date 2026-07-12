@@ -1,0 +1,32 @@
+title: '[Idea] '
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing an idea for mcpfold! Discussions are the right place to
+        float proposals before they become issues or PRs. For bugs, please open an
+        issue instead; for anything security-related, use the private path in
+        [SECURITY.md](../blob/main/SECURITY.md).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The use case or pain point behind the idea.
+      placeholder: I keep having to...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed idea
+      description: What you'd like mcpfold to do. Rough sketches welcome.
+    validations:
+      required: true
+  - type: input
+    id: area
+    attributes:
+      label: Area
+      description: e.g. new adapter, secret provider, doctor check, CLI, docs.
+    validations:
+      required: false

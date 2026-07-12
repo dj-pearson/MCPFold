@@ -1,0 +1,28 @@
+name: Sync labels
+
+# Applies .github/labels.yml as the repo's label set whenever that file changes
+# on main (or on manual dispatch). Labels become code-reviewed and reproducible
+# instead of hand-managed in the UI.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/labels.yml'
+      - '.github/workflows/labels.yml'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crazy-max/ghaction-github-labeler@v5
+        with:
+          yaml-file: .github/labels.yml
+          # Leave existing extra labels in place on the first run; flip to true
+          # once you're happy for labels.yml to be the *only* source of truth.
+          skip-delete: true
+          dry-run: false
