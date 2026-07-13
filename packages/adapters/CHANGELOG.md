@@ -1,5 +1,12 @@
 # @mcpfold/adapters
 
+## 1.2.0
+
+### Patch Changes
+
+- Updated dependencies [569376b]
+  - @mcpfold/core@1.2.0
+
 ## 1.1.0
 
 ### Patch Changes
