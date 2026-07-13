@@ -17,6 +17,9 @@ extension puts the CLI's everyday commands — and a live **drift indicator** �
   `mcpfold sync --check`, which writes nothing.
 - **Token calculator** — jump to the free [MCP token calculator](https://mcpfold.com/mcp-token-calculator)
   to see what your servers cost you in context tokens.
+- **Curate to usage** — with a proxy audit log configured, an inline CodeLens shows how many tools
+  each server _actually_ uses and offers one-click **Curate to usage** to write an allow-list of just
+  those tools (`mcpfold curate --write`), trimming the context every request pays for.
 - **Zero lock-in** — a thin front-end over the open-source `mcpfold` CLI. It never reimplements CLI
   behavior, so what you see here is exactly what `mcpfold sync` does.
 
@@ -43,6 +46,9 @@ npm install -g mcpfold
 | `mcpfold.path`             | _(empty)_ | Path to the `mcpfold` binary. Empty = auto-detect (global, else npx). |
 | `mcpfold.useNpx`           | `false`   | Always run via `npx mcpfold@latest`.                                  |
 | `mcpfold.checkDriftOnSave` | `true`    | Re-check sync status when a config file is saved.                     |
+| `mcpfold.showTokenBudget`  | `true`    | Inline estimate of each server's tool-schema token cost.              |
+| `mcpfold.showCurateLens`   | `true`    | Inline "Curate to usage" CodeLens from real recorded proxy usage.     |
+| `mcpfold.auditLog`         | _(empty)_ | Audit-log path powering curation. Empty = use `MCPFOLD_AUDIT_LOG`.    |
 
 ## Links
 

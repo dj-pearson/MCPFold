@@ -7,6 +7,10 @@
 - Downsized the Marketplace icon to 128px (was a 1024px, ~500 KB asset that `vsce` flagged); the
   full-resolution source is kept as `media/icon-source-1024.png` and excluded from the `.vsix`.
 - Documented the smoke-test checklist and Marketplace publish runbook in `PUBLISHING.md`.
+- Added an inline **tool-token-budget CodeLens** on `mcp.config.jsonc`: each server shows its
+  estimated tool-schema token cost and the file shows a total, each opening the web token calculator.
+  Estimates reuse the committed benchmark method and are labeled approximate until real `tools/list`
+  data is collected; toggle with the `mcpfold.showTokenBudget` setting.
 
 ## 0.1.0
 
