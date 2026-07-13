@@ -345,9 +345,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   ).action(async (opts: GlobalFlags & { fix?: string | boolean; yes?: boolean }) => {
     const ctx = resolve(opts);
     if (opts.fix === undefined) {
-      setExit(
-        await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer),
-      );
+      setExit(await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer));
       return;
     }
     const ids = parseFixIds(opts.fix);

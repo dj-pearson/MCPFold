@@ -4,12 +4,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '@mcpfold/core';
 import { vscodeAdapter, type OsContext } from '@mcpfold/adapters';
-import {
-  runDoctor,
-  runDoctorFix,
-  runSecretExtract,
-  runSync,
-} from 'mcpfold';
+import { runDoctor, runDoctorFix, runSecretExtract, runSync } from 'mcpfold';
 
 /**
  * S25.6 — cross-OS end-to-end gate for the diagnose → repair loop. One fixture reproduces all three
@@ -102,7 +97,12 @@ describe('config assistance: diagnose → repair, end to end (S25.6)', () => {
     // Byte-stable + OS-independent: the canonical config carries no absolute/home paths, and re-running
     // the repair commands is a no-op (idempotent) — so the repaired file is identical across the matrix.
     expect(finalText).not.toContain(home);
-    const extractAgain = await runSecretExtract({ cwd, server: 'gh', scheme: 'dotenv', osContext: ctx });
+    const extractAgain = await runSecretExtract({
+      cwd,
+      server: 'gh',
+      scheme: 'dotenv',
+      osContext: ctx,
+    });
     expect(extractAgain.data.extracted).toEqual([]); // nothing left to extract
     await runDoctorFix({ cwd, osContext: ctx, yes: true });
     expect(readFileSync(configPath(), 'utf8')).toBe(finalText); // byte-identical after a repeat pass

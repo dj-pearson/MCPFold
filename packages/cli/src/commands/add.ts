@@ -88,7 +88,10 @@ export const defaultProbe: UrlProber = async (url, signal) => {
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
       body: JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'initialize', params: {} }),
       signal,
     });
@@ -237,7 +240,8 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
     }
     if (url) {
       // S17.5: the canonical remote transport is `streamable-http` (the spec's HTTP transport).
-      let transport: 'sse' | 'streamable-http' = options.transport === 'sse' ? 'sse' : 'streamable-http';
+      let transport: 'sse' | 'streamable-http' =
+        options.transport === 'sse' ? 'sse' : 'streamable-http';
       // S25.4: opt-in probe to auto-detect transport + auth. Best-effort and timeout-bounded — any
       // failure keeps the defaults. It only affects what is written now, never `sync` output.
       let probedAuthRequired = false;

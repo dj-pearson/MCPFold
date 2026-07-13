@@ -87,7 +87,13 @@ describe('doctor → explain wiring (S25.5)', () => {
         ids.add(f.explain);
       }
     }
-    for (const expected of ['deprecated-sse', 'unpinned-latest', 'hardcoded-secret', 'unknown-secret-scheme', 'vscode-root-key']) {
+    for (const expected of [
+      'deprecated-sse',
+      'unpinned-latest',
+      'hardcoded-secret',
+      'unknown-secret-scheme',
+      'vscode-root-key',
+    ]) {
       expect(ids.has(expected), `expected doctor to emit "${expected}"`).toBe(true);
     }
   });
@@ -98,6 +104,8 @@ describe('doctor → explain wiring (S25.5)', () => {
       "servers": { "s": { "transport": "stdio", "command": "x", "env": { "API_TOKEN": "ghp_x" }, "tags": ["t"] } },
       "profiles": { "cursor": { "client": "cursor", "scope": "user", "include": ["t"] } }
     }`);
-    expect(runDoctor({ cwd, osContext: ctx }).human).toContain('see: mcpfold explain hardcoded-secret');
+    expect(runDoctor({ cwd, osContext: ctx }).human).toContain(
+      'see: mcpfold explain hardcoded-secret',
+    );
   });
 });

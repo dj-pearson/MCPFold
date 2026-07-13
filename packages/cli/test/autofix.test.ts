@@ -30,8 +30,7 @@ afterEach(() => {
 
 const write = (text: string) => writeFileSync(join(cwd, 'mcp.config.jsonc'), text);
 const findings = () => runDoctor({ cwd, osContext: ctx }).data.findings;
-const roundTrips = (a: FixAction | undefined) =>
-  expect(JSON.parse(JSON.stringify(a))).toEqual(a);
+const roundTrips = (a: FixAction | undefined) => expect(JSON.parse(JSON.stringify(a))).toEqual(a);
 
 describe('autofix descriptors (S25.1)', () => {
   it('a hardcoded secret carries an extract-secret descriptor (guided, not auto-applicable)', () => {
@@ -119,10 +118,16 @@ describe('autofix descriptors (S25.1)', () => {
     mkdirSync(join(home, '.cursor'), { recursive: true });
     writeFileSync(
       join(home, '.cursor', 'mcp.json'),
-      JSON.stringify({ mcpServers: { pw: { command: 'npx', args: ['-y', '@playwright/mcp@1.4.2'] } } }),
+      JSON.stringify({
+        mcpServers: { pw: { command: 'npx', args: ['-y', '@playwright/mcp@1.4.2'] } },
+      }),
     );
     const f = findings().find((x) => x.where === 'mcpServers.pw');
-    expect(f?.autofix).toMatchObject({ kind: 'resync-client', profile: 'cursor', client: 'cursor' });
+    expect(f?.autofix).toMatchObject({
+      kind: 'resync-client',
+      profile: 'cursor',
+      client: 'cursor',
+    });
     expect((f?.autofix as { path: string }).path).toBe(f?.file);
     roundTrips(f?.autofix);
   });
@@ -173,7 +178,9 @@ describe('autofix descriptors (S25.1)', () => {
     expect(advisory((f) => f.message.includes('@latest'))?.autofix).toBeUndefined();
     expect(advisory((f) => f.message.includes('scheme'))?.autofix).toBeUndefined();
     // Every info-severity finding is advisory-only.
-    expect(all.filter((f) => f.severity === 'info').every((f) => f.autofix === undefined)).toBe(true);
+    expect(all.filter((f) => f.severity === 'info').every((f) => f.autofix === undefined)).toBe(
+      true,
+    );
   });
 
   it('a clean config yields no autofix descriptors at all', () => {
