@@ -5575,6 +5575,67 @@
       "definition_of_done": [
         "Users can go from raw usage to a committed, curated allow-list in one command, with a safe diff/confirm flow and doctor pointing the way."
       ]
+    },
+    {
+      "id": "S23.4",
+      "epic": "E23",
+      "order": 4,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S23.2"
+      ],
+      "title": "curate reads rotated audit logs (full-history correctness)",
+      "user_story": "As an mcpfold user whose audit log has rotated, I want `mcpfold curate` to count my whole usage history, not just the active log file, so the recommendation never drops a tool I actually use.",
+      "context": "The proxy audit sink (S18.4/S22.24) rotates at maxBytes to a UNIQUE sibling `${path}.<pid>.<seq>.<rand>` and starts a fresh primary. S23.2's reader only reads the primary file, so after any rotation the recommendation is computed from a partial history — and `curate --write` could then remove a tool the user relies on (a real footgun). Add a shared CLI-layer reader (fs boundary, not core) that reads the primary log plus every rotated sibling in the same directory (basename === name OR startsWith(name + '.')), concatenates their lines, and feeds the combined stream to the S23.1 engine (order-independent: counts sum, lastTs takes the max). Use it in both `buildCurateData` and the doctor curation check so they agree. Missing/unreadable siblings are skipped best-effort.",
+      "acceptance_criteria": [
+        "A new shared reader (e.g. packages/cli/src/util/audit-log.ts) returns the combined lines of the primary log and all rotated siblings `${name}.*` in its directory; used by both curate and the doctor hint.",
+        "After a rotation, `mcpfold curate` counts calls from the rotated file(s) too: a tool used only in a rotated log still appears in usage and the recommendation.",
+        "Aggregation is order-independent (sibling read order does not change counts or the recommended list); a sibling that fails to read is skipped without failing the command.",
+        "The reader only matches this log's rotations (its exact basename or basename + '.'), never unrelated files in the directory.",
+        "curate and doctor read the same combined history (no divergence between the report and the hint)."
+      ],
+      "files_hint": [
+        "packages/cli/src/util/audit-log.ts",
+        "packages/cli/src/commands/curate.ts",
+        "packages/cli/src/checks/curation.ts",
+        "packages/cli/test/curate.test.ts"
+      ],
+      "tests": [
+        "Unit/integration: primary+rotated merge (tool only in rotated log surfaces); read-order independence; unrelated sibling ignored; unreadable sibling skipped; doctor + curate agree."
+      ],
+      "definition_of_done": [
+        "curate and its doctor hint reflect the full recorded history across log rotations, so a recommended allow-list never silently drops a still-used tool."
+      ]
+    },
+    {
+      "id": "S23.5",
+      "epic": "E23",
+      "order": 5,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S23.4"
+      ],
+      "title": "surface the curation opportunity in `mcpfold status`",
+      "user_story": "As an mcpfold user, I want `mcpfold status` (the daily front door) to tell me when I have unused tool-schema context I could trim, so curation is discoverable without my knowing the command exists.",
+      "context": "status (S10.1) aggregates diff/doctor/cloud into one scannable summary. When an audit log is configured (MCPFOLD_AUDIT_LOG, read via the OsContext env — same trigger as the S23.3 doctor hint) and readable, compute, from the combined history (S23.4 reader): how many servers have a recommendation that differs from their current directive, and the total count of currently-exposed-but-unused tools that curation would trim. Add a one-line `Curation:` entry to the human summary and a structured field to StatusData, pointing at `mcpfold curate`. Silent (line omitted) when no audit log is set, none is readable, or nothing is trimmable. This is informational and must not change status's existing exit-code semantics.",
+      "acceptance_criteria": [
+        "When MCPFOLD_AUDIT_LOG is set and readable and at least one server is curatable, `mcpfold status` shows a one-line `Curation:` summary naming the count of curatable servers and pointing at `mcpfold curate`; StatusData gains a structured field.",
+        "The line is omitted entirely when no audit log is configured, it is unreadable, or every server is already curated (no false nudge).",
+        "The curation summary never changes status's exit code (still driven by drift + doctor findings only); --json includes the new field.",
+        "Counts are computed from the full rotated history via the S23.4 reader, consistent with `mcpfold curate` and the doctor hint."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/status.ts",
+        "packages/cli/test/status.test.ts"
+      ],
+      "tests": [
+        "Unit: status shows the curation line with a configured log + curatable server; omits it with no log / all-curated; exit code unchanged; --json field present."
+      ],
+      "definition_of_done": [
+        "The daily `status` view surfaces trimmable tool-schema context when usage data exists, making curation discoverable without prior knowledge of the command."
+      ]
     }
   ],
   "milestones": [
