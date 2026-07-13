@@ -150,6 +150,9 @@ export {
 } from './migrate/index.js';
 export { MIGRATIONS, type Migration } from './migrate/migrations.js';
 
+// Token estimation — the committed benchmark method (S5.4 / S24.6)
+export { estimateTokens, estimateToolTokens } from './tokens.js';
+
 // Drift-diff engine (S1.6)
 export {
   diffRendered,

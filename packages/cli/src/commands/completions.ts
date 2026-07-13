@@ -69,7 +69,7 @@ _${spec.bin}_complete() {
   local flags="${spec.flags.join(' ')}"
   case "$prev" in
     -p|--profile) COMPREPLY=( $(compgen -W "$(${spec.bin} __complete profiles 2>/dev/null)" -- "$cur") ); return;;
-    test|restore) COMPREPLY=( $(compgen -W "$(${spec.bin} __complete servers 2>/dev/null)" -- "$cur") ); return;;
+    test|inspect|restore) COMPREPLY=( $(compgen -W "$(${spec.bin} __complete servers 2>/dev/null)" -- "$cur") ); return;;
   esac
   if [[ "$cur" == -* ]]; then
     COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -97,7 +97,7 @@ ${described}
     cmds) _describe 'command' commands ;;
     opts)
       case $words[1] in
-        test|restore) compadd $(${spec.bin} __complete servers 2>/dev/null) ;;
+        test|inspect|restore) compadd $(${spec.bin} __complete servers 2>/dev/null) ;;
         *) compadd ${spec.flags.join(' ')} ;;
       esac ;;
   esac

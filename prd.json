@@ -5802,7 +5802,7 @@
       "epic": "E24",
       "order": 6,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Live tool-surface discovery: collect real tools/list + token estimates per configured server",
       "user_story": "As a user, I want mcpfold to introspect my actual servers and tell me how many tools and roughly how many tokens each one costs, so curation decisions and savings numbers rest on my real config - not fixtures or assumptions.",

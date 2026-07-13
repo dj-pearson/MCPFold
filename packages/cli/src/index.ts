@@ -44,6 +44,22 @@ export { type FsWatcher, nodeFsWatcher, watchWithDebounce, type WatchHandle } fr
 export { runDiff, type ClientDiff, type DiffData, type DiffOptions } from './commands/diff.js';
 export { runInit, starterConfig, type InitData, type InitOptions } from './commands/init.js';
 export {
+  runInspect,
+  type InspectData,
+  type InspectOptions,
+  type InspectServerResult,
+} from './commands/inspect.js';
+export {
+  cachedToolNames,
+  discoveryCacheDir,
+  readSnapshot,
+  writeSnapshot,
+  type CacheLocation,
+  type SurfaceSnapshot,
+  type ToolTokenEstimate,
+} from './discover/cache.js';
+export { discoverSurface, type DiscoverOptions } from './discover/surface.js';
+export {
   applySafeFixes,
   autoPrompter,
   type GuidedOptions,

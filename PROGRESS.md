@@ -2022,3 +2022,35 @@ Tests: 3 new doctor cases (curated+direct client entry → error; fully-shimmed 
 info), status stable-shape + nudge updates, and the "clean config" doctor fixture is now curated so the
 new info doesn't fire. Full CLI suite green (383 pass; only the pre-existing stale-dist version test
 fails). Typecheck + lint clean.
+
+---
+
+## S24.6 — Live tool-surface discovery: real tools/list + token estimates per server
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p1, deps: none.
+
+Real per-server tool counts and token estimates now exist locally for any stdio server the user can
+launch — curation and savings rest on the user's actual config, not fixtures.
+
+- **Token method in core** (`packages/core/src/tokens.ts`): `estimateTokens` (the committed
+  benchmark's 1-tok-≈-4-chars, tokenizer-independent, no heavy deps in the shipped build) +
+  `estimateToolTokens`. Exported from core so discovery and the benchmark agree.
+- **Discovery routine** (`packages/cli/src/discover/surface.ts`): reuses the `mcpfold test` machinery
+  (`realTransport` + `handshake`) to open a live MCP session, capture `tools/list`, and distill a
+  REDACTED snapshot — tool names + per-tool/per-server token estimates only. Coded `UsageError` with a
+  transport-appropriate hint on failure (stdio: check command/secrets; remote: direct probe can't
+  reach a bridge-only/OAuth server).
+- **Per-user cache** (`packages/cli/src/discover/cache.ts`): snapshots under
+  `$XDG_CONFIG_HOME|$APPDATA/mcpfold/discovery/<server>.json` (trust-store convention), never synced.
+  `cachedToolNames` is curate's knownTools source.
+- **`mcpfold inspect [server]`** (`commands/inspect.ts`, registered in cli.ts, added to server-name
+  shell completions): resolves secrets in memory, discovers, caches, prints human + `--json`. Verified
+  end-to-end against the e2e fixture server (3 tools, ~69 tokens, snapshot written, no secret in cache).
+- **Curate integration**: `knownToolsFor` feeds the cached surface into `recommendDirective` for
+  `deny`-mode (minus the deny list) and directive-less servers, so "allowed but never used" is reported
+  for them too — not just `allow` lists (closes curate's cold-start half).
+
+Tests: core `tokens.test.ts`; cli `discover.test.ts` (cache round-trip, inspect exact names + stable
+estimates, ref-only invariant that no secret/env lands in the cache, coded failure on no-handshake,
+curate-uses-snapshot integration). Snapshots for the completion scripts regenerated. Full core (122) +
+cli (389) suites green; `pnpm --filter mcpfold build` clean; typecheck + lint clean.

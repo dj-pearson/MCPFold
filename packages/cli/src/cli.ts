@@ -12,6 +12,7 @@ import { runCurate, runCurateApply } from './commands/curate.js';
 import { runInfo } from './commands/info.js';
 import { runUpdate } from './commands/update.js';
 import { runTest } from './commands/test.js';
+import { runInspect } from './commands/inspect.js';
 import { runRestore } from './commands/restore.js';
 import {
   buildSpec,
@@ -390,6 +391,29 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
         ctx.json,
         () =>
           runTest({
+            cwd: ctx.cwd,
+            server,
+            profile: ctx.profile,
+            timeoutMs: parseIntFlag('--timeout', opts.timeout),
+          }),
+        writer,
+      ),
+    );
+  });
+
+  addGlobalFlags(
+    program
+      .command('inspect [server]')
+      .description("introspect a server's live tool surface and cache tool counts + token estimates")
+      .option('--timeout <ms>', 'per-server connect timeout in milliseconds (default: 10000)'),
+  ).action(async (server: string | undefined, opts: GlobalFlags & { timeout?: string }) => {
+    const ctx = resolve(opts);
+    setExit(
+      await runCommand(
+        'inspect',
+        ctx.json,
+        () =>
+          runInspect({
             cwd: ctx.cwd,
             server,
             profile: ctx.profile,

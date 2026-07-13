@@ -13,6 +13,7 @@ import {
   type ToolsDirective,
 } from '@mcpfold/core';
 import { findConfigPath, loadConfigFromDisk } from '../util/config.js';
+import { cachedToolNames, type CacheLocation } from '../discover/cache.js';
 import { readAuditLogLines } from '../util/audit-log.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import { EXIT } from '../output/exit-codes.js';
@@ -91,6 +92,8 @@ export interface CurateOptions {
   confirm?: () => Promise<boolean>;
   /** Whether stdin is a TTY (drives whether to prompt). Defaults to `process.stdin.isTTY`. */
   isTTY?: boolean;
+  /** S24.6: discovery-cache location override (tests point this at a temp dir). */
+  cache?: CacheLocation;
 }
 
 /** Resolve the audit-log path from the flag or env, or throw a UsageError naming both. */
@@ -110,18 +113,36 @@ export function resolveAuditLogPath(opts: {
   return path;
 }
 
-/** Build one server's report from its aggregated usage and current directive. */
+/**
+ * The known tool surface for a server: what curate can call out as allowed-but-unused. An allow
+ * directive names it directly. For deny/no-directive, a live discovery snapshot (S24.6) supplies the
+ * real surface — the deny list is subtracted so a denied tool isn't reported as trimmable. Without a
+ * snapshot, deny/no-directive have no reliable surface, so knownTools stays undefined (unchanged pre-S24.6).
+ */
+function knownToolsFor(
+  current: ToolsDirective | undefined,
+  cached: string[] | null,
+): string[] | undefined {
+  if (current?.mode === 'allow') return current.list;
+  if (!cached) return undefined;
+  if (current?.mode === 'deny') {
+    const denied = new Set(current.list);
+    return cached.filter((t) => !denied.has(t));
+  }
+  return cached; // no directive: the full discovered surface is the known surface
+}
+
+/** Build one server's report from its aggregated usage, current directive, and cached surface. */
 function reportForServer(
   usage: ServerUsage,
   current: ToolsDirective | undefined,
+  cached: string[] | null = null,
 ): CurateServerReport {
   const tools: CurateToolRow[] = [...usage.tools.values()]
     .map((t) => ({ tool: t.tool, calls: t.calls, outcomes: t.outcomes, lastTs: t.lastTs }))
     .sort((a, b) => b.calls - a.calls || a.tool.localeCompare(b.tool));
 
-  // Only an allow directive gives us a reliable "known" surface to call out as unused; for deny/none
-  // we don't know the full tool list without a live tools/list, so we omit knownTools there.
-  const knownTools = current?.mode === 'allow' ? current.list : undefined;
+  const knownTools = knownToolsFor(current, cached);
   const rec = recommendDirective({ used: usedTools(usage), current, knownTools });
 
   return {
@@ -214,7 +235,10 @@ export function buildCurateData(opts: CurateOptions): CurateData {
   for (const [name, usage] of byServer) {
     if (wanted && name !== wanted) continue;
     if (usage.tools.size === 0) continue;
-    servers.push(reportForServer(usage, config.servers[name]?.tools));
+    // S24.6: a cached discovery snapshot gives the full tool surface for deny/no-directive servers,
+    // so "allowed but never used" is reported for them too — not just allow-mode.
+    const cached = cachedToolNames(name, opts.cache);
+    servers.push(reportForServer(usage, config.servers[name]?.tools, cached));
   }
   servers.sort((a, b) => a.server.localeCompare(b.server));
 

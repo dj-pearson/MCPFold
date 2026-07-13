@@ -6,11 +6,11 @@ _mcpfold_complete() {
   local cur prev
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
-  local commands="diagnose sync diff init import export doctor scan status curate info update test completions restore migrate run secret scaffold-adapter add search trust login push pull"
+  local commands="diagnose sync diff init import export doctor scan status curate info update test inspect completions restore migrate run secret scaffold-adapter add search trust login push pull"
   local flags="--allow-unsigned --apply --as --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --from-mcpb --from-registry --guided --help --integrity --json --limit --list --mcp-json --min-calls --output --package --pin --profile --secret-scheme --since --tag --team --timeout --token-ref --tools --transport --url --version --watch --write --yes"
   case "$prev" in
     -p|--profile) COMPREPLY=( $(compgen -W "$(mcpfold __complete profiles 2>/dev/null)" -- "$cur") ); return;;
-    test|restore) COMPREPLY=( $(compgen -W "$(mcpfold __complete servers 2>/dev/null)" -- "$cur") ); return;;
+    test|inspect|restore) COMPREPLY=( $(compgen -W "$(mcpfold __complete servers 2>/dev/null)" -- "$cur") ); return;;
   esac
   if [[ "$cur" == -* ]]; then
     COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -41,6 +41,7 @@ complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'curate' -d 'recommend a per
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'info' -d 'environment snapshot: version, install channel, config, and diagnostic state'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'update' -d 'check now for a newer mcpfold and print the upgrade command for your install'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'test' -d 'connect to a server and confirm it initializes + lists tools'
+complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'inspect' -d 'introspect a servers live tool surface and cache tool counts + token estimates'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'completions' -d 'print a shell completion script (bash | zsh | fish | pwsh)'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'restore' -d 'roll a client file back to a mcpfold backup'
 complete -c mcpfold -n '__mcpfold_no_subcommand' -a 'migrate' -d 'upgrade an outdated mcp.config.jsonc to the current schema version'
@@ -62,7 +63,7 @@ exports[`completion scripts (S11.2) > generates a stable pwsh script from the co
 "# PowerShell completion for mcpfold — mcpfold completions pwsh | Out-String | Invoke-Expression
 Register-ArgumentCompleter -Native -CommandName mcpfold,mcpf -ScriptBlock {
   param($wordToComplete, $commandAst, $cursorPosition)
-  $commands = @('diagnose','sync','diff','init','import','export','doctor','scan','status','curate','info','update','test','completions','restore','migrate','run','secret','scaffold-adapter','add','search','trust','login','push','pull')
+  $commands = @('diagnose','sync','diff','init','import','export','doctor','scan','status','curate','info','update','test','inspect','completions','restore','migrate','run','secret','scaffold-adapter','add','search','trust','login','push','pull')
   $flags = @('--allow-unsigned','--apply','--as','--at','--audit-log','--auth-type','--check','--config','--config-version','--cwd','--debug','--dry-run','--force','--from-mcpb','--from-registry','--guided','--help','--integrity','--json','--limit','--list','--mcp-json','--min-calls','--output','--package','--pin','--profile','--secret-scheme','--since','--tag','--team','--timeout','--token-ref','--tools','--transport','--url','--version','--watch','--write','--yes')
   $candidates = if ($wordToComplete -like '-*') { $flags } else { $commands }
   $candidates | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
@@ -91,6 +92,7 @@ _mcpfold() {
     'info:environment snapshot: version, install channel, config, and diagnostic state'
     'update:check now for a newer mcpfold and print the upgrade command for your install'
     'test:connect to a server and confirm it initializes + lists tools'
+    'inspect:introspect a servers live tool surface and cache tool counts + token estimates'
     'completions:print a shell completion script (bash | zsh | fish | pwsh)'
     'restore:roll a client file back to a mcpfold backup'
     'migrate:upgrade an outdated mcp.config.jsonc to the current schema version'
@@ -109,7 +111,7 @@ _mcpfold() {
     cmds) _describe 'command' commands ;;
     opts)
       case $words[1] in
-        test|restore) compadd $(mcpfold __complete servers 2>/dev/null) ;;
+        test|inspect|restore) compadd $(mcpfold __complete servers 2>/dev/null) ;;
         *) compadd --allow-unsigned --apply --as --at --audit-log --auth-type --check --config --config-version --cwd --debug --dry-run --force --from-mcpb --from-registry --guided --help --integrity --json --limit --list --mcp-json --min-calls --output --package --pin --profile --secret-scheme --since --tag --team --timeout --token-ref --tools --transport --url --version --watch --write --yes ;;
       esac ;;
   esac

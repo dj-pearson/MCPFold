@@ -125,6 +125,23 @@ The context-window saver. Restrict a server to just the tools you use:
 proxy applies the filter at `tools/list` time, so the client only ever sees the curated
 set — see the [benchmark](./benchmark.md) for the ~80% token reduction this buys.
 
+### Seeing what a server actually costs (`mcpfold inspect`)
+
+`mcpfold inspect [server]` opens a real MCP session to a configured server (secrets resolved in
+memory, never printed), lists its tools, and reports how many tools and roughly how many tokens each
+one adds to context — using the same 1-token-≈-4-characters method as the
+[benchmark](./benchmark.md):
+
+```bash
+mcpfold inspect                    # every server in the config
+mcpfold inspect github             # just one server
+mcpfold inspect --json             # machine-readable envelope
+```
+
+Each run caches a **redacted** surface snapshot per user — tool names and token estimates only, never
+a secret value or a tool-call payload. `mcpfold curate` reads that snapshot so it can report
+"allowed but never used" tools for `deny`-mode and directive-less servers too, not just `allow` lists.
+
 ### Recommending a tool list from usage (`mcpfold curate`)
 
 You don't have to guess which tools to allow. When a server runs through the proxy with an
