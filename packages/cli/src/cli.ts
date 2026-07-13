@@ -7,6 +7,7 @@ import { runInit } from './commands/init.js';
 import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
 import { runDoctorFix } from './commands/doctor-fix.js';
+import { runExplain } from './commands/explain.js';
 import { runScan } from './commands/scan.js';
 import { runStatus } from './commands/status.js';
 import {
@@ -367,6 +368,16 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   ).action(async (opts: GlobalFlags) => {
     const ctx = resolve(opts);
     setExit(await runCommand('scan', ctx.json, () => runScan({ cwd: ctx.cwd }), writer));
+  });
+
+  addGlobalFlags(
+    program
+      .command('explain')
+      .description('explain a doctor finding or a core concept (offline; run bare to list topics)')
+      .argument('[topic]', 'a doctor finding id (see the `see:` line) or a concept'),
+  ).action(async (topic: string | undefined, opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('explain', ctx.json, () => runExplain({ topic }), writer));
   });
 
   addGlobalFlags(

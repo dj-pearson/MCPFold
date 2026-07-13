@@ -73,6 +73,21 @@ mcpfold secret extract <server> --dry-run          # preview the plan, write not
 - Once the value is a reference, `mcpfold sync` folds it through the run shim, so it never lands in any
   client file. See [Secrets](./secrets.md) for the reference format and providers.
 
+## `mcpfold explain` — learn why a footgun matters
+
+Every `doctor` finding ends with a `see: mcpfold explain <id>` pointer. Run it for an offline, authored
+explanation of *why* the footgun matters and *why* the fix is right — so you learn the model instead of
+applying fixes blindly:
+
+```bash
+mcpfold explain                     # list every topic
+mcpfold explain vscode-root-key     # a specific finding class
+mcpfold explain shim                # a core concept (the run shim, curation, secret refs, …)
+mcpfold explain hardcoded-secret --json
+```
+
+There is no network and no generation — the catalog is static and versioned in the CLI.
+
 ## The whole loop
 
 ```bash

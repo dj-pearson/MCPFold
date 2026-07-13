@@ -16,6 +16,7 @@ export function checkConfigValid(
       where: e.path ?? (e.line ? `line ${e.line}:${e.column}` : undefined),
       message: e.message,
       fix: e.hint ?? 'Fix the reported field to match the canonical schema.',
+      explain: 'schema-error',
     })),
   };
 }

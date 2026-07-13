@@ -36,6 +36,7 @@ function checkMcpRemotePins(
           ? `Server "${name}" bridges through mcp-remote@${ref.version}, at or below the CVE-2025-6514 vulnerable range (0.0.5–0.1.15).`
           : `Server "${name}" launches an unpinned "mcp-remote" (CVE-2025-6514: RCE in 0.0.5–0.1.15).`,
         fix: `Pin the bridge to a safe version — run \`mcpfold sync\` to rewrite it to mcp-remote@${MCP_REMOTE_PINNED_VERSION}.`,
+        explain: 'mcp-remote-cve',
         autofix: { kind: 'resync-client', profile, client, path },
       });
     }
@@ -76,6 +77,7 @@ export function checkClientFiles(config: Config, ctx: OsContext): Finding[] {
         file: path,
         message: `Client file for profile "${profileName}" is not valid JSON.`,
         fix: 'Fix the JSON syntax or re-run `mcpfold sync` to regenerate it.',
+        explain: 'client-json',
         autofix: resync,
       });
       continue;
@@ -87,6 +89,7 @@ export function checkClientFiles(config: Config, ctx: OsContext): Finding[] {
         file: path,
         message: 'VS Code MCP file uses root key "mcpServers", but VS Code requires "servers".',
         fix: 'VS Code uses the root key "servers", not "mcpServers". Run `mcpfold sync` to rewrite it correctly.',
+        explain: 'vscode-root-key',
         autofix: resync,
       });
     }

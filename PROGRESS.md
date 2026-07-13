@@ -2359,3 +2359,21 @@ Probing only affects add-time writes, never sync output (test proves a probed ad
 plain add). Wired --probe into cli.ts; exported ProbeResult/UrlProber/defaultProbe. 6 unit tests +
 completion snapshots refreshed. Verified on the built binary (closed port → fast fallback, no hang).
 verify_all green (lint + typecheck + build + 456 cli tests).
+
+### S25.5 — `mcpfold explain <topic|finding-id>` [in_progress]
+START: add an offline `explain` command with an authored entry per doctor finding class + core concept;
+add an optional `explain?` topic id to the Finding contract, populate it in each check, and have doctor
+print a `see: mcpfold explain <id>` pointer. `--json` returns the structured entry; unknown key lists
+topics. Static in-repo content, no network/generation. On branch story/e25-config-assistance.
+
+DONE S25.5 — `mcpfold explain <topic|finding-id>` (packages/cli/src/commands/explain.ts). Offline authored
+catalog (EXPLAIN) with an entry per doctor finding class + core concept (shim, curation, secret-refs,
+config-format). Added optional `explain?` id to the Finding contract, populated it across every check
+(servers/clients/config/curation/audit), and doctor now prints a `see: mcpfold explain <id>` pointer per
+finding. Bare `explain` lists topics; a known topic prints the entry; an unknown key is a loud UsageError;
+`--json` returns the structured entry. 6 unit tests incl. a no-orphans guard (every finding's explain id
+resolves; related links resolve). Wired `explain` into cli.ts; exported runExplain/EXPLAIN/hasExplain;
+added an explain section to docs/config-assistance.md. Completion snapshots refreshed for the new command.
+Verified on the binary. verify_all green (lint + typecheck + build + 462 cli tests).
+
+*** E25 (Guided configuration assistance) COMPLETE — all 6 stories done. ***

@@ -40,6 +40,7 @@ export function checkCurationOpportunity(
       where: `servers.${name}`,
       message: `"${name}" has recorded tool usage but no \`tools\` directive — every tool loads into context.`,
       fix: `Run \`mcpfold curate ${name}\` to see usage and \`mcpfold curate ${name} --write\` to apply the recommended allow-list.`,
+      explain: 'curation-opportunity',
     });
   }
   return findings;
@@ -93,6 +94,7 @@ export function checkCurationInactive(config: Config, ctx: OsContext): Finding[]
           where: `${rootKey}.${name}`,
           message: `Curated server "${name}" (profile "${profileName}") launches its real command directly in this client file, bypassing the mcpfold proxy — its \`tools\` directive has no effect and every tool loads into context.`,
           fix: `Run \`mcpfold sync\` to re-fold "${name}" through the \`mcpfold run\` proxy shim (this file predates the fix, or was hand-edited).`,
+          explain: 'inert-curation',
           autofix: { kind: 'resync-client', profile: profileName, client: profile.client, path },
         });
       }
@@ -116,6 +118,7 @@ export function checkNoCurationConfigured(config: Config, configPath: string): F
       file: configPath,
       message: `No tool curation configured — all ${summary.totalServers} server${summary.totalServers === 1 ? '' : 's'} expose their full toolsets to every client.`,
       fix: 'Add a `tools` allow-list to trim each server, or run `mcpfold curate` (with a recorded audit log) to get a usage-based recommendation.',
+      explain: 'no-curation',
     },
   ];
 }
@@ -138,6 +141,7 @@ export function checkAllowlistStaleness(
     where: `servers.${s.server}.tools`,
     message: `"${s.server}" exposes ${s.newTools.length} new tool${s.newTools.length === 1 ? '' : 's'} its allow-list was written before: ${s.newTools.join(', ')}.`,
     fix: `Run \`mcpfold curate ${s.server} --refresh\` to review and (with consent) add them.`,
+    explain: 'allowlist-staleness',
   }));
 }
 

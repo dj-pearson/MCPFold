@@ -71,6 +71,14 @@ export {
 } from './onboarding/guided.js';
 export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';
 export {
+  runExplain,
+  hasExplain,
+  EXPLAIN,
+  type ExplainEntry,
+  type ExplainData,
+  type ExplainOptions,
+} from './commands/explain.js';
+export {
   runDoctorFix,
   type DoctorFixData,
   type DoctorFixOptions,

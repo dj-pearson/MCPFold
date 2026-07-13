@@ -15,6 +15,12 @@ export interface Finding {
   /** The concrete fix, as a human-readable instruction. */
   fix: string;
   /**
+   * Id of the `mcpfold explain` entry that teaches why this finding matters (E25, S25.5). doctor
+   * renders it as a `see: mcpfold explain <id>` pointer. Every id must resolve to a catalog entry
+   * (a test enforces no orphans); a finding without one simply shows no pointer.
+   */
+  explain?: string;
+  /**
    * A deterministic, machine-applicable form of `fix` (E25). Present only when the repair is
    * unambiguous — a repair engine (`doctor --fix`, S25.2) can apply it without re-deriving anything
    * from the prose. Ambiguous findings (which version to pin, which scheme to use, arbitrary schema

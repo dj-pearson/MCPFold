@@ -6122,7 +6122,7 @@
       "epic": "E25",
       "order": 5,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "`mcpfold explain <topic|finding-id>`: teach the footgun",
       "user_story": "As a user, I want `mcpfold explain` to tell me why a footgun matters and why the fix is right, so I learn the config model instead of blindly applying fixes.",
