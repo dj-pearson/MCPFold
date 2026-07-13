@@ -2262,3 +2262,25 @@ Tests: **`funnel.e2e.ts`** (mock `window.plausible` sink) asserts copy, calculat
 install-clicked (with `ref=hackernews` attribution), and outbound-to-npm events fire with the expected
 payload. Verified green (3/3), plus install/home/calculator specs (24/24) — no regressions; site `tsc`
 clean and `build` green (142 routes).
+
+---
+
+## S21.1 — VS Code extension (partial: inert CI publish workflow)
+
+**Still in_progress** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p1.
+
+The extension's codeable work was already complete on-branch (F5 harness `.vscode/launch.json` +
+`tasks.json` with a watch build; recorded smoke-test checklist + publish runbook in `PUBLISHING.md`;
+128px icon; PearsonMedia publisher; smoke-workspace fixture). This turn verified the build gates stay
+green — typecheck, build, 19 tests, and a clean `.vsix` (26.5 KB, no large-asset warning) — confirming
+the S24.3/S24.9 extension changes didn't regress packaging.
+
+Added `.github/workflows/vscode-extension-publish.yml`: an **inert-by-default** publish pipeline that
+runs only on a `vscode-v*` tag (or manual dispatch) and only publishes when a `VSCE_PAT` repo secret
+exists — otherwise it builds, packages, uploads the `.vsix`, and exits cleanly (never fails a tag push,
+never publishes by surprise). Fails fast if the tag version ≠ package.json; `workflow_dispatch` supports
+`dry_run`. Runbook (`PUBLISHING.md` §3) updated with the enable-it steps.
+
+REMAINING (user-only, cannot be automated): the manual Extension-Development-Host smoke run on macOS +
+Windows (criterion 2), and creating the PearsonMedia Marketplace publisher + first publish + listing
+verification (criterion 3, needs an Azure DevOps PAT). Story stays in_progress until those land.
