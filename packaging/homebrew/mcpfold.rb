@@ -6,7 +6,7 @@
 class Mcpfold < Formula
   desc "One source of truth for your MCP servers — write once, fold out to every client"
   homepage "https://mcpfold.com"
-  version "1.2.0"
+  version "1.3.0"
   license "MIT"
 
   on_macos do
