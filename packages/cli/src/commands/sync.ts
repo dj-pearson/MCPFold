@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve as resolvePath } from 'node:path';
 import {
   resolveProfile,
   UnknownProfileError,
@@ -75,7 +75,10 @@ export interface SyncOptions {
 export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncData>> {
   registerAll();
   const ctx = options.osContext ?? realOsContext();
-  const { config } = loadConfigFromDisk(options.cwd);
+  const { path: configPath, config } = loadConfigFromDisk(options.cwd);
+  // Embedded into every shim (`mcpfold run <name> --cwd <dir>`) so GUI clients, which launch
+  // MCP servers from an arbitrary working directory, still resolve the canonical config.
+  const configDir = dirname(resolvePath(configPath));
 
   if (options.profile && !config.profiles[options.profile]) {
     throw new UnknownProfileError(options.profile, Object.keys(config.profiles));
@@ -143,6 +146,7 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
       existing: onDisk,
       // S19.4: per-profile secret-strategy override (a server's own override still wins, applied inside).
       strategyOverride: profile.secretStrategy,
+      configDir,
     });
 
     if (preview) {

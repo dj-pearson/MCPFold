@@ -39,6 +39,16 @@ export interface StrategyOptions {
    * `native-env` opt-in) — `native-input`/`inline` adapters keep their intrinsic behavior.
    */
   strategyOverride?: SecretStrategy;
+  /**
+   * Absolute directory containing the canonical config. When set, the shim embeds it
+   * (`mcpfold run <name> --cwd <dir>`): GUI clients (Claude Desktop, etc.) launch MCP servers
+   * from an arbitrary working directory, and `mcpfold run` resolves the config from its cwd —
+   * without the flag the shimmed server dies with "No mcp.config.jsonc found" even though
+   * sync succeeded. Sync/diff always pass it; omitting it keeps the bare legacy shim.
+   * Project-scope folds never embed it (see toShim) — those files are committed and must
+   * stay machine-portable.
+   */
+  configDir?: string;
 }
 
 /**
@@ -52,13 +62,22 @@ function applyPinAtFold(server: ResolvedServer): ResolvedServer {
   return { ...server, args: server.args.map((a) => a.replace(/@latest$/, `@${server.pin}`)) };
 }
 
-/** Rewrite a server's launch to the shim: `mcpfold run <name>` (no secret on disk). */
-function toShim(server: ResolvedServer): ResolvedServer {
+/**
+ * Rewrite a server's launch to the shim: `mcpfold run <name> --cwd <configDir>` (no secret on
+ * disk). `--cwd` pins the canonical config's location so the shim works from any launch cwd.
+ *
+ * Scope rule: only USER-scope folds embed the (absolute, machine-specific) `--cwd`. Project-scope
+ * client files live inside the repo and are often committed (the S12.1 team workflow gates them
+ * with `sync --check` in CI), so they must stay machine-portable — and their client launches
+ * servers with the workspace as cwd, where the bare shim already finds the config.
+ */
+function toShim(server: ResolvedServer, configDir?: string): ResolvedServer {
+  const embedCwd = server.scope === 'project' ? undefined : configDir;
   return {
     name: server.name,
     transport: 'stdio',
     command: 'mcpfold',
-    args: ['run', server.name],
+    args: embedCwd ? ['run', server.name, '--cwd', embedCwd] : ['run', server.name],
     tags: server.tags,
     client: server.client,
     scope: server.scope,
@@ -111,6 +130,7 @@ function transformSecret(
   server: ResolvedServer,
   adapter: ClientAdapter,
   profileOverride: SecretStrategy | undefined,
+  configDir: string | undefined,
 ): ResolvedServer {
   const refs = findSecretRefs(server);
   if (refs.length === 0) return server;
@@ -118,7 +138,7 @@ function transformSecret(
   if (want === 'native-env' && adapter.envInterpolation && refs.every((r) => r.scheme === 'env')) {
     return toNativeEnv(server, adapter.envInterpolation);
   }
-  return toShim(server);
+  return toShim(server, configDir);
 }
 
 /** Inline a resolved server's secrets so the adapter emits real values (bearer → header). */
@@ -169,7 +189,9 @@ export async function renderWithStrategy(
     // Shim-default adapters (the vast majority). Each secret-bearing server folds via the shim, or —
     // when the profile/server opts into `native-env` and the adapter has a dialect — via the client's
     // own env interpolation. Non-env schemes silently fall back to the shim (safe by construction).
-    const transformed = pinned.map((s) => transformSecret(s, adapter, options.strategyOverride));
+    const transformed = pinned.map((s) =>
+      transformSecret(s, adapter, options.strategyOverride, options.configDir),
+    );
     return adapter.render(transformed, ctx, options.existing);
   }
 

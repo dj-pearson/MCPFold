@@ -38,6 +38,32 @@ describe('renderWithStrategy — shim (S4.6)', () => {
     expect(parsed.mcpServers.github).toEqual({ command: 'mcpfold', args: ['run', 'github'] });
   });
 
+  it('embeds the config location as `--cwd` when configDir is provided', async () => {
+    // GUI clients (Claude Desktop, etc.) launch MCP servers from an arbitrary working
+    // directory; the embedded --cwd is what lets `mcpfold run` find the canonical config.
+    const file = await renderWithStrategy(cursorAdapter, [githubSecret], {
+      osContext: ctx,
+      configDir: '/home/dev/project',
+    });
+    const parsed = JSON.parse(file.contents);
+    expect(parsed.mcpServers.github).toEqual({
+      command: 'mcpfold',
+      args: ['run', 'github', '--cwd', '/home/dev/project'],
+    });
+  });
+
+  it('keeps PROJECT-scope shims bare — committed client files must stay machine-portable', async () => {
+    // The S12.1 team workflow commits project-scope client files and gates them with
+    // `sync --check` in CI; an absolute --cwd would make them differ on every machine.
+    const file = await renderWithStrategy(
+      cursorAdapter,
+      [{ ...githubSecret, scope: 'project', projectPath: '/home/dev/project' }],
+      { osContext: ctx, configDir: '/home/dev/project' },
+    );
+    const parsed = JSON.parse(file.contents);
+    expect(parsed.mcpServers.github.args).toEqual(['run', 'github']);
+  });
+
   it('leaves a secret-free server rendered natively', async () => {
     const file = await renderWithStrategy(cursorAdapter, [plainStdio], { osContext: ctx });
     const parsed = JSON.parse(file.contents);

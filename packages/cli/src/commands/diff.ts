@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve as resolvePath } from 'node:path';
 import {
   resolveProfile,
   UnknownProfileError,
@@ -43,7 +44,10 @@ export interface DiffOptions {
 export async function runDiff(options: DiffOptions): Promise<CommandOutput<DiffData>> {
   registerAll();
   const ctx = options.osContext ?? realOsContext();
-  const { config } = loadConfigFromDisk(options.cwd);
+  const { path: configPath, config } = loadConfigFromDisk(options.cwd);
+  // Must match sync's render exactly — the shim embeds `--cwd <configDir>` — or every
+  // secret-bearing server would show as perpetually drifted.
+  const configDir = dirname(resolvePath(configPath));
 
   if (options.profile && !config.profiles[options.profile]) {
     throw new UnknownProfileError(options.profile, Object.keys(config.profiles));
@@ -62,6 +66,7 @@ export async function runDiff(options: DiffOptions): Promise<CommandOutput<DiffD
     const file = await renderWithStrategy(adapter, resolveProfile(config, name), {
       osContext: ctx,
       resolve,
+      configDir,
     });
     const onDisk = existsSync(file.path) ? readFileSync(file.path, 'utf8') : undefined;
     const diff = diffRenderedSafe(file, onDisk, adapter);
