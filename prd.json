@@ -5516,7 +5516,7 @@
       "epic": "E23",
       "order": 2,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S23.1"
       ],

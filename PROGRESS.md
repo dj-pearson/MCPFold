@@ -1779,3 +1779,29 @@ deduped recommendation, add/remove/unchanged diff, and unusedKnown. Typecheck, l
 
 Follow-ups: S23.2 wires this into `mcpfold curate` (read the log at the CLI edge, render a report);
 S23.3 adds `--write` to persist the recommended directive.
+
+## S23.2 — CLI `mcpfold curate [server]` — read-only usage report
+
+Started/done: 2026-07-13. E23 story 2. New `packages/cli/src/commands/curate.ts` + registration in
+`cli.ts`, sitting on the S23.1 core engine. Reads the redacted proxy audit log and reports, per
+server, which tools were actually used and the minimal `allow` list that would have covered them —
+the missing consumer of the S18.4 log.
+
+**What.** `resolveAuditLogPath` takes `--audit-log` then `MCPFOLD_AUDIT_LOG`, else throws a
+UsageError naming both and pointing at `mcpfold run --audit-log`. `buildCurateData` reads the JSONL
+(via the CLI fs boundary), loads the canonical config for each server's current `tools` directive
+(an allow-directive's own list becomes `knownTools`, so "allowed but never used" is meaningful),
+resolves `--since <days>` into an epoch cutoff at the CLI edge (core stays clock-free), applies
+`--min-calls <n>` (both parseIntFlag-validated), and supports an optional positional `<server>`
+filter. Human output lists tools most-used-first with call counts and error/denied tails, the
+allowed-but-unused set, and the recommended allow-list; `--json` emits the stable envelope with no
+ANSI. Read-only — exits 0 even when a server has zero calls; non-zero only on usage/IO errors.
+
+Verified end-to-end against the built binary (human + `--json` + missing-log exit 2). Tests
+(`packages/cli/test/curate.test.ts`, 9): flag/env resolution, per-server report + read-only config
+invariant, server filter, since/min-calls filtering, missing-log and no-source UsageErrors, empty
+report exit 0, and no-ANSI output. Completions snapshots regenerated (new `curate` command in the
+tree). Full core+cli suite green (345 passed); typecheck, lint, prettier clean.
+
+Follow-up: S23.3 adds `--write` (persist the recommended directive to mcp.config.jsonc), a doctor
+hint, and docs.
