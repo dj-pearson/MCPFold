@@ -1,10 +1,19 @@
 import { Buffer } from 'node:buffer';
+import { existsSync } from 'node:fs';
 import { realOsContext, requireAdapter, type OsContext } from '@mcpfold/adapters';
-import type { ClientId } from '@mcpfold/core';
+import {
+  analyzeUsage,
+  parseAuditEvents,
+  recommendDirective,
+  usedTools,
+  type ClientId,
+} from '@mcpfold/core';
 import type { SecretProvider } from '@mcpfold/secrets';
 import { runDiff } from './diff.js';
 import { runDoctor } from './doctor.js';
 import { detectClients } from '../util/detect-clients.js';
+import { loadConfigFromDisk } from '../util/config.js';
+import { readAuditLogLines } from '../util/audit-log.js';
 import { loadSession, osKeychainBackend, type KeychainBackend } from '../cloud/token-store.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
@@ -35,12 +44,24 @@ export interface StatusCloud {
   identity?: string;
 }
 
+/** S23.5: the trimmable-context opportunity, when an audit log is configured and something is curatable. */
+export interface StatusCuration {
+  /** The audit log the counts were computed from (primary path). */
+  logPath: string;
+  /** Servers whose `tools` directive would change if curated to observed usage. */
+  curatableServers: number;
+  /** Total currently-exposed-but-unused tools those servers would trim (allow-mode servers only). */
+  trimmableTools: number;
+}
+
 export interface StatusData {
   clients: StatusClient[];
   /** S19.3: client ids installed on this machine but not yet in any profile (onboarding hint). */
   installedUnconfigured: string[];
   health: { errors: number; warnings: number };
   cloud: StatusCloud | null;
+  /** S23.5: curation opportunity from recorded usage, or null when none/unavailable. */
+  curation: StatusCuration | null;
   ok: boolean;
 }
 
@@ -61,6 +82,39 @@ function identityOf(accessToken: string): string | undefined {
     return typeof json.sub === 'string' ? json.sub : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * S23.5: compute the curation opportunity from recorded proxy usage. Triggered only when an audit
+ * log is configured (`MCPFOLD_AUDIT_LOG`, same signal as the S23.3 doctor hint) and readable. Reads
+ * the full rotated history (S23.4), and for each server counts a curatable change when the
+ * recommendation differs from the current directive and is non-empty. Returns null (line omitted)
+ * when no log is set, it is unreadable, or nothing is curatable — never a false nudge, never an error.
+ */
+function computeCuration(cwd: string, env: NodeJS.ProcessEnv): StatusCuration | null {
+  const logPath = env.MCPFOLD_AUDIT_LOG;
+  if (!logPath || !existsSync(logPath)) return null;
+  try {
+    const events = parseAuditEvents(readAuditLogLines(logPath));
+    const byServer = analyzeUsage(events);
+    if (byServer.size === 0) return null;
+    const { config } = loadConfigFromDisk(cwd);
+
+    let curatableServers = 0;
+    let trimmableTools = 0;
+    for (const [name, usage] of byServer) {
+      const current = config.servers[name]?.tools;
+      const knownTools = current?.mode === 'allow' ? current.list : undefined;
+      const rec = recommendDirective({ used: usedTools(usage), current, knownTools });
+      if (!rec.unchanged && rec.recommended.list.length > 0) {
+        curatableServers += 1;
+        trimmableTools += rec.unusedKnown?.length ?? 0;
+      }
+    }
+    return curatableServers > 0 ? { logPath, curatableServers, trimmableTools } : null;
+  } catch {
+    return null;
   }
 }
 
@@ -95,6 +149,16 @@ function renderHuman(data: StatusData): string {
   if (data.cloud) {
     const who = data.cloud.identity ? ` as ${data.cloud.identity}` : '';
     lines.push(`${style.bold('Cloud:')} logged in${who} ${symbols.arrow} ${data.cloud.endpoint}`);
+  }
+  if (data.curation) {
+    const n = data.curation.curatableServers;
+    const trim =
+      data.curation.trimmableTools > 0
+        ? ` (${data.curation.trimmableTools} unused tool${data.curation.trimmableTools === 1 ? '' : 's'})`
+        : '';
+    lines.push(
+      `${style.bold('Curation:')} ${style.yellow(`${n} server${n === 1 ? '' : 's'}`)} could be trimmed to your usage${trim} ${symbols.arrow} run \`mcpfold curate\``,
+    );
   }
   lines.push('');
   lines.push(
@@ -144,7 +208,10 @@ export async function runStatus(options: StatusOptions): Promise<CommandOutput<S
     .filter((c) => c.state === 'installed-only' && !profileClients.has(c.id))
     .map((c) => c.id);
 
+  // S23.5: curation opportunity from recorded usage — informational, never affects the exit code.
+  const curation = computeCuration(options.cwd, ctx.env);
+
   const ok = !diff.data.drift && health.errors === 0 && health.warnings === 0;
-  const data: StatusData = { clients, installedUnconfigured, health, cloud, ok };
+  const data: StatusData = { clients, installedUnconfigured, health, cloud, curation, ok };
   return { data, human: renderHuman(data), exit: ok ? EXIT.SUCCESS : EXIT.DIFF };
 }

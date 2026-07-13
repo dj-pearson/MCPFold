@@ -54,10 +54,15 @@ Each adapter declares how it keeps the resolved **value** off disk:
 
 | Strategy       | What lands in the client file                                  | Who resolves the value           |
 | -------------- | -------------------------------------------------------------- | -------------------------------- |
-| `shim`         | `mcpfold run <name>` launcher — no ref, no value               | mcpfold, at launch               |
+| `shim`         | `mcpfold run <name> --cwd <dir>` launcher — no ref, no value   | mcpfold, at launch               |
 | `native-input` | the client's own indirection (VS Code `${input:}` + `inputs`)  | the client prompts + stores it   |
 | `native-env`   | the client's own env placeholder (`${env:NAME}` / `${NAME}` …) | the client, from its process env |
 | `inline`       | the resolved **value** — only ever to a **gitignored** target  | mcpfold, at fold time            |
+
+User-scope shims embed `--cwd <config dir>` because GUI clients (Claude Desktop, etc.) launch MCP
+servers from an arbitrary working directory — the flag is how `mcpfold run` finds the canonical
+config (and the `.env` next to it). Project-scope shims stay a bare `mcpfold run <name>`: those
+client files live in the repo and are often committed, so they must remain machine-portable.
 
 ### `native-env` — fold `${env:NAME}` shim-free (S19.4)
 

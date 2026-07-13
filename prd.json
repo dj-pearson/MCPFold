@@ -237,6 +237,11 @@
       "id": "E22",
       "title": "Post-1.0 code review - CLI, core, adapters & proxy hardening",
       "goal": "Close the security, data-safety, and robustness findings from the CLI/core/adapters/proxy/secrets code review so the daily-driver path (run, sync, pull, import) is safe against tampered configs, malicious MCP servers, and malformed input. Findings were produced by a five-way parallel review and each blocker/high was verified against the code."
+    },
+    {
+      "id": "E23",
+      "title": "Curation intelligence - close the loop on the token-tax metric",
+      "goal": "Turn the headline metric (cut tool-schema context via curation) from a manual chore into a data-driven, one-command result. The proxy already records every tools/call in the redacted audit log (S18.4); nothing consumes it. E23 adds a pure analysis engine and an `mcpfold curate` command that reads that log, reports which tools a server actually uses, and writes the recommended `allow` directive back to the canonical config - so users get the ~80% reduction without hand-authoring tool lists."
     }
   ],
   "stories": [
@@ -5475,6 +5480,161 @@
       ],
       "definition_of_done": [
         "Auditing is low-overhead and race-safe, and tool filtering is O(1) per tool."
+      ]
+    },
+    {
+      "id": "S23.1",
+      "epic": "E23",
+      "order": 1,
+      "priority": "p1",
+      "status": "done",
+      "dependencies": [],
+      "title": "core: audit-log usage analysis + curation recommendation (I/O-free)",
+      "user_story": "As an mcpfold user, I want a pure engine that turns recorded tool-call events into a per-server usage summary and a recommended `allow` directive, so the CLI can suggest exactly the tools I actually use without any guesswork.",
+      "context": "The proxy audit log (S18.4) is redacted JSONL with events {ts, server, type:'tools/call'|'filter-drift', tool?, outcome?, durationMs?, argShape?, reason?}. This story adds packages/core/src/curate.ts (no node:fs / net - core purity): a tolerant JSONL parser that skips malformed lines and non-tools/call events, a usage aggregator that groups by server -> tool with call count, last-seen ts, and outcome tally (honoring an optional `since` cutoff and an optional min-calls threshold), and recommendDirective() that produces {mode:'allow', list:[...sorted used tools]} and diffs it against a passed current ToolsDirective (added / removed / unchanged). An optional knownTools set lets it also report tools currently exposed/allowed but never called. Denied outcomes are counted but excluded from the recommended allow list by default. Deterministic and side-effect-free; `since` is passed in as an epoch ms so core stays clock-free.",
+      "acceptance_criteria": [
+        "New packages/core/src/curate.ts exports parseAuditEvents(lines), analyzeUsage(events, {sinceMs?, minCalls?}), and recommendDirective({used, current?, knownTools?}); all pure, no node:fs/os/net imports (core-purity CI stays green).",
+        "parseAuditEvents tolerates malformed/blank JSONL lines (skips them) and ignores non 'tools/call' events; analyzeUsage groups by server->tool with {calls, lastTs, outcomes:{ok,error,denied}} and respects sinceMs and minCalls filters.",
+        "recommendDirective returns a sorted, de-duplicated allow directive and a diff {added, removed, unchanged} vs the current directive; when knownTools is supplied it also returns unusedKnown (exposed but never successfully called).",
+        "Denied-only tools are excluded from the recommended allow list; a tool with at least one 'ok' or 'error' call is included.",
+        "New symbols are exported from packages/core/src/index.ts and covered by types (zod-inferred where a schema already exists, e.g. ToolsDirective)."
+      ],
+      "files_hint": [
+        "packages/core/src/curate.ts",
+        "packages/core/src/index.ts",
+        "packages/core/test/curate.test.ts"
+      ],
+      "tests": [
+        "Unit: malformed-line tolerance; since/min-calls filtering; per-outcome tally; allow-list recommendation is sorted+deduped; diff added/removed/unchanged; denied-only excluded; unusedKnown when knownTools given."
+      ],
+      "definition_of_done": [
+        "A pure, tested core function maps recorded audit events to a recommended per-server allow directive plus a diff against the current config, with zero I/O."
+      ]
+    },
+    {
+      "id": "S23.2",
+      "epic": "E23",
+      "order": 2,
+      "priority": "p1",
+      "status": "done",
+      "dependencies": [
+        "S23.1"
+      ],
+      "title": "CLI `mcpfold curate [server]` - read-only usage report",
+      "user_story": "As an mcpfold user, I want `mcpfold curate` to read my proxy audit log and show me, per server, which tools I actually use and which are exposed but never called, so I can see the curation opportunity before changing anything.",
+      "context": "Adds packages/cli/src/commands/curate.ts wired into cli.ts. Resolves the audit log from --audit-log or MCPFOLD_AUDIT_LOG (this story is read-only; if neither is set and no log exists, exit with a UsageError that names the flag/env and points at `mcpfold run --audit-log`). Reads the JSONL via the CLI's fs boundary, loads the canonical config (to know current `tools` directives and, for allow-mode servers, the currently-allowed set as knownTools), and calls the S23.1 core engine. Supports --since <days> (converted to an epoch cutoff at the CLI edge), --min-calls <n> (validated via parseIntFlag), an optional positional server filter, and --json. Human output: a per-server summary - used N tools (with call counts, sorted desc), tools currently allowed but never called, and the recommended directive. No writes in this story.",
+      "acceptance_criteria": [
+        "`mcpfold curate` reads the audit log from --audit-log or MCPFOLD_AUDIT_LOG; with neither set and no default log, it exits non-zero with a UsageError naming the flag/env and the `mcpfold run --audit-log` path.",
+        "An optional positional <server> narrows the report to one server; absent, all servers with recorded calls are shown.",
+        "--since <days> and --min-calls <n> filter the analysis (parseIntFlag-validated: reject NaN/negative/non-integer); --json emits a stable machine-readable shape and --json output contains no ANSI codes.",
+        "Human output lists, per server: tools used with call counts (desc), tools currently allowed-but-never-called, and the recommended `allow` list; the command makes no changes to any file (read-only).",
+        "Exit code 0 on a successful report even when a server has zero recorded calls (reported as such), non-zero only on usage/IO errors."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/curate.ts",
+        "packages/cli/src/cli.ts",
+        "packages/cli/test/curate.test.ts"
+      ],
+      "tests": [
+        "Unit/integration: fixture audit log + config -> expected --json report; server filter; since/min-calls filtering and flag validation; missing-log UsageError; --json has no ANSI."
+      ],
+      "definition_of_done": [
+        "`mcpfold curate` gives a read-only, per-server view of actual tool usage and the recommended allow-list, sourced from the redacted audit log."
+      ]
+    },
+    {
+      "id": "S23.3",
+      "epic": "E23",
+      "order": 3,
+      "priority": "p1",
+      "status": "done",
+      "dependencies": [
+        "S23.2"
+      ],
+      "title": "`mcpfold curate --write` - apply recommended allow-list to the canonical config",
+      "user_story": "As an mcpfold user, once I see the recommendation I want `mcpfold curate --write` to update my mcp.config.jsonc `tools` directive for me, with a diff and confirmation, so I capture the token savings without editing JSON by hand.",
+      "context": "Extends the S23.2 command with --write (alias --apply) to persist the recommended {mode:'allow', list} into each affected server's `tools` directive in mcp.config.jsonc, preserving comments/formatting via the same JSONC-aware write path other mutating commands use. Shows the per-server directive diff first; --dry-run prints the diff and writes nothing; --yes skips the interactive confirm (default is to confirm, or require --yes in non-TTY). Writing is idempotent. Also adds a `doctor` hint: when a server has audit data but no `tools` directive, doctor suggests `mcpfold curate <server>`. Docs: a subsection in docs/config-format.md and the command reference, plus a changeset.",
+      "acceptance_criteria": [
+        "`mcpfold curate --write` updates each affected server's `tools` directive to the recommended allow-list in mcp.config.jsonc, preserving surrounding comments and formatting (JSONC round-trip; a golden/round-trip test proves it).",
+        "The command prints the per-server directive diff before writing; --dry-run shows the diff and writes nothing; without --yes in a non-interactive context it does not write (and says so), --yes applies without prompting.",
+        "Re-running --write with unchanged usage is a no-op that reports 'already curated' and exits 0 (idempotent).",
+        "`mcpfold doctor` emits an actionable hint (naming the exact command) when a server has recorded audit calls but no `tools` directive; the hint is informational, not a failure.",
+        "docs/config-format.md and the command reference document `mcpfold curate` (report + --write), and a changeset is added for the new user-facing command."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/curate.ts",
+        "packages/cli/src/cli.ts",
+        "packages/cli/src/commands/doctor.ts",
+        "packages/cli/test/curate.test.ts",
+        "docs/config-format.md",
+        ".changeset/"
+      ],
+      "tests": [
+        "Integration: --write updates directive and round-trips JSONC comments; --dry-run leaves file byte-identical; idempotent re-run reports already-curated; doctor hint fires only when audit data exists and no directive; non-TTY without --yes does not write."
+      ],
+      "definition_of_done": [
+        "Users can go from raw usage to a committed, curated allow-list in one command, with a safe diff/confirm flow and doctor pointing the way."
+      ]
+    },
+    {
+      "id": "S23.4",
+      "epic": "E23",
+      "order": 4,
+      "priority": "p2",
+      "status": "done",
+      "dependencies": [
+        "S23.2"
+      ],
+      "title": "curate reads rotated audit logs (full-history correctness)",
+      "user_story": "As an mcpfold user whose audit log has rotated, I want `mcpfold curate` to count my whole usage history, not just the active log file, so the recommendation never drops a tool I actually use.",
+      "context": "The proxy audit sink (S18.4/S22.24) rotates at maxBytes to a UNIQUE sibling `${path}.<pid>.<seq>.<rand>` and starts a fresh primary. S23.2's reader only reads the primary file, so after any rotation the recommendation is computed from a partial history — and `curate --write` could then remove a tool the user relies on (a real footgun). Add a shared CLI-layer reader (fs boundary, not core) that reads the primary log plus every rotated sibling in the same directory (basename === name OR startsWith(name + '.')), concatenates their lines, and feeds the combined stream to the S23.1 engine (order-independent: counts sum, lastTs takes the max). Use it in both `buildCurateData` and the doctor curation check so they agree. Missing/unreadable siblings are skipped best-effort.",
+      "acceptance_criteria": [
+        "A new shared reader (e.g. packages/cli/src/util/audit-log.ts) returns the combined lines of the primary log and all rotated siblings `${name}.*` in its directory; used by both curate and the doctor hint.",
+        "After a rotation, `mcpfold curate` counts calls from the rotated file(s) too: a tool used only in a rotated log still appears in usage and the recommendation.",
+        "Aggregation is order-independent (sibling read order does not change counts or the recommended list); a sibling that fails to read is skipped without failing the command.",
+        "The reader only matches this log's rotations (its exact basename or basename + '.'), never unrelated files in the directory.",
+        "curate and doctor read the same combined history (no divergence between the report and the hint)."
+      ],
+      "files_hint": [
+        "packages/cli/src/util/audit-log.ts",
+        "packages/cli/src/commands/curate.ts",
+        "packages/cli/src/checks/curation.ts",
+        "packages/cli/test/curate.test.ts"
+      ],
+      "tests": [
+        "Unit/integration: primary+rotated merge (tool only in rotated log surfaces); read-order independence; unrelated sibling ignored; unreadable sibling skipped; doctor + curate agree."
+      ],
+      "definition_of_done": [
+        "curate and its doctor hint reflect the full recorded history across log rotations, so a recommended allow-list never silently drops a still-used tool."
+      ]
+    },
+    {
+      "id": "S23.5",
+      "epic": "E23",
+      "order": 5,
+      "priority": "p2",
+      "status": "done",
+      "dependencies": [
+        "S23.4"
+      ],
+      "title": "surface the curation opportunity in `mcpfold status`",
+      "user_story": "As an mcpfold user, I want `mcpfold status` (the daily front door) to tell me when I have unused tool-schema context I could trim, so curation is discoverable without my knowing the command exists.",
+      "context": "status (S10.1) aggregates diff/doctor/cloud into one scannable summary. When an audit log is configured (MCPFOLD_AUDIT_LOG, read via the OsContext env — same trigger as the S23.3 doctor hint) and readable, compute, from the combined history (S23.4 reader): how many servers have a recommendation that differs from their current directive, and the total count of currently-exposed-but-unused tools that curation would trim. Add a one-line `Curation:` entry to the human summary and a structured field to StatusData, pointing at `mcpfold curate`. Silent (line omitted) when no audit log is set, none is readable, or nothing is trimmable. This is informational and must not change status's existing exit-code semantics.",
+      "acceptance_criteria": [
+        "When MCPFOLD_AUDIT_LOG is set and readable and at least one server is curatable, `mcpfold status` shows a one-line `Curation:` summary naming the count of curatable servers and pointing at `mcpfold curate`; StatusData gains a structured field.",
+        "The line is omitted entirely when no audit log is configured, it is unreadable, or every server is already curated (no false nudge).",
+        "The curation summary never changes status's exit code (still driven by drift + doctor findings only); --json includes the new field.",
+        "Counts are computed from the full rotated history via the S23.4 reader, consistent with `mcpfold curate` and the doctor hint."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/status.ts",
+        "packages/cli/test/status.test.ts"
+      ],
+      "tests": [
+        "Unit: status shows the curation line with a configured log + curatable server; omits it with no log / all-curated; exit code unchanged; --json field present."
+      ],
+      "definition_of_done": [
+        "The daily `status` view surfaces trimmable tool-schema context when usage data exists, making curation discoverable without prior knowledge of the command."
       ]
     }
   ],
