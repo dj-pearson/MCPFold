@@ -10,6 +10,7 @@ import {
   checkCurationOpportunity,
   checkNoCurationConfigured,
 } from '../checks/curation.js';
+import { checkAuditTrail } from '../checks/audit.js';
 import {
   checkDeprecatedTransports,
   checkHardcodedSecrets,
@@ -75,6 +76,7 @@ export function runDoctor(options: DoctorOptions): CommandOutput<DoctorData> {
       findings.push(...checkCurationOpportunity(config, configPath, ctx.env));
       findings.push(...checkNoCurationConfigured(config, configPath));
       findings.push(...checkCurationInactive(config, ctx));
+      findings.push(...checkAuditTrail(config, ctx));
       findings.push(...checkClientFiles(config, ctx));
     }
   }

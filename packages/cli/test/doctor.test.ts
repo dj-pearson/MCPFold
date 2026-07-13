@@ -31,8 +31,27 @@ describe('runDoctor (S3.7)', () => {
       "profiles": { "cursor": { "client": "cursor", "scope": "user", "include": ["code"] } }
     }`);
     const result = runDoctor({ cwd, osContext: ctx });
-    expect(result.data.findings).toEqual([]);
+    // The only finding is the S24.8 audit-trail disclosure (an info, so exit stays 0).
+    expect(result.data.findings.filter((f) => f.severity !== 'info')).toEqual([]);
+    expect(result.data.findings.every((f) => f.severity === 'info')).toBe(true);
     expect(result.exit).toBe(EXIT.SUCCESS);
+  });
+
+  it('discloses the default-on local audit trail as an info (S24.8)', () => {
+    write(`{
+      "version": 1,
+      "servers": { "pw": { "transport": "stdio", "command": "s", "tags": ["c"] } },
+      "profiles": { "cursor": { "client": "cursor", "scope": "user", "include": ["c"] } }
+    }`);
+    const on = runDoctor({ cwd, osContext: ctx });
+    const info = on.data.findings.find((f) => f.message.includes('Local audit trail is on'));
+    expect(info?.severity).toBe('info');
+    expect(info?.message).toContain('never leaves this machine');
+
+    // Opting out flips the disclosure and does not change the exit code.
+    const off = runDoctor({ cwd, osContext: { ...ctx, env: { MCPFOLD_NO_AUDIT: '1' } } });
+    expect(off.data.findings.some((f) => f.message.includes('Local audit trail is off'))).toBe(true);
+    expect(off.exit).toBe(EXIT.SUCCESS);
   });
 
   it('warns about the deprecated sse transport, but not about an oauth server (S17.5)', () => {

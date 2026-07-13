@@ -18,6 +18,7 @@ import {
 } from '@mcpfold/proxy';
 import { realOsContext, type OsContext } from '@mcpfold/adapters';
 import { loadConfigFromDisk } from '../util/config.js';
+import { resolveActiveAuditLog } from '../util/audit-log.js';
 import { checkServer, describeViolation, loadPolicy } from '../util/policy.js';
 import { fileTrustGate, isExecutable, type TrustGate } from '../trust/tofu.js';
 import { resolveCommand } from '../util/spawn.js';
@@ -126,6 +127,13 @@ export interface RunOptions {
    * unset means auditing is off.
    */
   auditLogPath?: string;
+  /**
+   * Turn on the default-on local audit trail (S24.8): when no explicit path / MCPFOLD_AUDIT_LOG is
+   * set and the user hasn't opted out (env or `audit.enabled: false`), record to the per-user default
+   * path. The CLI entry point passes this; unit tests that call runRun directly omit it, so they keep
+   * the pre-S24.8 "audit only when a path is given" behavior.
+   */
+  defaultAudit?: boolean;
   /** OS context for org-policy discovery (S18.3); defaults to the real environment. */
   osContext?: OsContext;
 }
@@ -256,9 +264,13 @@ export async function runRun(options: RunOptions): Promise<number> {
       },
     };
 
-    // Redacted tool-call audit log (S18.4): opt-in via --audit-log / MCPFOLD_AUDIT_LOG. When on,
-    // route stdio through the proxy so calls are logged even without a tools directive.
-    const auditLogPath = options.auditLogPath ?? process.env.MCPFOLD_AUDIT_LOG;
+    // Redacted tool-call audit log (S18.4 + S24.8): an explicit --audit-log / MCPFOLD_AUDIT_LOG always
+    // wins; otherwise, when the CLI entry enables it (defaultAudit) and the user hasn't opted out, log
+    // to the per-user default path. When on, route stdio through the proxy so calls are recorded even
+    // without a tools directive — this is what gives `mcpfold curate` real data with zero setup.
+    const auditLogPath = options.defaultAudit
+      ? resolveActiveAuditLog({ explicit: options.auditLogPath, config, env: process.env })
+      : (options.auditLogPath ?? process.env.MCPFOLD_AUDIT_LOG);
     const audit: AuditRecorder | undefined = auditLogPath
       ? createAuditRecorder({
           server: options.name,

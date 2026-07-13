@@ -91,6 +91,7 @@ describe('runStatus (S10.1)', () => {
     await runSync({ cwd, osContext: ctx });
     const result = await runStatus({ cwd, osContext: ctx, backend: inMemoryBackend() });
     expect(Object.keys(result.data).sort()).toEqual([
+      'audit',
       'clients',
       'cloud',
       'curation',

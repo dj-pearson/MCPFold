@@ -137,6 +137,18 @@ export const ProfileSchema = z
     message: '`path` is required when scope is "project" or "workspace"',
   });
 
+/**
+ * Local audit-trail settings (S24.8). The proxy records tool-call NAMES (never args/results) to a
+ * per-user data directory by default, so `mcpfold curate` has real usage the first time it runs. Set
+ * `enabled: false` to opt out. This governs only the LOCAL, never-synced audit log — telemetry stays
+ * a separate, opt-in concern (see docs/telemetry.md).
+ */
+export const AuditSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+  })
+  .strict();
+
 export const ConfigSchema = z
   .object({
     /** Optional JSON Schema pointer for editor autocomplete; ignored semantically. */
@@ -146,5 +158,7 @@ export const ConfigSchema = z
     version: z.literal(2),
     servers: z.record(ServerSchema),
     profiles: z.record(ProfileSchema),
+    /** Local tool-call audit trail (S24.8); default-on, opt out with `{ "enabled": false }`. */
+    audit: AuditSchema.optional(),
   })
   .strict();

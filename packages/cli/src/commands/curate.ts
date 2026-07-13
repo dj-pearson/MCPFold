@@ -14,7 +14,7 @@ import {
 } from '@mcpfold/core';
 import { findConfigPath, loadConfigFromDisk } from '../util/config.js';
 import { cachedToolNames, type CacheLocation } from '../discover/cache.js';
-import { readAuditLogLines } from '../util/audit-log.js';
+import { AUDIT_OPT_OUT_ENV, readAuditLogLines, resolveActiveAuditLog } from '../util/audit-log.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
@@ -213,13 +213,20 @@ function renderHuman(data: CurateData): string {
  * and mutate from an identical view of usage.
  */
 export function buildCurateData(opts: CurateOptions): CurateData {
-  const logPath = resolveAuditLogPath(opts);
-  if (!existsSync(logPath)) {
-    throw new UsageError(`Audit log not found: ${logPath}`, {
-      hint: 'Check the path, or record usage first with `mcpfold run <server> --audit-log <path>`.',
+  const { config } = loadConfigFromDisk(opts.cwd);
+  // S24.8: resolve the default per-user audit path with zero flags (unless opted out); an explicit
+  // --audit-log / MCPFOLD_AUDIT_LOG still overrides.
+  const logPath = resolveActiveAuditLog({ explicit: opts.auditLogPath, config, env: opts.env });
+  if (!logPath) {
+    throw new UsageError('The local audit trail is disabled, so there is no recorded usage to curate.', {
+      hint: `Re-enable it (remove \`audit.enabled: false\` / unset ${AUDIT_OPT_OUT_ENV}), or pass --audit-log <path>.`,
     });
   }
-  const { config } = loadConfigFromDisk(opts.cwd);
+  if (!existsSync(logPath)) {
+    throw new UsageError(`No recorded tool usage yet at ${logPath}.`, {
+      hint: 'Use your shimmed servers through `mcpfold run` (the default audit trail records tool names automatically), then re-run curate.',
+    });
+  }
 
   const now = opts.now ?? (() => Date.now());
   const sinceMs =

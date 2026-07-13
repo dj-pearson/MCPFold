@@ -2084,3 +2084,37 @@ Tests: cli `savings.test.ts` (measure/deny/format/block paths incl. the no-curat
 lines), guided honesty assertions, status shape + savings, extension `discoveryCache.test.ts`
 (toolCountFor injection: cached → exact, uncached → approximate). Full cli (396) + extension (19) +
 core suites green; root lint + core purity clean; `mcpfold` build clean.
+
+---
+
+## S24.8 — Default-on local audit trail so usage-based curation has data
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p1, deps: S24.3.
+User signed off on **default-on (as written)** over opt-in.
+
+A user who has simply been using their shimmed servers now gets a meaningful `mcpfold curate` report
+with no prior setup.
+
+- **Default-on**: `mcpfold run` records tool-call NAMES (+ arg shapes, never values/results — S18.4
+  redaction) by default. Gated by a new `RunOptions.defaultAudit` that only the CLI entry sets, so unit
+  tests calling `runRun` directly keep the pre-S24.8 behavior (no blast radius). The sink already
+  rotates + size-caps (S22.24); the recorder already stores shapes not values (ref-only invariant holds
+  by construction, now covered by a test).
+- **Path + opt-out** (`util/audit-log.ts`): `defaultAuditLogPath` → per-user DATA dir
+  (`%LOCALAPPDATA%\mcpfold\audit.log` / `$XDG_STATE_HOME/mcpfold/audit.log`, platform-specific joins).
+  `resolveActiveAuditLog` precedence: explicit `--audit-log` > `MCPFOLD_AUDIT_LOG` > default (unless
+  opted out). Opt-out via `MCPFOLD_NO_AUDIT` env OR a new schema key `audit.enabled: false`
+  (`ConfigSchema`, JSON schema regenerated).
+- **Zero-flag resolution**: `curate` (buildCurateData) and `status` (computeCuration) resolve the
+  default path with no flags; curate's not-found message points at `mcpfold run`'s automatic recording.
+- **Disclosure**: `status` shows an `Audit:` line (path + size + names-only / disabled); `doctor` shows
+  an info (`checks/audit.ts`) with the same facts + how to disable. Verified end-to-end: status/curate
+  resolve the real default path; `MCPFOLD_NO_AUDIT=1` flips both to disabled.
+- **docs/telemetry.md**: a table drawing the line — local audit (default-on, never leaves the machine,
+  `MCPFOLD_NO_AUDIT`/config) vs telemetry (opt-in, allow-listed, `DO_NOT_TRACK`). DO_NOT_TRACK governs
+  telemetry only.
+
+Tests: `audit-default.test.ts` (per-OS path, opt-out, precedence, size sum, ref-only invariant that no
+secret value lands in the file); doctor S24.8 disclosure; status shape+audit. Full core (122) + schema
+(9) + cli (399) suites green; root lint + core purity clean. (The Windows DPAPI token-store test is a
+pre-existing load-flaky native-spawn timeout, unrelated.)

@@ -503,7 +503,14 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   ).action(async (name: string, opts: GlobalFlags & { auditLog?: string }) => {
     const ctx = resolve(opts);
     try {
-      setExit((await runRun({ cwd: ctx.cwd, name, auditLogPath: opts.auditLog })) as ExitCode);
+      setExit(
+        (await runRun({
+          cwd: ctx.cwd,
+          name,
+          auditLogPath: opts.auditLog,
+          defaultAudit: true, // S24.8: record tool-call names by default (opt out via config/env)
+        })) as ExitCode,
+      );
     } catch (error) {
       const enorm = toEnvelopeError(error);
       errWrite(`error: ${enorm.message}\n`);
