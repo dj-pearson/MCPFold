@@ -1754,6 +1754,44 @@ lose no records across rotation. `verify_all` green — lint, typecheck, full su
 
 **All E22 stories (S22.1–S22.24) complete.**
 
+## S21.2 — VS Code extension: inline tool-token-budget CodeLens
+
+Started/done: 2026-07-12. The extension now annotates `mcp.config.jsonc` inline: a CodeLens above each
+server key shows that server's estimated tool-schema token cost (`~N tokens · ~M tools (approx)`), and
+a file-level CodeLens above the `servers` key shows the total across all servers — every lens opens
+`https://mcpfold.com/mcp-token-calculator`. This ties the editor to the calculator narrative and makes
+the context-window tax visible where config decisions are made.
+
+**Implementation.** New pure `src/tokenBudget.ts` — a faithful copy of the committed benchmark method
+(`apps/site/src/benchmark/model.ts`, itself the port of `packages/proxy/bench`): 1 token ≈ 4 chars of
+serialized JSON over a representative tool shape. A small comment/string-aware JSONC scanner tracks
+brace depth so only the direct keys of the top-level `servers` object count as servers (not inner
+`command`/`args`/`tags` keys, not a sibling `profiles`), returning each server with its 0-based key
+line for anchoring. Since real per-server tool counts aren't known until S21.4, it assumes a
+representative count (15, the published fixture average) and labels every figure approximate;
+`computeConfigBudget` takes an optional `toolCountFor` injector so S21.4 can supply real counts with no
+UI change. New `src/tokenBudgetLens.ts` renders the CodeLenses, registered only for the
+`**/mcp.config.{json,jsonc}` path selector (plus a filename guard) so no other file is ever annotated,
+and gated by the new `mcpfold.showTokenBudget` setting (default true, live-refreshed on toggle).
+
+**Tests.** New `test/tokenBudget.test.ts` (8 tests) asserts the estimator reproduces the benchmark
+model's per-server `tokensBefore` for every fixture server and shares its tokenizer; that the scanner
+finds exactly the servers under `servers` in document order, anchors each to its key line, totals them,
+honors an injected real count, and returns nothing for a config without a `servers` object. Wired the
+extension into the vitest workspace (new `vitest.config.ts` + `test` script) so `pnpm -r test` runs it.
+
+`verify_all` green — lint, typecheck, full suite (incl. the 8 new extension tests), and build; plus
+`format:check`. Two pre-existing local-only breakages were cleared in passing: stale `node_modules`
+(missing the `gsap` dep The Fold added, which failed `apps/site` typecheck) fixed by `pnpm install`,
+and a stale `packages/cli/dist` reporting the old `1.0.2` version fixed by rebuilding — neither was a
+source change.
+
+Follow-ups: exactness lands once **S21.4** provides collected `tools/list` counts (feed them through
+`toolCountFor`). Ordering note: S21.2's listed dependency S21.1 is `done` only in its code/harness form
+— the extension builds and the dev loop exists — while S21.1's _Marketplace publish_ + manual
+macOS/Windows GUI smoke remain external, human-in-the-loop steps (Azure DevOps PAT, `vsce publish`).
+S21.2's own deliverable is fully implemented and verified independent of that publish gate.
+
 ## S23.1 — core: audit-log usage analysis + curation recommendation (I/O-free)
 
 Started/done: 2026-07-13. E23 (curation intelligence) story 1. New pure module

@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 import { spawn } from 'node:child_process';
+import { MCP_CONFIG_SELECTOR, TokenBudgetLensProvider } from './tokenBudgetLens';
+import { CurationLensProvider } from './curationLens';
+import { parseCurateReport } from './curation';
 
 /**
  * mcpfold VS Code extension. A thin front-end over the mcpfold CLI — it never reimplements CLI logic,
@@ -12,6 +15,7 @@ const CALCULATOR_URL = 'https://mcpfold.com/mcp-token-calculator';
 
 let output: vscode.OutputChannel;
 let status: vscode.StatusBarItem;
+let curationLens: CurationLensProvider;
 /** True once we've fallen back to npx for this session (so we only tell the user once). */
 let usingNpxFallback = false;
 
@@ -35,11 +39,36 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.env.openExternal(vscode.Uri.parse(CALCULATOR_URL)),
   );
 
-  // Re-check sync state when a config file is saved (opt-out via setting).
+  // Curation (E23): a usage report, an apply-all, a per-server apply (invoked by the CodeLens),
+  // and a manual refresh of the cached report.
+  register('mcpfold.curate', () => runCommand('Curate', curateArgs()));
+  register('mcpfold.curateApply', () => void curateWriteFlow());
+  register(
+    'mcpfold.curateServer',
+    (name?: unknown) => void curateWriteFlow(typeof name === 'string' ? name : undefined),
+  );
+  register('mcpfold.refreshCuration', () => void refreshCuration());
+
+  // Re-check sync state and refresh the curation report when a config file is saved.
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
-      if (!getConfig().get<boolean>('checkDriftOnSave', true)) return;
-      if (/mcp\.config\.jsonc?$/.test(doc.fileName)) void refreshDrift();
+      if (!/mcp\.config\.jsonc?$/.test(doc.fileName)) return;
+      if (getConfig().get<boolean>('checkDriftOnSave', true)) void refreshDrift();
+      void refreshCuration();
+    }),
+  );
+
+  // Inline tool-token-budget CodeLens on MCP config files (S21.2).
+  const budgetLens = new TokenBudgetLensProvider();
+  // "Curate to usage" CodeLens driven by real recorded usage (E23).
+  curationLens = new CurationLensProvider();
+  context.subscriptions.push(
+    vscode.languages.registerCodeLensProvider(MCP_CONFIG_SELECTOR, budgetLens),
+    vscode.languages.registerCodeLensProvider(MCP_CONFIG_SELECTOR, curationLens),
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('mcpfold.showTokenBudget')) budgetLens.refresh();
+      if (e.affectsConfiguration('mcpfold.showCurateLens')) curationLens.refresh();
+      if (e.affectsConfiguration('mcpfold.auditLog')) void refreshCuration();
     }),
   );
 
@@ -47,8 +76,9 @@ export function activate(context: vscode.ExtensionContext): void {
   status.tooltip = 'mcpfold — click for actions';
   status.show();
 
-  // Kick off an initial, non-blocking drift check.
+  // Kick off an initial, non-blocking drift check and curation report.
   void refreshDrift();
+  void refreshCuration();
 }
 
 export function deactivate(): void {
@@ -153,6 +183,65 @@ async function runCommand(label: string, args: string[]): Promise<void> {
   }
 }
 
+/** Build a `curate` argv, honoring the optional `mcpfold.auditLog` setting and an optional server. */
+function curateArgs(server?: string, extra: string[] = []): string[] {
+  const auditLog = getConfig().get<string>('auditLog', '').trim();
+  const audit = auditLog ? ['--audit-log', auditLog] : [];
+  return ['curate', ...(server ? [server] : []), ...audit, ...extra];
+}
+
+/** Whether an audit log is discoverable (setting or inherited env), gating the background report. */
+function auditLogConfigured(): boolean {
+  return (
+    getConfig().get<string>('auditLog', '').trim() !== '' ||
+    typeof process.env.MCPFOLD_AUDIT_LOG === 'string'
+  );
+}
+
+/**
+ * Refresh the cached curation report by running `mcpfold curate --json` (read-only). Skips the CLI
+ * entirely when no audit log is configured, so the lens simply stays absent rather than churning the
+ * CLI or nagging. Any failure (CLI missing, too old to know `curate`, unreadable log) clears the
+ * report so no stale lenses linger.
+ */
+async function refreshCuration(): Promise<void> {
+  if (!curationLens) return;
+  if (!workspaceCwd() || !auditLogConfigured()) {
+    curationLens.setReport(null);
+    return;
+  }
+  try {
+    const { code, stdout } = await runCli([...curateArgs(), '--json'], false);
+    curationLens.setReport(code === 0 ? parseCurateReport(stdout) : null);
+  } catch {
+    curationLens.setReport(null);
+  }
+}
+
+/**
+ * Confirm and apply a curation recommendation — for one server (from the CodeLens) or all servers.
+ * Writing is guarded by a modal confirm since it rewrites the canonical config; on completion the
+ * cached report is refreshed so the lenses reflect the new state.
+ */
+async function curateWriteFlow(server?: string): Promise<void> {
+  if (!workspaceCwd()) {
+    void vscode.window.showWarningMessage('mcpfold: open a folder to run commands.');
+    return;
+  }
+  const target = server ? `"${server}"` : 'every server';
+  const choice = await vscode.window.showWarningMessage(
+    `Curate ${target} to your recorded tool usage? This rewrites the \`tools\` allow-list in mcp.config.jsonc.`,
+    { modal: true },
+    'Curate',
+  );
+  if (choice !== 'Curate') return;
+  await runCommand(
+    server ? `Curate ${server}` : 'Curate',
+    curateArgs(server, ['--write', '--yes']),
+  );
+  void refreshCuration();
+}
+
 /** Run `sync --check` (writing nothing) and reflect the result in the status bar. */
 async function refreshDrift(): Promise<void> {
   if (!workspaceCwd()) {
@@ -209,6 +298,11 @@ async function showMenu(): Promise<void> {
       command: 'mcpfold.import',
     },
     { label: '$(pulse) Doctor', description: 'mcpfold doctor', command: 'mcpfold.doctor' },
+    {
+      label: '$(sparkle) Curate tools to your usage',
+      description: 'mcpfold curate',
+      command: 'mcpfold.curate',
+    },
     { label: '$(new-file) Init a config', description: 'mcpfold init', command: 'mcpfold.init' },
     {
       label: '$(dashboard) Open the token calculator',
