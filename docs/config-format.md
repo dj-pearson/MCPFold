@@ -125,6 +125,35 @@ The context-window saver. Restrict a server to just the tools you use:
 proxy applies the filter at `tools/list` time, so the client only ever sees the curated
 set — see the [benchmark](./benchmark.md) for the ~80% token reduction this buys.
 
+### Recommending a tool list from usage (`mcpfold curate`)
+
+You don't have to guess which tools to allow. When a server runs through the proxy with an
+audit log enabled (`mcpfold run <server> --audit-log <path>`, or the `MCPFOLD_AUDIT_LOG`
+environment variable), every `tools/call` is recorded (redacted — names and argument _shapes_
+only, never values). `mcpfold curate` reads that log and reports, per server, which tools you
+actually use and the minimal `allow` list that would have covered them:
+
+```bash
+mcpfold curate                     # report every server with recorded usage
+mcpfold curate github              # just one server
+mcpfold curate --since 30 --min-calls 2   # last 30 days, ignore one-off calls
+mcpfold curate --json              # machine-readable envelope
+```
+
+Apply the recommendation straight to your canonical config (comments and formatting are
+preserved):
+
+```bash
+mcpfold curate --write             # diff, confirm, then update the `tools` directives
+mcpfold curate --write --yes       # skip the confirmation
+mcpfold curate --dry-run           # preview the diff and resulting file; write nothing
+```
+
+Only tools that were successfully invoked are recommended — a call that was _denied_ by an
+existing directive is never added back. Re-running `--write` with no change in usage is a
+no-op. When an audit log is configured, `mcpfold doctor` also nudges you toward `curate` for
+any server that has recorded usage but no `tools` directive yet.
+
 ## Profiles
 
 A profile decides which servers load into which client, at which scope. This is the

@@ -1805,3 +1805,31 @@ tree). Full core+cli suite green (345 passed); typecheck, lint, prettier clean.
 
 Follow-up: S23.3 adds `--write` (persist the recommended directive to mcp.config.jsonc), a doctor
 hint, and docs.
+
+## S23.3 — `mcpfold curate --write` — apply recommended allow-list to the canonical config
+
+Started/done: 2026-07-13. E23 story 3 (epic complete). `curate` can now persist the recommendation,
+turning "raw usage → committed allow-list" into one command.
+
+**What.** `runCurateApply` (dispatched from cli.ts on `--write`/`--apply` or the global `--dry-run`)
+computes the applicable servers (not already curated AND with ≥1 safely-used tool — an all-denied
+server yields an empty allow-list that would hide everything, so it's skipped), prints a per-server
+directive diff (`allow = [...]`, `+added`, `-removed`), and writes each recommended `{mode:'allow',
+list}` into `servers.<name>.tools` via jsonc-parser `modify`/`applyEdits` (comments + formatting
+preserved), re-validating with `loadConfig` before an `atomicWrite`. `--dry-run` shows the diff and
+resulting file but writes nothing; writing requires confirmation — `--yes`, an injected/TTY confirm,
+or it declines in a non-interactive context and says to re-run with `--yes`. Idempotent: a second
+`--write` with unchanged usage reports "already curated" and touches nothing.
+
+New `checkCurationOpportunity` doctor check (info severity, never breaks the exit code): when
+`MCPFOLD_AUDIT_LOG` is set and readable, any server with recorded usage but no `tools` directive gets
+an actionable `mcpfold curate <server>` hint. Silent when no log is configured.
+
+Docs: a "Recommending a tool list from usage" subsection in docs/config-format.md; changeset added
+(`@mcpfold/core` + `mcpfold` minor). Completions snapshots regenerated for the new `--write`/`--apply`
+flags. Verified end-to-end against the built binary: dry-run preview, `--write --yes` tightening
+(denied/unused tools dropped, comments kept), idempotent re-run, and the doctor hint. `verify_all`
+green — lint + core purity, typecheck across all packages, full test suite (16 curate tests among
+them), and build.
+
+**All E23 stories (S23.1–S23.3) complete.**

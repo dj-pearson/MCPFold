@@ -5,6 +5,7 @@ import { findConfigPath } from '../util/config.js';
 import { checkConfigValid } from '../checks/config.js';
 import { Redactor } from '../util/redact.js';
 import { checkClientFiles } from '../checks/clients.js';
+import { checkCurationOpportunity } from '../checks/curation.js';
 import {
   checkDeprecatedTransports,
   checkHardcodedSecrets,
@@ -65,6 +66,7 @@ export function runDoctor(options: DoctorOptions): CommandOutput<DoctorData> {
       findings.push(...checkHardcodedSecrets(config, configPath));
       findings.push(...checkSecretSchemes(config, configPath));
       findings.push(...checkNativeEnvFallback(config, configPath));
+      findings.push(...checkCurationOpportunity(config, configPath, ctx.env));
       findings.push(...checkClientFiles(config, ctx));
     }
   }

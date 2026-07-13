@@ -3,7 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { UsageError } from '@mcpfold/core';
-import { runCurate, resolveAuditLogPath } from '../src/commands/curate.js';
+import { loadConfig } from '@mcpfold/core';
+import { runCurate, runCurateApply, resolveAuditLogPath } from '../src/commands/curate.js';
+import { checkCurationOpportunity } from '../src/checks/curation.js';
 
 const CONFIG = `{
   "version": 1,
@@ -129,5 +131,105 @@ describe('runCurate (S23.2)', () => {
     expect(human).not.toMatch(/\u001b\[/);
     expect(human).toContain('github');
     expect(human).toContain('recommend allow');
+  });
+});
+
+describe('runCurateApply (S23.3)', () => {
+  const configPath = () => join(cwd, 'mcp.config.jsonc');
+
+  it('--write applies the recommended allow-list and preserves JSONC comments', async () => {
+    // Add a comment to prove the structural edit keeps it.
+    writeFileSync(configPath(), `// keep me\n${CONFIG}`);
+    const out = await runCurateApply({
+      cwd,
+      auditLogPath: logPath,
+      now: NOW,
+      write: true,
+      yes: true,
+    });
+    expect(out.exit).toBe(0);
+    const text = readFileSync(configPath(), 'utf8');
+    expect(text).toContain('// keep me'); // comment survived
+    const cfg = loadConfig(text);
+    expect(cfg.ok).toBe(true);
+    if (cfg.ok) {
+      // github allow-list tightened to actually-used tools; delete_repo (denied-only) dropped.
+      expect(cfg.config.servers.github!.tools).toEqual({
+        mode: 'allow',
+        list: ['create_pr', 'search_code'],
+      });
+      // supabase had no directive; it gains one for its used tool.
+      expect(cfg.config.servers.supabase!.tools).toEqual({ mode: 'allow', list: ['run_sql'] });
+    }
+  });
+
+  it('--dry-run shows the diff but leaves the file byte-identical', async () => {
+    const before = readFileSync(configPath(), 'utf8');
+    const out = await runCurateApply({ cwd, auditLogPath: logPath, now: NOW, dryRun: true });
+    expect(out.exit).toBe(0);
+    expect(out.human).toContain('allow');
+    expect(readFileSync(configPath(), 'utf8')).toBe(before);
+  });
+
+  it('non-interactive without --yes does not write', async () => {
+    const before = readFileSync(configPath(), 'utf8');
+    const out = await runCurateApply({
+      cwd,
+      auditLogPath: logPath,
+      now: NOW,
+      write: true,
+      isTTY: false,
+    });
+    expect(out.human).toMatch(/--yes/);
+    expect(readFileSync(configPath(), 'utf8')).toBe(before);
+  });
+
+  it('a declined confirmation does not write', async () => {
+    const before = readFileSync(configPath(), 'utf8');
+    await runCurateApply({
+      cwd,
+      auditLogPath: logPath,
+      now: NOW,
+      write: true,
+      isTTY: true,
+      confirm: () => Promise.resolve(false),
+    });
+    expect(readFileSync(configPath(), 'utf8')).toBe(before);
+  });
+
+  it('is idempotent — a second --write reports already-curated and does not rewrite', async () => {
+    await runCurateApply({ cwd, auditLogPath: logPath, now: NOW, write: true, yes: true });
+    const after1 = readFileSync(configPath(), 'utf8');
+    const out = await runCurateApply({
+      cwd,
+      auditLogPath: logPath,
+      now: NOW,
+      write: true,
+      yes: true,
+    });
+    expect(out.human).toMatch(/[Aa]lready curated/);
+    expect(readFileSync(configPath(), 'utf8')).toBe(after1); // unchanged second time
+  });
+});
+
+describe('checkCurationOpportunity (S23.3 doctor hint)', () => {
+  it('hints for a server with usage and no tools directive when the log env is set', () => {
+    const cfg = loadConfig(CONFIG);
+    expect(cfg.ok).toBe(true);
+    if (!cfg.ok) return;
+    const findings = checkCurationOpportunity(cfg.config, 'mcp.config.jsonc', {
+      MCPFOLD_AUDIT_LOG: logPath,
+    });
+    // supabase has recorded run_sql and no directive → hint. github already has a directive → none.
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.severity).toBe('info');
+    expect(findings[0]!.where).toBe('servers.supabase');
+    expect(findings[0]!.fix).toContain('mcpfold curate supabase');
+  });
+
+  it('is silent when no audit-log env is set', () => {
+    const cfg = loadConfig(CONFIG);
+    if (!cfg.ok) return;
+    expect(checkCurationOpportunity(cfg.config, 'mcp.config.jsonc', {})).toEqual([]);
   });
 });

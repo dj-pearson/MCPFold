@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { createInterface } from 'node:readline/promises';
+import { applyEdits, modify } from 'jsonc-parser';
 import {
   analyzeUsage,
+  loadConfig,
   parseAuditEvents,
   recommendDirective,
   usedTools,
@@ -9,7 +12,8 @@ import {
   type ServerUsage,
   type ToolsDirective,
 } from '@mcpfold/core';
-import { loadConfigFromDisk } from '../util/config.js';
+import { findConfigPath, loadConfigFromDisk } from '../util/config.js';
+import { atomicWrite } from '../io/atomic-write.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
 import { style, symbols } from '../util/style.js';
@@ -76,6 +80,16 @@ export interface CurateOptions {
   now?: () => number;
   /** Injectable env lookup for tests. */
   env?: NodeJS.ProcessEnv;
+  /** Persist the recommended directives to the canonical config (S23.3). */
+  write?: boolean;
+  /** Show the diff and the resulting file but write nothing. */
+  dryRun?: boolean;
+  /** Skip the interactive confirmation before writing. */
+  yes?: boolean;
+  /** Injectable confirmation for tests; defaults to a readline prompt when interactive. */
+  confirm?: () => Promise<boolean>;
+  /** Whether stdin is a TTY (drives whether to prompt). Defaults to `process.stdin.isTTY`. */
+  isTTY?: boolean;
 }
 
 /** Resolve the audit-log path from the flag or env, or throw a UsageError naming both. */
@@ -212,4 +226,115 @@ export function buildCurateData(opts: CurateOptions): CurateData {
 export function runCurate(opts: CurateOptions): CommandOutput<CurateData> {
   const data = buildCurateData(opts);
   return { data, human: renderHuman(data), exit: EXIT.SUCCESS };
+}
+
+/** A server whose directive the write path would change. */
+type Applicable = CurateServerReport;
+
+/**
+ * The servers `--write` would actually touch: those not already curated and with at least one
+ * safely-used tool. A server whose recorded calls were ALL denied yields an empty allow-list —
+ * writing that would hide every tool, the opposite of intent — so it is skipped, not applied.
+ */
+function applicableServers(data: CurateData): Applicable[] {
+  return data.servers.filter((s) => !s.alreadyCurated && s.recommended.list.length > 0);
+}
+
+/** One-line-per-server preview of the directive change the write would make. */
+function renderWriteDiff(servers: Applicable[]): string {
+  const lines: string[] = [];
+  for (const s of servers) {
+    lines.push(style.bold(s.server));
+    lines.push(`  ${style.cyan('allow')} = [${s.recommended.list.join(', ')}]`);
+    if (s.added.length > 0) lines.push(style.green(`  + ${s.added.join(', ')}`));
+    if (s.unusedAllowed.length > 0) lines.push(style.red(`  - ${s.unusedAllowed.join(', ')}`));
+  }
+  return lines.join('\n');
+}
+
+/** Apply each server's recommended `tools` directive to the raw JSONC text, preserving comments. */
+function applyDirectives(text: string, servers: Applicable[]): string {
+  let out = text;
+  for (const s of servers) {
+    const edits = modify(out, ['servers', s.server, 'tools'], s.recommended, {
+      formattingOptions: { insertSpaces: true, tabSize: 2 },
+    });
+    out = applyEdits(out, edits);
+  }
+  return out;
+}
+
+/** Ask for confirmation on a TTY; injectable for tests. */
+async function defaultConfirm(): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = (await rl.question('Apply these changes? [y/N] ')).trim().toLowerCase();
+    return answer === 'y' || answer === 'yes';
+  } finally {
+    rl.close();
+  }
+}
+
+/**
+ * `mcpfold curate --write` (S23.3) — persist the recommended allow-lists to the canonical config.
+ *
+ * Idempotent: with nothing to apply it reports "already curated" and exits 0. `--dry-run` shows the
+ * diff and the resulting file but writes nothing. Otherwise it writes only after confirmation —
+ * `--yes` (or an injected/TTY confirm); in a non-interactive context without `--yes` it prints the
+ * diff and declines to write. The JSONC edit preserves surrounding comments and formatting, and the
+ * result is re-validated before it touches disk.
+ */
+export async function runCurateApply(opts: CurateOptions): Promise<CommandOutput<CurateData>> {
+  const data = buildCurateData(opts);
+  const servers = applicableServers(data);
+
+  if (servers.length === 0) {
+    return {
+      data,
+      human: `${style.green(symbols.ok)} Already curated — nothing to apply.`,
+      exit: EXIT.SUCCESS,
+    };
+  }
+
+  const diff = renderWriteDiff(servers);
+  const configPath = findConfigPath(opts.cwd);
+  if (!configPath) throw new UsageError(`No mcp.config.jsonc found in ${opts.cwd}.`);
+  const text = readFileSync(configPath, 'utf8');
+
+  if (opts.dryRun) {
+    const newText = applyDirectives(text, servers);
+    return {
+      data,
+      human: `${diff}\n\n${style.dim(`(dry run — ${configPath} unchanged)`)}\n\n${newText}`,
+      exit: EXIT.SUCCESS,
+    };
+  }
+
+  const isTTY = opts.isTTY ?? Boolean(process.stdin.isTTY);
+  const confirm = opts.confirm ?? defaultConfirm;
+  const confirmed = opts.yes === true || (isTTY && (await confirm()));
+  if (!confirmed) {
+    const why = isTTY ? 'Not applied.' : 'Not applied (non-interactive).';
+    return {
+      data,
+      human: `${diff}\n\n${style.yellow(why)} Re-run with ${style.bold('--yes')} to write the changes.`,
+      exit: EXIT.SUCCESS,
+    };
+  }
+
+  const newText = applyDirectives(text, servers);
+  const revalidated = loadConfig(newText);
+  if (!revalidated.ok) {
+    throw new UsageError(
+      `Curating would make the config invalid: ${revalidated.errors[0]?.message ?? 'unknown error'}.`,
+    );
+  }
+  atomicWrite(configPath, newText);
+
+  const n = servers.length;
+  return {
+    data,
+    human: `${diff}\n\n${style.green(symbols.ok)} Curated ${n} server${n === 1 ? '' : 's'} in ${configPath}.\nRun \`mcpfold sync\` to fold the tighter tool-sets out to your clients.`,
+    exit: EXIT.SUCCESS,
+  };
 }
