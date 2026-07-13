@@ -2337,3 +2337,14 @@ a client file. Wired `secret extract` (+ --scheme/--key) into cli.ts with `parse
 tests + 2 parser tests. Verified end-to-end on the built binary (dotenv persist + comment preserved + 0
 value leakage). This is the command `doctor --fix` already points to for a hardcoded-secret finding, closing
 the guided loop. verify_all green (lint + typecheck + build + full 450-test suite).
+
+DONE S25.6 — docs + cross-OS e2e gate for the diagnose→repair loop. Added docs/config-assistance.md
+(the full doctor --fix + secret extract surface, incl. the honest "what it won't auto-fix" table) and
+linked it from docs/index.md. Added e2e/config-assistance.test.ts: one fixture with all three footguns
+(VS Code root-key trap, unpinned @latest, hardcoded token) driven through secret extract + doctor --fix,
+asserting the canonical config re-validates, is byte-stable (idempotent re-run + no home/abs paths → OS-
+independent), and leaks no secret value in the config or the folded client file. Runs in the @mcpfold/e2e
+suite on the existing cross-OS CI matrix. Reconciled AC[1] with the S25.1 reality: unpinned @latest is
+advisory (no deterministic autofix), so the fixture supplies a pin to reach a clean doctor. No changeset
+(docs + test only; the commands were already announced by the S25.2/S25.3 changesets). verify_all green
+across the whole workspace (core/adapters/proxy/cli/e2e).

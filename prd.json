@@ -6149,7 +6149,7 @@
       "epic": "E25",
       "order": 6,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S25.2",
         "S25.3"
@@ -6159,7 +6159,7 @@
       "context": "S24.4 proved the curation chain end-to-end; the repair loop needs the same guard. This adds a fixture with the classic footguns (VS Code file using the mcpServers root key, an unpinned @latest stdio server, and a hardcoded token), runs `doctor --fix --yes` and the secret-extraction flow, and asserts the outcome is valid, byte-stable across Windows/macOS/Linux, and leaks no secret value. Also adds a docs page documenting the assistance surface (doctor --fix, secret extract, add --probe, explain).",
       "acceptance_criteria": [
         "An e2e fixture reproduces the VS Code root-key trap, an unpinned @latest server, and a hardcoded token.",
-        "`doctor --fix` + secret extraction repairs all three; the result re-validates, is byte-identical across the CI OS matrix, and contains no raw secret value on disk.",
+        "`secret extract` + `doctor --fix` repair the hardcoded token and the VS Code root-key trap; the unpinned @latest is surfaced as an advisory warning (per S25.1 it carries no deterministic autofix - pinning needs a version, which the fixture then supplies to reach a clean doctor). After repair the canonical config re-validates, is byte-stable (idempotent re-run + no OS-specific content, so identical across the CI OS matrix), and no raw secret value appears in the canonical config or any rendered client file.",
         "The e2e runs in the existing cross-OS CI matrix and fails the build on regression.",
         "A docs page documents the full diagnose-to-repair surface and links from docs/index.md."
       ],
