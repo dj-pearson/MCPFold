@@ -1,0 +1,95 @@
+name: VS Code extension — publish
+
+# Publishes the mcpfold VS Code extension to the Visual Studio Marketplace (S21.1).
+#
+# INERT BY DEFAULT: it only runs on a `vscode-v*` tag (or a manual dispatch) AND only actually
+# publishes when a `VSCE_PAT` repository secret exists. Until you create the PearsonMedia publisher
+# and add that secret (see apps/vscode-extension/PUBLISHING.md §3), the job checks out, confirms the
+# gate is closed, and exits cleanly — it never fails a tag push and never publishes by surprise.
+#
+# To cut a release once the listing is live and the manual smoke test has passed on both OSes:
+#   1. bump `version` in apps/vscode-extension/package.json (+ a CHANGELOG.md entry)
+#   2. add the Azure DevOps PAT as the `VSCE_PAT` repo secret (Marketplace → Manage scope)
+#   3. git tag vscode-v<version> && git push origin vscode-v<version>
+# The tag version must match package.json, or the job fails before publishing.
+on:
+  push:
+    tags:
+      - 'vscode-v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Package only — do not publish even if VSCE_PAT is set'
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    name: publish to Marketplace
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Gate on the VSCE_PAT secret
+        id: gate
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::notice::VSCE_PAT secret is not set — the publish step is skipped (workflow is inert). Add it to enable Marketplace publishing; see apps/vscode-extension/PUBLISHING.md."
+            echo "have_pat=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_pat=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify the tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/vscode-v')
+        run: |
+          pkg=$(node -p "require('./apps/vscode-extension/package.json').version")
+          tag="${GITHUB_REF_NAME#vscode-v}"
+          echo "package.json=$pkg tag=$tag"
+          if [ "$pkg" != "$tag" ]; then
+            echo "::error::Tag vscode-v$tag does not match package.json version $pkg — bump the version to match before tagging."
+            exit 1
+          fi
+
+      # Always prove it still packages (mirrors the icon-size + build gates in vscode-extension.yml),
+      # so a tag push is validated even when the publish gate is closed.
+      - name: Guard the Marketplace icon size
+        run: |
+          icon="apps/vscode-extension/media/icon.png"
+          bytes=$(wc -c < "$icon")
+          if [ "$bytes" -gt 51200 ]; then
+            echo "::error file=$icon::icon.png is ${bytes} bytes (> 50 KB) — downsize it to ~128px before publishing."
+            exit 1
+          fi
+      - name: Typecheck + build + package (.vsix)
+        run: |
+          pnpm --filter mcpfold-vscode typecheck
+          pnpm --filter mcpfold-vscode build
+          pnpm --filter mcpfold-vscode package
+
+      - name: Publish to the Marketplace
+        if: steps.gate.outputs.have_pat == 'true' && !inputs.dry_run
+        working-directory: apps/vscode-extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        # --no-dependencies: this package has no runtime deps to bundle, and the monorepo's
+        # workspace symlinks would otherwise trip vsce (see PUBLISHING.md).
+        run: npx --yes @vscode/vsce publish --no-dependencies
+
+      - name: Upload the .vsix artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: mcpfold-vscode-vsix
+          path: apps/vscode-extension/*.vsix
+          if-no-files-found: error

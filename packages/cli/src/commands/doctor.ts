@@ -5,14 +5,19 @@ import { findConfigPath } from '../util/config.js';
 import { checkConfigValid } from '../checks/config.js';
 import { Redactor } from '../util/redact.js';
 import { checkClientFiles } from '../checks/clients.js';
-import { checkCurationOpportunity } from '../checks/curation.js';
+import {
+  checkAllowlistStaleness,
+  checkCurationInactive,
+  checkCurationOpportunity,
+  checkNoCurationConfigured,
+} from '../checks/curation.js';
+import { checkAuditTrail } from '../checks/audit.js';
 import {
   checkDeprecatedTransports,
   checkHardcodedSecrets,
   checkNativeEnvFallback,
   checkPinIntegrity,
   checkSecretSchemes,
-  checkUnenforcedToolsDirective,
   checkUnpinnedLatest,
 } from '../checks/servers.js';
 import type { Finding } from '../checks/types.js';
@@ -67,8 +72,11 @@ export function runDoctor(options: DoctorOptions): CommandOutput<DoctorData> {
       findings.push(...checkHardcodedSecrets(config, configPath));
       findings.push(...checkSecretSchemes(config, configPath));
       findings.push(...checkNativeEnvFallback(config, configPath));
-      findings.push(...checkUnenforcedToolsDirective(config, configPath));
       findings.push(...checkCurationOpportunity(config, configPath, ctx.env));
+      findings.push(...checkNoCurationConfigured(config, configPath));
+      findings.push(...checkCurationInactive(config, ctx));
+      findings.push(...checkAllowlistStaleness(config, configPath, ctx));
+      findings.push(...checkAuditTrail(config, ctx));
       findings.push(...checkClientFiles(config, ctx));
     }
   }

@@ -11,9 +11,18 @@ import {
 import type { SecretProvider } from '@mcpfold/secrets';
 import { runDiff } from './diff.js';
 import { runDoctor } from './doctor.js';
+import { summarizeCuration } from '../checks/curation.js';
+import { curatedServerSavings, renderServerSavingsLine } from '../discover/savings.js';
+import { staleAllowlists as computeStaleAllowlists } from '../discover/staleness.js';
 import { detectClients } from '../util/detect-clients.js';
 import { loadConfigFromDisk } from '../util/config.js';
-import { readAuditLogLines } from '../util/audit-log.js';
+import {
+  auditLogSizeBytes,
+  auditOptedOut,
+  defaultAuditLogPath,
+  readAuditLogLines,
+  resolveActiveAuditLog,
+} from '../util/audit-log.js';
 import { loadSession, osKeychainBackend, type KeychainBackend } from '../cloud/token-store.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
@@ -62,7 +71,30 @@ export interface StatusData {
   cloud: StatusCloud | null;
   /** S23.5: curation opportunity from recorded usage, or null when none/unavailable. */
   curation: StatusCuration | null;
+  /**
+   * S24.5: how many servers are curated vs. total. When `curatedServers` is 0 (and there is at least
+   * one server) the headline feature is entirely unused — status nudges toward curation, mirroring the
+   * doctor `info`. Null only when the config could not be read.
+   */
+  curationSummary: { totalServers: number; curatedServers: number } | null;
+  /**
+   * S24.9: measured per-server savings lines for curated servers that have a discovery snapshot —
+   * computed from the user's own config, never a fixture. Empty when nothing is curated or no
+   * snapshot exists yet.
+   */
+  savings: string[];
+  /** S24.8: where the local tool-call audit trail lives, its size, and whether it is enabled. */
+  audit: StatusAudit | null;
+  /** S24.11: per-server count of new upstream tools an allow-list predates (empty when none/unknown). */
+  staleAllowlists: { server: string; newTools: number }[];
   ok: boolean;
+}
+
+/** S24.8: the local audit trail's location and size, for the status disclosure line. */
+export interface StatusAudit {
+  path: string;
+  sizeBytes: number;
+  enabled: boolean;
 }
 
 export interface StatusOptions {
@@ -93,13 +125,14 @@ function identityOf(accessToken: string): string | undefined {
  * when no log is set, it is unreadable, or nothing is curatable — never a false nudge, never an error.
  */
 function computeCuration(cwd: string, env: NodeJS.ProcessEnv): StatusCuration | null {
-  const logPath = env.MCPFOLD_AUDIT_LOG;
-  if (!logPath || !existsSync(logPath)) return null;
   try {
+    const { config } = loadConfigFromDisk(cwd);
+    // S24.8: resolve the default audit path with zero flags (unless opted out).
+    const logPath = resolveActiveAuditLog({ config, env });
+    if (!logPath || !existsSync(logPath)) return null;
     const events = parseAuditEvents(readAuditLogLines(logPath));
     const byServer = analyzeUsage(events);
     if (byServer.size === 0) return null;
-    const { config } = loadConfigFromDisk(cwd);
 
     let curatableServers = 0;
     let trimmableTools = 0;
@@ -116,6 +149,14 @@ function computeCuration(cwd: string, env: NodeJS.ProcessEnv): StatusCuration | 
   } catch {
     return null;
   }
+}
+
+/** Human-readable byte size: `0` → "empty", `900` → "900 B", `2048` → "2.0 KB". */
+function formatBytes(n: number): string {
+  if (n === 0) return 'empty';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function renderHuman(data: StatusData): string {
@@ -159,6 +200,32 @@ function renderHuman(data: StatusData): string {
     lines.push(
       `${style.bold('Curation:')} ${style.yellow(`${n} server${n === 1 ? '' : 's'}`)} could be trimmed to your usage${trim} ${symbols.arrow} run \`mcpfold curate\``,
     );
+  } else if (data.curationSummary && data.curationSummary.curatedServers === 0 && data.curationSummary.totalServers > 0) {
+    // S24.5: no server is curated at all — the headline feature is unused. Mirror the doctor info.
+    const total = data.curationSummary.totalServers;
+    lines.push(
+      `${style.bold('Curation:')} ${style.yellow('none configured')} — all ${total} server${total === 1 ? '' : 's'} expose their full toolsets ${symbols.arrow} run \`mcpfold curate\``,
+    );
+  }
+  if (data.savings.length > 0) {
+    // S24.9: measured savings on the user's own config (only for curated servers with a snapshot).
+    lines.push(`${style.bold('Savings')} ${style.dim('(measured on your config):')}`);
+    for (const line of data.savings) lines.push(`  ${style.green(line)}`);
+  }
+  if (data.audit) {
+    // S24.8: disclose the local audit trail — names only, never leaves the machine.
+    const where = data.audit.enabled
+      ? `${data.audit.path} (${formatBytes(data.audit.sizeBytes)}, names only)`
+      : `disabled (${data.audit.path})`;
+    lines.push(`${style.bold('Audit:')} ${style.dim(where)}`);
+  }
+  if (data.staleAllowlists.length > 0) {
+    // S24.11: curated servers now exposing tools their allow-list predates.
+    for (const s of data.staleAllowlists) {
+      lines.push(
+        `${style.bold('New tools:')} ${style.yellow(`${s.server} has ${s.newTools} new tool${s.newTools === 1 ? '' : 's'}`)} its allow-list predates ${symbols.arrow} \`mcpfold curate ${s.server} --refresh\``,
+      );
+    }
   }
   lines.push('');
   lines.push(
@@ -211,7 +278,43 @@ export async function runStatus(options: StatusOptions): Promise<CommandOutput<S
   // S23.5: curation opportunity from recorded usage — informational, never affects the exit code.
   const curation = computeCuration(options.cwd, ctx.env);
 
+  // S24.5: how many servers are curated at all — surfaces "no curation configured" the same way doctor
+  // does. Best-effort: an unreadable/invalid config (already reported by doctor) just omits the line.
+  let curationSummary: StatusData['curationSummary'] = null;
+  let savings: string[] = [];
+  let audit: StatusAudit | null = null;
+  let staleAllowlists: StatusData['staleAllowlists'] = [];
+  try {
+    const cfg = loadConfigFromDisk(options.cwd).config;
+    curationSummary = summarizeCuration(cfg);
+    savings = curatedServerSavings(cfg.servers).map(renderServerSavingsLine);
+    // S24.11: allow-lists that predate new upstream tools.
+    staleAllowlists = computeStaleAllowlists(cfg, {
+      home: ctx.home,
+      platform: ctx.platform,
+      env: ctx.env,
+    }).map((s) => ({ server: s.server, newTools: s.newTools.length }));
+    // S24.8: disclose where the default-on audit trail lives and how big it is.
+    const path =
+      resolveActiveAuditLog({ config: cfg, env: ctx.env }) ??
+      defaultAuditLogPath(ctx.home, ctx.platform, ctx.env);
+    audit = { path, sizeBytes: auditLogSizeBytes(path), enabled: !auditOptedOut(cfg, ctx.env) };
+  } catch {
+    curationSummary = null;
+  }
+
   const ok = !diff.data.drift && health.errors === 0 && health.warnings === 0;
-  const data: StatusData = { clients, installedUnconfigured, health, cloud, curation, ok };
+  const data: StatusData = {
+    clients,
+    installedUnconfigured,
+    health,
+    cloud,
+    curation,
+    curationSummary,
+    savings,
+    audit,
+    staleAllowlists,
+    ok,
+  };
   return { data, human: renderHuman(data), exit: ok ? EXIT.SUCCESS : EXIT.DIFF };
 }

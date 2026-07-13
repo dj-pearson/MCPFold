@@ -24,6 +24,7 @@ import { atomicWrite } from '../io/atomic-write.js';
 import { backupIfExists } from '../io/backup.js';
 import { type FsWatcher, watchWithDebounce, type WatchHandle } from '../io/watch.js';
 import { renderWithStrategy } from '../sync/strategy.js';
+import { curatedServerSavings, renderServerSavingsLine } from '../discover/savings.js';
 import { diffRenderedSafe } from '../util/safe-diff.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
@@ -57,6 +58,12 @@ export interface SyncData {
   wrote: boolean;
   /** Org-policy violations (S18.3): servers a policy blocked, with rule + file provenance. */
   policyViolations?: { server: string; profile: string; reason: string; source: string }[];
+  /**
+   * Servers routed through the `mcpfold run` proxy because they carry a `tools` directive (S24.1) —
+   * tool curation only takes effect behind the proxy, so these fold to the shim regardless of
+   * whether they also carry secrets. Surfaced so a user can see their curation is actually active.
+   */
+  curated?: string[];
 }
 
 export interface SyncOptions {
@@ -193,12 +200,32 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
       results.filter((r) => r.action === 'written' && r.needsRestart).map((r) => r.client),
     ),
   ];
-  const human = renderHuman(results, { preview, drift, restartClients, policyViolations });
+  // Curation-shimmed servers (S24.1): any kept server with a `tools` directive folds to the proxy
+  // shim so its allow-list actually filters. Distinct from shimmed-for-secrets — reported so the
+  // user can confirm curation is live rather than silently inert.
+  const curated = [
+    ...new Set(
+      [...keptServers.values()].flat().filter((s) => s.tools).map((s) => s.name),
+    ),
+  ].sort();
+
+  // Honest savings (S24.9): measured per-server reduction for curated servers that have a discovery
+  // snapshot — computed from THIS config, never a fixture. Servers without a snapshot make no claim.
+  const savings = curatedServerSavings(config.servers).map(renderServerSavingsLine);
+
+  const human = renderHuman(results, {
+    preview,
+    drift,
+    restartClients,
+    policyViolations,
+    curated,
+    savings,
+  });
   // --check is the CI gate: fail on drift OR any org-policy violation. --dry-run always exits 0.
   const exit = options.check && (drift || policyViolations.length > 0) ? EXIT.DIFF : EXIT.SUCCESS;
 
   return {
-    data: { results, drift, wrote, policyViolations },
+    data: { results, drift, wrote, policyViolations, curated },
     human,
     warnings,
     exit,
@@ -212,6 +239,8 @@ function renderHuman(
     drift: boolean;
     restartClients: string[];
     policyViolations: { server: string; profile: string; reason: string; source: string }[];
+    curated: string[];
+    savings: string[];
   },
 ): string {
   if (results.length === 0) return 'No profiles to sync.';
@@ -235,6 +264,16 @@ function renderHuman(
     for (const v of meta.policyViolations) {
       footer.push(`  ✗ ${v.server} (profile "${v.profile}"): ${v.reason} [policy: ${v.source}]`);
     }
+  }
+  if (meta.curated.length > 0) {
+    footer.push(
+      '',
+      `Tool curation active (filtered via \`mcpfold run\` proxy): ${meta.curated.join(', ')}.`,
+    );
+  }
+  if (meta.savings.length > 0) {
+    footer.push('', 'Measured context savings (your config):');
+    for (const line of meta.savings) footer.push(`  ${line}`);
   }
   if (meta.preview) {
     footer.push(

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { track } from '../analytics';
 
 /** A copy-paste command block with a one-click copy button and accessible feedback (S13.3). */
 export function CopyBlock({ command, label }: { command: string; label?: string }) {
@@ -11,6 +12,8 @@ export function CopyBlock({ command, label }: { command: string; label?: string 
       // Clipboard may be unavailable (e.g. insecure context) — still show feedback so the user
       // knows to copy manually; the command text is selectable.
     }
+    // S21.5: the key mid-funnel signal — an install command was actually copied.
+    track('Install command copied', { command: label ?? command });
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }

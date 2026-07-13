@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { dirname } from 'node:path';
 import {
   MCP_REMOTE_SPEC,
   UsageError,
@@ -17,6 +18,7 @@ import {
 } from '@mcpfold/proxy';
 import { realOsContext, type OsContext } from '@mcpfold/adapters';
 import { loadConfigFromDisk } from '../util/config.js';
+import { resolveActiveAuditLog } from '../util/audit-log.js';
 import { checkServer, describeViolation, loadPolicy } from '../util/policy.js';
 import { fileTrustGate, isExecutable, type TrustGate } from '../trust/tofu.js';
 import { resolveCommand } from '../util/spawn.js';
@@ -100,9 +102,13 @@ const defaultProxySpawner: ProxySpawner = (command, args, env, tools, pinned, au
     });
   });
 
-/** True when a server should launch behind the tool-filtering proxy (S5.3). */
+/**
+ * True when a server should launch behind the tool-filtering proxy (S5.3). A `tools` directive routes
+ * ANY transport through the proxy now — stdio directly, and remote (http/sse) by composing the proxy
+ * over the mcp-remote bridge's stdio (S24.10). Curation is no longer stdio-only.
+ */
 export function shouldUseProxy(server: { transport: string; tools?: ToolsDirective }): boolean {
-  return server.transport === 'stdio' && server.tools !== undefined;
+  return server.tools !== undefined;
 }
 
 export interface RunOptions {
@@ -125,6 +131,13 @@ export interface RunOptions {
    * unset means auditing is off.
    */
   auditLogPath?: string;
+  /**
+   * Turn on the default-on local audit trail (S24.8): when no explicit path / MCPFOLD_AUDIT_LOG is
+   * set and the user hasn't opted out (env or `audit.enabled: false`), record to the per-user default
+   * path. The CLI entry point passes this; unit tests that call runRun directly omit it, so they keep
+   * the pre-S24.8 "audit only when a path is given" behavior.
+   */
+  defaultAudit?: boolean;
   /** OS context for org-policy discovery (S18.3); defaults to the real environment. */
   osContext?: OsContext;
 }
@@ -186,10 +199,16 @@ function remoteInvocation(server: ResolvedServer): { args: string[]; env: NodeJS
 }
 
 export async function runRun(options: RunOptions): Promise<number> {
-  const providers = options.providers ?? defaultProviders(options.cwd);
   const spawner = options.spawnFn ?? defaultSpawner;
 
-  const { config } = loadConfigFromDisk(options.cwd);
+  // Resolve the canonical config by walking up from cwd (S24.2): sync embeds `--cwd <configDir>`
+  // so the exact directory is searched first, but a bare shim (no `--cwd`) launched by a GUI client
+  // from an arbitrary cwd still finds the nearest config up-tree. Secrets (.env) and org policy
+  // resolve from the config's own directory, not the launch cwd.
+  const { path: configPath, config } = loadConfigFromDisk(options.cwd, { upward: true });
+  const configDir = dirname(configPath);
+  const providers = options.providers ?? defaultProviders(configDir);
+
   const server = config.servers[options.name];
   if (!server) {
     throw new UsageError(`No server "${options.name}" in the canonical config.`, {
@@ -200,7 +219,7 @@ export async function runRun(options: RunOptions): Promise<number> {
   // Org policy (S18.3): deny always wins over local trust — a denied server never launches,
   // regardless of TOFU approval. Evaluated before the trust gate so policy can't be bypassed.
   const policyCtx = options.osContext ?? realOsContext();
-  const violation = checkServer(loadPolicy(options.cwd, policyCtx), options.name, server);
+  const violation = checkServer(loadPolicy(configDir, policyCtx), options.name, server);
   if (violation) {
     throw new UsageError(`Refusing to run "${options.name}": ${violation.decision.reason}.`, {
       hint: `Org policy blocks this server — ${describeViolation(violation)}. Contact your platform team.`,
@@ -230,45 +249,47 @@ export async function runRun(options: RunOptions): Promise<number> {
   const [resolved] = await resolveSecrets([asResolved], { providers });
   const s = resolved!;
 
+  // Tool-definition pinning (S18.1) and audit (S18.4/S24.8) are transport-INDEPENDENT — compute once,
+  // so a curated/pinned/audited server is proxied whether it launches directly (stdio) or through the
+  // mcp-remote bridge (S24.10). The bridge child is itself stdio-facing, so the filtering proxy composes
+  // over it: proxy → mcp-remote → remote. Pinning verifies the live surface — warn by default, block
+  // with strictTools (the enforcement point for PROXIED servers; non-proxied get `mcpfold test`).
+  const trustedSurface = trust.trustedTools(options.name);
+  const warn = options.warn ?? ((line: string) => process.stderr.write(`${line}\n`));
+  const pinned: PinnedToolsOptions | undefined = trustedSurface && {
+    surface: trustedSurface.surface,
+    mode: options.strictTools ? 'block' : 'warn',
+    onDrift: (diff) => {
+      warn(`⚠ mcpfold: tool definitions for "${options.name}" changed since you trusted it:`);
+      warn(renderToolSurfaceDiff(diff));
+      warn(`  Review, then re-run \`mcpfold trust ${options.name} --tools\` to approve.`);
+    },
+  };
+
+  // Redacted tool-call audit log: an explicit --audit-log / MCPFOLD_AUDIT_LOG always wins; otherwise,
+  // when the CLI entry enables it (defaultAudit) and the user hasn't opted out, log to the default path.
+  const auditLogPath = options.defaultAudit
+    ? resolveActiveAuditLog({ explicit: options.auditLogPath, config, env: process.env })
+    : (options.auditLogPath ?? process.env.MCPFOLD_AUDIT_LOG);
+  const audit: AuditRecorder | undefined = auditLogPath
+    ? createAuditRecorder({ server: options.name, sink: fileAuditSink(auditLogPath, { warn }) })
+    : undefined;
+
+  const proxySpawner = options.proxySpawnFn ?? defaultProxySpawner;
+  // Route through the proxy when the server declares a `tools` directive, has a pinned surface, or
+  // auditing is on. With none of these, plain passthrough — no proxy overhead.
+  const needsProxy = Boolean(s.tools || pinned || audit);
+
   if (s.transport === 'stdio') {
     const args = applyPin(s.args, s.pin) ?? [];
     const env: NodeJS.ProcessEnv = { ...process.env, ...(s.env ?? {}) };
-
-    // Tool-definition pinning (S18.1): if this server's tool surface was pinned, verify it live at
-    // the proxy — warn by default, block with strictTools. This is the enforcement point for
-    // PROXIED stdio servers (non-proxied get the test-time check in `mcpfold test`).
-    const trustedSurface = trust.trustedTools(options.name);
-    const warn = options.warn ?? ((line: string) => process.stderr.write(`${line}\n`));
-    const pinned: PinnedToolsOptions | undefined = trustedSurface && {
-      surface: trustedSurface.surface,
-      mode: options.strictTools ? 'block' : 'warn',
-      onDrift: (diff) => {
-        warn(`⚠ mcpfold: tool definitions for "${options.name}" changed since you trusted it:`);
-        warn(renderToolSurfaceDiff(diff));
-        warn(`  Review, then re-run \`mcpfold trust ${options.name} --tools\` to approve.`);
-      },
-    };
-
-    // Redacted tool-call audit log (S18.4): opt-in via --audit-log / MCPFOLD_AUDIT_LOG. When on,
-    // route stdio through the proxy so calls are logged even without a tools directive.
-    const auditLogPath = options.auditLogPath ?? process.env.MCPFOLD_AUDIT_LOG;
-    const audit: AuditRecorder | undefined = auditLogPath
-      ? createAuditRecorder({
-          server: options.name,
-          sink: fileAuditSink(auditLogPath, { warn }),
-        })
-      : undefined;
-
-    // S5.3: when the server declares a `tools` directive, has a pinned surface, or auditing is on,
-    // route stdio through the proxy. With none of these, plain passthrough — no proxy overhead.
-    if (s.tools || pinned || audit) {
-      const proxySpawner = options.proxySpawnFn ?? defaultProxySpawner;
-      return proxySpawner(s.command ?? '', args, env, s.tools, pinned, audit);
-    }
-    return spawner(s.command ?? '', args, env);
+    return needsProxy
+      ? proxySpawner(s.command ?? '', args, env, s.tools, pinned, audit)
+      : spawner(s.command ?? '', args, env);
   }
-  // http / sse (S17.2): prefer a direct connection where the CLI can; today it can't, so fall back
-  // to the pinned mcp-remote bridge. Resolved auth values travel via env (S16.4), never argv.
+  // http / sse (S17.2 + S24.10): prefer a direct connection where the CLI can; today it can't, so fall
+  // back to the pinned mcp-remote bridge and — when curation/audit/pinning apply — wrap the bridge's
+  // stdio in the filtering proxy. Resolved auth values travel via env (S16.4), never argv.
   const plan = planRemoteRun(s);
   if (plan.mode === 'direct') {
     // Reserved for a future native transport; no code path reaches here yet (see planRemoteRun).
@@ -277,5 +298,8 @@ export async function runRun(options: RunOptions): Promise<number> {
     });
   }
   const remote = remoteInvocation(s);
-  return spawner('npx', remote.args, { ...process.env, ...remote.env });
+  const remoteEnv = { ...process.env, ...remote.env };
+  return needsProxy
+    ? proxySpawner('npx', remote.args, remoteEnv, s.tools, pinned, audit)
+    : spawner('npx', remote.args, remoteEnv);
 }

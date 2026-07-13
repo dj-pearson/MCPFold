@@ -89,9 +89,21 @@ PR that bumps the version. A config workspace must be open for the commands to d
 
 ### Optional CI publish
 
-`vsce publish` can run from CI on a tag, gated on a `VSCE_PAT` repo secret. Keep it manual until
-the listing is live and the smoke test has passed on both OSes at least once — an automated first
-publish can't run the manual host checks that are the whole point of the release gate.
+`.github/workflows/vscode-extension-publish.yml` can publish from CI, but it is **inert by default**:
+it only runs on a `vscode-v*` tag (or a manual `workflow_dispatch`), and it only publishes when a
+`VSCE_PAT` repo secret exists. With no secret it checks out, builds, packages, uploads the `.vsix`
+artifact, and exits cleanly — it never fails a tag push and never publishes by surprise. It also fails
+fast if the tag version doesn't match `package.json`.
+
+**Enable it — but only after the first manual publish.** An automated first publish can't run the
+manual host checks that are the whole point of the release gate, so create the publisher and publish
+once by hand (above), then:
+
+1. Add the Azure DevOps PAT as the repo secret **`VSCE_PAT`** (Settings → Secrets and variables →
+   Actions). Scope: **Marketplace → Manage**, as in the one-time setup.
+2. To release: bump `version` (+ `CHANGELOG.md`), run the smoke checklist if `src/` changed, then
+   `git tag vscode-v<version> && git push origin vscode-v<version>`.
+3. `workflow_dispatch` with `dry_run: true` packages without publishing, to rehearse the pipeline.
 
 ## 4. CI
 

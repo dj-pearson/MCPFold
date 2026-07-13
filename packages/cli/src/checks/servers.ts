@@ -1,6 +1,5 @@
 import { findSecretRefs, isSecretRef, type Config } from '@mcpfold/core';
 import { parseIntegrity } from '../trust/integrity.js';
-import { shouldUseProxy } from '../commands/run.js';
 import type { Finding } from './types.js';
 
 /**
@@ -106,29 +105,6 @@ export function checkSecretSchemes(config: Config, file: string): Finding[] {
         });
       }
     }
-  }
-  return findings;
-}
-
-/**
- * Tool-curation enforcement gap. A `tools` directive is applied by the `mcpfold run` proxy
- * (S5.3), which `sync` routes every tools-bearing server through — but the proxy only wraps
- * stdio launches ({@link shouldUseProxy}). A remote (streamable-http/sse) server bridges via
- * mcp-remote with no curating proxy in between, so its directive is silently unenforced and
- * every tool the server exposes still loads.
- */
-export function checkUnenforcedToolsDirective(config: Config, file: string): Finding[] {
-  const findings: Finding[] = [];
-  for (const [name, server] of Object.entries(config.servers)) {
-    if (!server.tools) continue;
-    if (shouldUseProxy(server)) continue;
-    findings.push({
-      severity: 'warning',
-      file,
-      where: `servers.${name}.tools`,
-      message: `Server "${name}" has a tools directive, but ${server.transport} servers don't run behind the curating proxy — the directive has no effect and every tool loads.`,
-      fix: 'Tool curation currently applies to stdio servers only. Remove the "tools" block, or switch the server to a stdio launch so mcpfold can proxy it.',
-    });
   }
   return findings;
 }

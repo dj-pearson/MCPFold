@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { ConfigValidationError, loadConfig, UsageError, type Config } from '@mcpfold/core';
 
 /**
@@ -24,17 +24,58 @@ export function findConfigPath(cwd: string): string | null {
   return null;
 }
 
+/** The directories an upward search from `startDir` visits, nearest first up to the fs root. */
+export function upwardSearchDirs(startDir: string): string[] {
+  const dirs: string[] = [];
+  let dir = startDir;
+  // dirname('/') === '/' and dirname('C:\\') === 'C:\\' — the fixed point marks the root.
+  for (;;) {
+    dirs.push(dir);
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return dirs;
+}
+
+/**
+ * Walk up from `startDir` to the filesystem root, returning the NEAREST canonical config. GUI
+ * clients (Claude Desktop et al.) launch `mcpfold run` from an arbitrary cwd; sync embeds
+ * `--cwd <configDir>` so the exact directory is searched first, but a pre-existing bare shim
+ * (no `--cwd`) still resolves by walking up from wherever the client happened to launch it.
+ */
+export function findConfigPathUpward(startDir: string): string | null {
+  for (const dir of upwardSearchDirs(startDir)) {
+    const found = findConfigPath(dir);
+    if (found) return found;
+  }
+  return null;
+}
+
 export interface LoadedConfig {
   path: string;
   config: Config;
 }
 
+export interface LoadConfigOptions {
+  /**
+   * Walk up from `cwd` to the filesystem root, using the nearest config found. Used by
+   * `mcpfold run` so a folded shim launched from an arbitrary cwd (GUI clients) still resolves
+   * the canonical config even without an embedded `--cwd`. Off by default: other commands act on
+   * the config in the current directory only.
+   */
+  upward?: boolean;
+}
+
 /** Load + validate the config in `cwd`, throwing coded errors the CLI turns into output. */
-export function loadConfigFromDisk(cwd: string): LoadedConfig {
-  const path = findConfigPath(cwd);
+export function loadConfigFromDisk(cwd: string, opts: LoadConfigOptions = {}): LoadedConfig {
+  const path = opts.upward ? findConfigPathUpward(cwd) : findConfigPath(cwd);
   if (!path) {
-    throw new UsageError(`No ${CONFIG_FILENAMES[0]} found in ${cwd}.`, {
-      hint: 'Run `mcpfold init` to scaffold one, or pass --cwd to point at your config.',
+    const searched = opts.upward
+      ? `Searched: ${upwardSearchDirs(cwd).join(', ')}.`
+      : `Searched: ${cwd}.`;
+    throw new UsageError(`No ${CONFIG_FILENAMES[0]} found. ${searched}`, {
+      hint: 'Run `mcpfold init` to scaffold one, or pass --cwd to point at your config directory.',
     });
   }
   const result = loadConfig(readFileSync(path, 'utf8'));

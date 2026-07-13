@@ -50,7 +50,33 @@ describe('runGuided (S10.3)', () => {
     // It folded out to the client.
     expect(existsSync(cursorFile())).toBe(true);
     expect(result.synced).toBe(true);
-    expect(writes.some((l) => l.includes('~80%'))).toBe(true);
+    // S24.9: with nothing curated, the flow says so honestly instead of quoting the fixture as "typical
+    // savings"; the ~80% figure appears only labeled as the benchmark.
+    expect(writes.some((l) => l.includes('No curation active'))).toBe(true);
+    expect(writes.some((l) => l.includes('benchmark') && l.includes('~80%'))).toBe(true);
+    expect(writes.some((l) => l.includes('Typical context savings'))).toBe(false);
+  });
+
+  it('offers the day-zero curation step for uncurated stdio servers (S24.7)', async () => {
+    writeFileSync(configPath, CONFIG_WITH_FOOTGUN);
+    const writes: string[] = [];
+    // Say yes to everything, including the trailing (skippable) curation step.
+    await runGuided(
+      { cwd, osContext: ctx },
+      { prompt: scriptedPrompter(Array(8).fill(true)), write: (l) => writes.push(l) },
+    );
+    // The uncurated stdio server "gh" is offered to the `curate` picker.
+    expect(writes.some((l) => l.includes('mcpfold curate gh'))).toBe(true);
+  });
+
+  it('does NOT offer curation when the step is declined (skippable, never blocks)', async () => {
+    writeFileSync(configPath, CONFIG_WITH_FOOTGUN);
+    const writes: string[] = [];
+    // Accept every step EXCEPT the curation one — proving it is genuinely skippable.
+    const prompt = { confirm: (q: string) => Promise.resolve(!q.includes('Curate your servers')) };
+    const result = await runGuided({ cwd, osContext: ctx }, { prompt, write: (l) => writes.push(l) });
+    expect(result.aborted).toBe(false);
+    expect(writes.some((l) => l.includes('mcpfold curate gh'))).toBe(false);
   });
 
   it('aborts cleanly with no partial writes when overwrite is declined', async () => {
