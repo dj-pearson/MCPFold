@@ -71,6 +71,53 @@ describe('renderWithStrategy — shim (S4.6)', () => {
   });
 });
 
+describe('renderWithStrategy — tools directive forces the shim (S5.3)', () => {
+  const curated: ResolvedServer = {
+    ...plainStdio,
+    tools: { mode: 'allow', list: ['browser_click', 'browser_snapshot'] },
+  };
+
+  it('shims a secret-less server that carries a tools directive', async () => {
+    const file = await renderWithStrategy(cursorAdapter, [curated], { osContext: ctx });
+    const parsed = JSON.parse(file.contents);
+    expect(parsed.mcpServers.playwright).toEqual({
+      command: 'mcpfold',
+      args: ['run', 'playwright'],
+    });
+    // The real launch never reaches the client file — curation happens inside `mcpfold run`.
+    expect(file.contents).not.toContain('@playwright/mcp');
+    expect(file.contents).not.toContain('"tools"');
+  });
+
+  it('shims a tools-bearing server on a native-input adapter too', async () => {
+    const file = await renderWithStrategy(vscodeAdapter, [{ ...curated, client: 'vscode' }], {
+      osContext: ctx,
+    });
+    const parsed = JSON.parse(file.contents);
+    expect(parsed.servers.playwright.command).toBe('mcpfold');
+    expect(parsed.servers.playwright.args).toEqual(['run', 'playwright']);
+  });
+
+  it('honors an explicit secretStrategy "shim" even with zero secret refs', async () => {
+    const file = await renderWithStrategy(
+      cursorAdapter,
+      [{ ...plainStdio, secretStrategy: 'shim' }],
+      { osContext: ctx },
+    );
+    expect(JSON.parse(file.contents).mcpServers.playwright).toEqual({
+      command: 'mcpfold',
+      args: ['run', 'playwright'],
+    });
+  });
+
+  it('still renders a server with no tools and no secret directly', async () => {
+    const file = await renderWithStrategy(cursorAdapter, [plainStdio], { osContext: ctx });
+    const parsed = JSON.parse(file.contents);
+    expect(parsed.mcpServers.playwright.command).toBe('npx');
+    expect(parsed.mcpServers.playwright.args).toEqual(['-y', '@playwright/mcp@latest']);
+  });
+});
+
 describe('renderWithStrategy — pin at fold time (S8.3)', () => {
   const pinned: ResolvedServer = { ...plainStdio, pin: '1.4.2' };
 

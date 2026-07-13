@@ -70,6 +70,23 @@ describe('runDoctor (S3.7)', () => {
     expect(result.data.findings.some((f) => f.where?.includes('envsrv'))).toBe(false);
   });
 
+  it('warns when a remote server carries a tools directive (proxy curates stdio only)', () => {
+    write(`{
+      "version": 2,
+      "servers": {
+        "gh": { "transport": "streamable-http", "url": "https://x/mcp", "tools": { "mode": "allow", "list": ["search_code"] }, "tags": ["t"] },
+        "pw": { "transport": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@1.4.2"], "tools": { "mode": "allow", "list": ["browser_click"] }, "tags": ["t"] }
+      },
+      "profiles": { "cursor": { "client": "cursor", "scope": "user", "include": ["t"] } }
+    }`);
+    const result = runDoctor({ cwd, osContext: ctx });
+    const f = result.data.findings.find((x) => x.where === 'servers.gh.tools');
+    expect(f?.severity).toBe('warning');
+    expect(f?.message).toContain('proxy');
+    // The stdio server's directive IS enforced (sync shims it through `mcpfold run`) — no finding.
+    expect(result.data.findings.some((x) => x.where === 'servers.pw.tools')).toBe(false);
+  });
+
   it('reports pathed errors for an invalid config (exit 2)', () => {
     // An invalid transport → a real schema error (v2 accepts stdio/streamable-http/sse only).
     write(

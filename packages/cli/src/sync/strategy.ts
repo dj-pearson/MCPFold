@@ -132,9 +132,14 @@ function transformSecret(
   profileOverride: SecretStrategy | undefined,
   configDir: string | undefined,
 ): ResolvedServer {
+  const explicit = server.secretStrategy ?? profileOverride;
   const refs = findSecretRefs(server);
-  if (refs.length === 0) return server;
-  const want = server.secretStrategy ?? profileOverride ?? adapter.secretStrategy;
+  if (refs.length === 0) {
+    // No secret to protect — but an explicit `shim` opt-in is a routing choice, not a secrets
+    // feature: honor it so `secretStrategy: "shim"` reliably means "launch via mcpfold run".
+    return explicit === 'shim' ? toShim(server, configDir) : server;
+  }
+  const want = explicit ?? adapter.secretStrategy;
   if (want === 'native-env' && adapter.envInterpolation && refs.every((r) => r.scheme === 'env')) {
     return toNativeEnv(server, adapter.envInterpolation);
   }
@@ -168,7 +173,8 @@ export class InlineNotIgnoredError extends Error {
 /**
  * Render `servers` through an adapter, honoring its secret strategy. Returns the native
  * file with no raw secret for `shim`/`native-input`; for `inline` it resolves values and
- * gates on gitignore.
+ * gates on gitignore. A server carrying a `tools` directive is always rewritten to the
+ * shim first — tool curation only happens inside the `mcpfold run` proxy.
  */
 export async function renderWithStrategy(
   adapter: ClientAdapter,
@@ -177,7 +183,13 @@ export async function renderWithStrategy(
 ): Promise<RenderedFile> {
   const ctx = options.osContext ?? realOsContext();
   // Pin @latest → the fixed version at fold time, before any strategy transform.
-  const pinned = servers.map(applyPinAtFold);
+  // A `tools` directive only takes effect behind the `mcpfold run` proxy (S5.3) — no client file
+  // can carry it (adapters have no field to emit it into). Shim tools-bearing servers under EVERY
+  // strategy (native-input and inline included), or the directive is silently dropped. `configDir`
+  // is threaded through so the shim still resolves the canonical config from any launch cwd.
+  const pinned = servers
+    .map(applyPinAtFold)
+    .map((s) => (s.tools ? toShim(s, options.configDir) : s));
 
   if (adapter.secretStrategy === 'native-input') {
     // The adapter itself emits the client's secret indirection — never a raw token. Intrinsic; not
