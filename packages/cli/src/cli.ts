@@ -8,6 +8,7 @@ import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
 import { runScan } from './commands/scan.js';
 import { runStatus } from './commands/status.js';
+import { runCurate, runCurateApply } from './commands/curate.js';
 import { runInfo } from './commands/info.js';
 import { runUpdate } from './commands/update.js';
 import { runTest } from './commands/test.js';
@@ -311,6 +312,52 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
     const ctx = resolve(opts);
     setExit(await runCommand('status', ctx.json, () => runStatus({ cwd: ctx.cwd }), writer));
   });
+
+  addGlobalFlags(
+    program
+      .command('curate')
+      .description('recommend a per-server allow-list from recorded proxy tool usage (S23)')
+      .argument('[server]', 'a single server to report on; omit for all')
+      .option('--audit-log <path>', 'audit log to read (overrides MCPFOLD_AUDIT_LOG)')
+      .option('--since <days>', 'only count calls within the last N days')
+      .option('--min-calls <n>', 'ignore tools called fewer than N times')
+      .option('--write', 'apply the recommended allow-lists to the canonical config')
+      .option('--apply', 'alias for --write')
+      .option('-y, --yes', 'skip the confirmation prompt when writing'),
+  ).action(
+    async (
+      server: string | undefined,
+      opts: GlobalFlags & {
+        auditLog?: string;
+        since?: string;
+        minCalls?: string;
+        write?: boolean;
+        apply?: boolean;
+        yes?: boolean;
+      },
+    ) => {
+      const ctx = resolve(opts);
+      const curateOpts = {
+        cwd: ctx.cwd,
+        server,
+        auditLogPath: opts.auditLog,
+        sinceDays: parseIntFlag('--since', opts.since),
+        minCalls: parseIntFlag('--min-calls', opts.minCalls),
+      };
+      const write = Boolean(opts.write || opts.apply);
+      setExit(
+        await runCommand(
+          'curate',
+          ctx.json,
+          () =>
+            write || ctx.dryRun
+              ? runCurateApply({ ...curateOpts, write: true, dryRun: ctx.dryRun, yes: opts.yes })
+              : runCurate(curateOpts),
+          writer,
+        ),
+      );
+    },
+  );
 
   addGlobalFlags(
     program

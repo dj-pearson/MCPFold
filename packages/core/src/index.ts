@@ -160,3 +160,20 @@ export {
   type ServerDiff,
   type ServerDiffStatus,
 } from './diff.js';
+
+// Curation intelligence (S23.1)
+export {
+  analyzeUsage,
+  parseAuditEvents,
+  recommendDirective,
+  usedTools,
+  type AnalyzeOptions,
+  type AuditEventLike,
+  type AuditOutcome,
+  type DirectiveDiff,
+  type DirectiveRecommendation,
+  type OutcomeCounts,
+  type RecommendInput,
+  type ServerUsage,
+  type ToolUsage,
+} from './curate.js';

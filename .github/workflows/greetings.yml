@@ -18,12 +18,12 @@ jobs:
     steps:
       - uses: actions/first-interaction@v3
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: >
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: >
             👋 Thanks for opening your first issue in mcpfold! A maintainer will take
             a look soon. If this is a security report, please close it and use the
             private path in SECURITY.md instead.
-          pr-message: >
+          pr_message: >
             🎉 Thanks for your first pull request to mcpfold! A couple of things that
             help it land fast:
 

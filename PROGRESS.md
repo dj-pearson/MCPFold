@@ -1791,3 +1791,125 @@ Follow-ups: exactness lands once **S21.4** provides collected `tools/list` count
 — the extension builds and the dev loop exists — while S21.1's _Marketplace publish_ + manual
 macOS/Windows GUI smoke remain external, human-in-the-loop steps (Azure DevOps PAT, `vsce publish`).
 S21.2's own deliverable is fully implemented and verified independent of that publish gate.
+
+## S23.1 — core: audit-log usage analysis + curation recommendation (I/O-free)
+
+Started/done: 2026-07-13. E23 (curation intelligence) story 1. New pure module
+`packages/core/src/curate.ts` closes the loop on the token-tax metric: the proxy already records
+every `tools/call` in the redacted S18.4 audit log, but nothing consumed it, so the headline
+`tools: {mode: allow, list}` directive still had to be hand-authored.
+
+**What.** `parseAuditEvents(lines)` tolerantly parses the redacted JSONL (skips blank/malformed/
+non-object lines and events missing `server`/`type`). `analyzeUsage(events, {sinceMs?, minCalls?})`
+groups by server → tool with `{calls, outcomes:{ok,error,denied}, lastTs}`, ignoring non-`tools/call`
+events, filtering by an epoch-ms `sinceMs` (core stays clock-free — the CLI resolves `--since <days>`),
+and dropping sub-`minCalls` tools after aggregation. `usedTools(usage)` returns the sorted ok/error
+tools (denied-only excluded — those were blocked, not used). `recommendDirective({used, current?,
+knownTools?})` produces `{mode:'allow', list}` (sorted, deduped), a diff `{added, removed, unchanged}`
+against the current directive's effective visible surface (allow-list, or used∪known minus deny-list),
+an `unchanged` flag, and `unusedKnown` when `knownTools` is supplied.
+
+Pure — no `node:fs`/`node:os`/net imports (core-purity gate green). Exported from
+`packages/core/src/index.ts`. Tests (`packages/core/test/curate.test.ts`, 12): malformed-line
+tolerance, since/min-calls filtering, per-outcome tally + last-seen, denied-only exclusion, sorted/
+deduped recommendation, add/remove/unchanged diff, and unusedKnown. Typecheck, lint, prettier, and
+`@mcpfold/core` build all green.
+
+Follow-ups: S23.2 wires this into `mcpfold curate` (read the log at the CLI edge, render a report);
+S23.3 adds `--write` to persist the recommended directive.
+
+## S23.2 — CLI `mcpfold curate [server]` — read-only usage report
+
+Started/done: 2026-07-13. E23 story 2. New `packages/cli/src/commands/curate.ts` + registration in
+`cli.ts`, sitting on the S23.1 core engine. Reads the redacted proxy audit log and reports, per
+server, which tools were actually used and the minimal `allow` list that would have covered them —
+the missing consumer of the S18.4 log.
+
+**What.** `resolveAuditLogPath` takes `--audit-log` then `MCPFOLD_AUDIT_LOG`, else throws a
+UsageError naming both and pointing at `mcpfold run --audit-log`. `buildCurateData` reads the JSONL
+(via the CLI fs boundary), loads the canonical config for each server's current `tools` directive
+(an allow-directive's own list becomes `knownTools`, so "allowed but never used" is meaningful),
+resolves `--since <days>` into an epoch cutoff at the CLI edge (core stays clock-free), applies
+`--min-calls <n>` (both parseIntFlag-validated), and supports an optional positional `<server>`
+filter. Human output lists tools most-used-first with call counts and error/denied tails, the
+allowed-but-unused set, and the recommended allow-list; `--json` emits the stable envelope with no
+ANSI. Read-only — exits 0 even when a server has zero calls; non-zero only on usage/IO errors.
+
+Verified end-to-end against the built binary (human + `--json` + missing-log exit 2). Tests
+(`packages/cli/test/curate.test.ts`, 9): flag/env resolution, per-server report + read-only config
+invariant, server filter, since/min-calls filtering, missing-log and no-source UsageErrors, empty
+report exit 0, and no-ANSI output. Completions snapshots regenerated (new `curate` command in the
+tree). Full core+cli suite green (345 passed); typecheck, lint, prettier clean.
+
+Follow-up: S23.3 adds `--write` (persist the recommended directive to mcp.config.jsonc), a doctor
+hint, and docs.
+
+## S23.3 — `mcpfold curate --write` — apply recommended allow-list to the canonical config
+
+Started/done: 2026-07-13. E23 story 3 (epic complete). `curate` can now persist the recommendation,
+turning "raw usage → committed allow-list" into one command.
+
+**What.** `runCurateApply` (dispatched from cli.ts on `--write`/`--apply` or the global `--dry-run`)
+computes the applicable servers (not already curated AND with ≥1 safely-used tool — an all-denied
+server yields an empty allow-list that would hide everything, so it's skipped), prints a per-server
+directive diff (`allow = [...]`, `+added`, `-removed`), and writes each recommended `{mode:'allow',
+list}` into `servers.<name>.tools` via jsonc-parser `modify`/`applyEdits` (comments + formatting
+preserved), re-validating with `loadConfig` before an `atomicWrite`. `--dry-run` shows the diff and
+resulting file but writes nothing; writing requires confirmation — `--yes`, an injected/TTY confirm,
+or it declines in a non-interactive context and says to re-run with `--yes`. Idempotent: a second
+`--write` with unchanged usage reports "already curated" and touches nothing.
+
+New `checkCurationOpportunity` doctor check (info severity, never breaks the exit code): when
+`MCPFOLD_AUDIT_LOG` is set and readable, any server with recorded usage but no `tools` directive gets
+an actionable `mcpfold curate <server>` hint. Silent when no log is configured.
+
+Docs: a "Recommending a tool list from usage" subsection in docs/config-format.md; changeset added
+(`@mcpfold/core` + `mcpfold` minor). Completions snapshots regenerated for the new `--write`/`--apply`
+flags. Verified end-to-end against the built binary: dry-run preview, `--write --yes` tightening
+(denied/unused tools dropped, comments kept), idempotent re-run, and the doctor hint. `verify_all`
+green — lint + core purity, typecheck across all packages, full test suite (16 curate tests among
+them), and build.
+
+**All E23 stories (S23.1–S23.3) complete.**
+
+## S23.4 — curate reads rotated audit logs (full-history correctness)
+
+Started/done: 2026-07-13. E23 story 4. Closes a correctness gap in S23.2/S23.3: the audit sink
+(S18.4/S22.24) rotates at maxBytes to a unique sibling `${path}.<pid>.<seq>.<rand>` and starts a
+fresh primary, but curate read only the primary — so after any rotation the recommendation came from
+a partial history, and `curate --write` could drop a still-used tool (a real footgun).
+
+**What.** New shared reader `packages/cli/src/util/audit-log.ts` `readAuditLogLines(primaryPath)`:
+lists the log's directory, matches the primary basename plus rotated siblings (name === basename OR
+startsWith(basename + '.') — scoped to THIS log, never unrelated files), reads each best-effort
+(a sibling removed/unreadable between scan and read is skipped), and returns the combined lines.
+Aggregation downstream is order-independent (counts sum, lastTs takes max), so read order is
+irrelevant. Wired into both `buildCurateData` (curate) and `checkCurationOpportunity` (the doctor
+hint) so the report and the hint always agree on the full history.
+
+Verified end-to-end: a `create_pr` living only in a rotated sibling now appears in the recommendation
+alongside the active log's `search_code`. Tests (4 new, 20 in the curate file): primary+rotated
+merge, a tool only in a rotated log surfaces in the recommendation, read-order independence, and
+unrelated same-dir files ignored. Lint, typecheck, prettier clean.
+
+## S23.5 — surface the curation opportunity in `mcpfold status`
+
+Started/done: 2026-07-13. E23 story 5 (epic extension complete). Makes curation discoverable from the
+daily front door without the user knowing the command exists.
+
+**What.** `computeCuration(cwd, env)` in status.ts: when `MCPFOLD_AUDIT_LOG` is set and readable (same
+trigger as the S23.3 doctor hint), it reads the full rotated history (S23.4 reader), analyzes usage,
+and per server computes the recommendation vs. the current directive — counting a server as curatable
+when the recommendation differs and is non-empty, and summing allow-mode unused tools as
+`trimmableTools`. Adds a `StatusCuration` field to `StatusData` and a one-line `Curation:` entry to the
+human summary pointing at `mcpfold curate`. Returns null / omits the line when no log is configured,
+it is unreadable, or nothing is curatable (no false nudge). Purely informational — never changes
+status's exit code (still drift + doctor findings only); wrapped in try/catch so it can't break status.
+
+Verified end-to-end: the line appears only with a configured log and a curatable server, absent
+otherwise. Tests (3 new in status.test.ts + updated stable-json-shape key list): null without a log,
+surfaces a curatable server (exit still 0), null when the configured log is missing. `verify_all`
+green across all packages (core/schema/secrets/adapters/proxy/cli/e2e), typecheck, lint + core purity,
+and build.
+
+**E23 extended set (S23.4–S23.5) complete; full epic S23.1–S23.5 done.**
