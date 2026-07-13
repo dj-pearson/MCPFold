@@ -1853,3 +1853,25 @@ Verified end-to-end: a `create_pr` living only in a rotated sibling now appears 
 alongside the active log's `search_code`. Tests (4 new, 20 in the curate file): primary+rotated
 merge, a tool only in a rotated log surfaces in the recommendation, read-order independence, and
 unrelated same-dir files ignored. Lint, typecheck, prettier clean.
+
+## S23.5 — surface the curation opportunity in `mcpfold status`
+
+Started/done: 2026-07-13. E23 story 5 (epic extension complete). Makes curation discoverable from the
+daily front door without the user knowing the command exists.
+
+**What.** `computeCuration(cwd, env)` in status.ts: when `MCPFOLD_AUDIT_LOG` is set and readable (same
+trigger as the S23.3 doctor hint), it reads the full rotated history (S23.4 reader), analyzes usage,
+and per server computes the recommendation vs. the current directive — counting a server as curatable
+when the recommendation differs and is non-empty, and summing allow-mode unused tools as
+`trimmableTools`. Adds a `StatusCuration` field to `StatusData` and a one-line `Curation:` entry to the
+human summary pointing at `mcpfold curate`. Returns null / omits the line when no log is configured,
+it is unreadable, or nothing is curatable (no false nudge). Purely informational — never changes
+status's exit code (still drift + doctor findings only); wrapped in try/catch so it can't break status.
+
+Verified end-to-end: the line appears only with a configured log and a curatable server, absent
+otherwise. Tests (3 new in status.test.ts + updated stable-json-shape key list): null without a log,
+surfaces a curatable server (exit still 0), null when the configured log is missing. `verify_all`
+green across all packages (core/schema/secrets/adapters/proxy/cli/e2e), typecheck, lint + core purity,
+and build.
+
+**E23 extended set (S23.4–S23.5) complete; full epic S23.1–S23.5 done.**

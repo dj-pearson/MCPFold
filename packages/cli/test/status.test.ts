@@ -93,6 +93,7 @@ describe('runStatus (S10.1)', () => {
     expect(Object.keys(result.data).sort()).toEqual([
       'clients',
       'cloud',
+      'curation',
       'health',
       'installedUnconfigured',
       'ok',
@@ -111,5 +112,41 @@ describe('runStatus (S10.1)', () => {
         'unmanaged',
       ].sort(),
     );
+  });
+
+  describe('curation surfacing (S23.5)', () => {
+    const usageLine = JSON.stringify({
+      ts: '2026-07-11T00:00:00.000Z',
+      server: 'playwright',
+      type: 'tools/call',
+      tool: 'browser_click',
+      outcome: 'ok',
+    });
+
+    it('is null when no audit log is configured', async () => {
+      const result = await runStatus({ cwd, osContext: ctx, backend: inMemoryBackend() });
+      expect(result.data.curation).toBeNull();
+      expect(result.human).not.toContain('Curation:');
+    });
+
+    it('surfaces a curatable server when the audit log shows unused tools', async () => {
+      const logPath = join(cwd, 'audit.jsonl');
+      writeFileSync(logPath, usageLine);
+      const withLog: OsContext = { ...ctx, env: { MCPFOLD_AUDIT_LOG: logPath } };
+      await runSync({ cwd, osContext: withLog }); // clean baseline so exit reflects only curation
+      const result = await runStatus({ cwd, osContext: withLog, backend: inMemoryBackend() });
+      // playwright has usage but no `tools` directive → curatable.
+      expect(result.data.curation?.curatableServers).toBe(1);
+      expect(result.human).toContain('Curation:');
+      expect(result.human).toContain('mcpfold curate');
+      // Informational only — exit code still driven by drift/health.
+      expect(result.exit).toBe(EXIT.SUCCESS);
+    });
+
+    it('is null when the configured log does not exist', async () => {
+      const withLog: OsContext = { ...ctx, env: { MCPFOLD_AUDIT_LOG: join(cwd, 'nope.jsonl') } };
+      const result = await runStatus({ cwd, osContext: withLog, backend: inMemoryBackend() });
+      expect(result.data.curation).toBeNull();
+    });
   });
 });
