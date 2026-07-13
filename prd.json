@@ -4713,7 +4713,7 @@
       "epic": "E21",
       "order": 5,
       "priority": "p2",
-      "status": "blocked",
+      "status": "done",
       "dependencies": [],
       "title": "Web funnel instrumentation and channel attribution",
       "user_story": "As the maintainer, I want to see which growth channels drive installs and where the funnel leaks, so I invest in what converts instead of guessing.",

@@ -3,11 +3,12 @@ import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { applyStoredTheme } from './design/theme';
-import { initAnalytics } from './analytics';
+import { initAnalytics, trackOutboundClicks } from './analytics';
 import './design/tokens.css';
 
 applyStoredTheme();
 initAnalytics();
+trackOutboundClicks(); // S21.5: measure funnel exits to npm/GitHub with one delegated listener
 
 const root = document.getElementById('root')!;
 const tree = (

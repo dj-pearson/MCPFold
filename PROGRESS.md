@@ -2238,3 +2238,27 @@ Verified: `tsc --noEmit` clean; `pnpm --filter @mcpfold/site build` green (142 r
 calculator e2e 5/5 (dev server), compare e2e 7/7 (prerender). (Env note: `gsap` was declared but not
 installed in this workspace — `pnpm install` pulled it; a pre-existing gsap-less tsc error in
 TheFold.tsx was the missing dep, not a code fault.)
+
+---
+
+## S21.5 — Web funnel instrumentation and channel attribution
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p2, deps: none.
+Stale-`blocked` (no deps); flipped after a green e2e run. **WEB-only — zero CLI telemetry added.**
+
+- **`analytics.ts`**: added `track(event, props)` (a safe no-op until the cookieless Plausible-style
+  script loads — dev/preview never phone home), `channelRef()` (first-touch `utm_source`/`ref`
+  persisted per session so every event is attributable), and `trackOutboundClicks()` — ONE delegated
+  document listener firing `Outbound link {host}` for any off-site link, so npm/GitHub exits are
+  measured without touching each component. Wired in `main.tsx`.
+- **Funnel events**: `CopyBlock` fires `Install command copied {command}`; the calculator fires
+  `Calculator config pasted {servers}` on a successful paste-load and `Install clicked {from:'calculator'}`
+  on its CTA (added `data-testid="calculator-install-cta"`). Every event carries the channel `ref`.
+- **`docs/launch/growth-channels.md`**: a link-tagging convention (`?ref=<channel>`, reuse the same
+  token per channel) so the funnel segments by channel, plus an explicit privacy note — web funnel
+  only, cookieless/PII-free, separate from the CLI (which ships no telemetry by default).
+
+Tests: **`funnel.e2e.ts`** (mock `window.plausible` sink) asserts copy, calculator config-pasted +
+install-clicked (with `ref=hackernews` attribution), and outbound-to-npm events fire with the expected
+payload. Verified green (3/3), plus install/home/calculator specs (24/24) — no regressions; site `tsc`
+clean and `build` green (142 routes).

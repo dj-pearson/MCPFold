@@ -9,6 +9,29 @@ utility → the token/context problem → mcpfold as the deterministic, cross-cl
 
 ---
 
+## Link tagging — always add `?ref=` so the funnel is attributable (S21.5)
+
+Every link you post to a channel below MUST carry a channel tag, so we can see which channel actually
+drives installs (not just clicks). Use a single query param, lowercase, no spaces:
+
+    https://mcpfold.com/mcp-token-calculator?ref=hackernews
+    https://mcpfold.com/?ref=twitter
+    https://mcpfold.com/install?ref=console-dev
+
+The site reads `?ref=` (or standard `utm_source=`) on the landing page and keeps it for the session as
+the **first-touch channel**, so every downstream funnel event — install-command copy, calculator
+"config pasted" / "install clicked", and outbound clicks to npm/GitHub — is segmented by it. Reuse the
+**same ref token per channel** every time (`hackernews`, `twitter`, `reddit`, `console-dev`, `tldr`,
+`linkedin`, …) so the numbers aggregate.
+
+**Privacy posture.** This measures the **website funnel only**, through the existing cookieless,
+PII-free analytics (no identifiers, just coarse event names + the channel ref). It is entirely
+separate from the CLI: **mcpfold the tool ships no telemetry of its own by default** (see
+[../telemetry.md](../telemetry.md) — its local audit trail never leaves the machine). Nothing added
+for attribution runs in the CLI.
+
+---
+
 ## Dev-tool newsletters (submit once — 20-minute win each)
 
 These curate exactly this audience and most makers never bother submitting.

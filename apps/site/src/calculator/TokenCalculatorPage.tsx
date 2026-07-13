@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Container } from '../design/components';
 import { compute, type BenchServer } from '../benchmark/model';
 import { faqsForPath } from '../seo/faq';
+import { track } from '../analytics';
 
 /**
  * Standalone MCP token calculator (/mcp-token-calculator) — a free, utility-first tool that estimates
@@ -96,6 +97,8 @@ export function TokenCalculatorPage() {
     setPasteMsg(
       `Loaded ${parsed.length} server${parsed.length === 1 ? '' : 's'}. Tool counts are estimates — edit them to match yours.`,
     );
+    // S21.5: calculator engagement — the user brought their own config.
+    track('Calculator config pasted', { servers: parsed.length });
   };
 
   const faqs = faqsForPath('/mcp-token-calculator');
@@ -364,6 +367,8 @@ export function TokenCalculatorPage() {
         </div>
         <Link
           to="/install"
+          data-testid="calculator-install-cta"
+          onClick={() => track('Install clicked', { from: 'calculator' })}
           style={{
             padding: 'var(--space-3) var(--space-5)',
             borderRadius: 'var(--radius)',
