@@ -1,5 +1,54 @@
 # mcpfold
 
+## 1.4.0
+
+### Minor Changes
+
+- cb06bd0: `mcpfold add --url <url> --probe` (E25, S25.4): an opt-in probe that auto-detects a remote server's
+  transport (streamable-http vs the legacy sse) and whether it requires auth, then scaffolds the entry
+  accordingly — a placeholder `${env:…}` token reference (never a value) when the endpoint answers with an
+  auth challenge. It is off by default, so an add stays fully offline unless you ask for it; it is
+  timeout-bounded and best-effort, falling back to the defaults on any network error, timeout, or
+  ambiguous response, and an explicit `--transport` always wins. Probing only affects what is written at
+  add time — it never changes `sync` output.
+- cb06bd0: `mcpfold doctor --fix` (E25, S25.2): apply the deterministic repairs for doctor findings. It previews
+  by default (per-finding, writes nothing) and applies on `--fix --yes`; `--fix <ids>` scopes to specific
+  findings. Auto-applicable fixes (the VS Code root-key trap, inert curation, an unpinned/vulnerable
+  mcp-remote bridge, a malformed client file) re-fold that client through the real `sync` path — backing
+  up first, writing atomically, then re-running doctor to confirm; any fix that raises the error count is
+  rolled back from its backup. Guided fixes (a hardcoded secret, a deprecated `sse` transport) are
+  reported but never auto-applied, and no secret value ever appears in the output. `--json` reports what
+  was applied, skipped, and failed; the exit code reflects the errors that remain.
+- cb06bd0: `mcpfold explain <topic>` (E25, S25.5): offline, authored explanations of every doctor finding class and
+  core concept (the run shim, tool curation, secret references, the VS Code root-key trap, the mcp-remote
+  CVE, and more). Every `doctor` finding now ends with a `see: mcpfold explain <id>` pointer, so you can
+  learn _why_ a footgun matters and _why_ the fix is right instead of applying fixes blindly. Run bare to
+  list topics; `--json` returns the structured entry. The catalog is static and versioned in the CLI —
+  no network, no generation.
+- cb06bd0: `mcpfold secret extract <server>` (E25, S25.3): the guided repair for a hardcoded token. It finds the
+  literal secret values in a server's `env` / `auth.headers` (the same detector `doctor` uses), moves
+  each into a provider — default `dotenv`, or `--scheme env|keychain|infisical|op`, or an interactive
+  chooser — and rewrites the config value to a `${scheme:path}` reference with a comment-preserving edit,
+  backing the config up first and re-validating. `dotenv` persists the value to `.env`; every other
+  scheme prints the exact store-it command with a `<value>` placeholder (the raw value is never echoed
+  to stdout or logs, and stays recoverable from the config backup). Once the value is a reference,
+  `mcpfold sync` folds it through the run shim, so it never lands in any client file. This is also the
+  command `doctor --fix` points you to for a hardcoded-secret finding.
+
+### Patch Changes
+
+- cb06bd0: Groundwork for guided config repair (E25, S25.1): the `doctor` `Finding` type now carries an optional
+  `autofix` descriptor — a deterministic, machine-applicable form of the human `fix` string. The VS Code
+  root-key trap, inert curation, an unpinned/vulnerable `mcp-remote` bridge, and a malformed client file
+  map to a `resync-client` fix; a hardcoded secret maps to a guided `extract-secret` fix and a deprecated
+  `sse` transport to a guided `rewrite-transport` fix. Ambiguous findings (unpinned `@latest`, unknown
+  secret schemes, schema errors) stay advisory with no descriptor. No user-facing behavior change yet —
+  `doctor --fix` (S25.2) consumes these descriptors.
+  - @mcpfold/core@1.4.0
+  - @mcpfold/adapters@1.4.0
+  - @mcpfold/proxy@1.4.0
+  - @mcpfold/secrets@1.4.0
+
 ## 1.3.0
 
 ### Minor Changes
