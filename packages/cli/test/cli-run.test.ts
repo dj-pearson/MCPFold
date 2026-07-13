@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { run, parseIntFlag } from '../src/cli.js';
+import { run, parseIntFlag, parseFixIds } from '../src/cli.js';
 import { UsageError } from '@mcpfold/core';
 import { EXIT } from '../src/output/exit-codes.js';
 import type { Writer } from '../src/output/render.js';
@@ -84,5 +84,24 @@ describe('parseIntFlag (S22.21)', () => {
     expect(() => parseIntFlag('--limit', '-3')).toThrow(UsageError);
     expect(() => parseIntFlag('--config-version', '1.5')).toThrow(/integer/);
     expect(() => parseIntFlag('--limit', '3.0e2')).not.toThrow(); // 300 is an integer
+  });
+});
+
+describe('parseFixIds (S25.2)', () => {
+  it('treats bare --fix / empty / "all" as "every fixable finding" (undefined)', () => {
+    expect(parseFixIds(true)).toBeUndefined(); // `--fix` with no value
+    expect(parseFixIds(undefined)).toBeUndefined();
+    expect(parseFixIds('')).toBeUndefined();
+    expect(parseFixIds('all')).toBeUndefined();
+  });
+
+  it('parses a comma-separated id list', () => {
+    expect(parseFixIds('1')).toEqual([1]);
+    expect(parseFixIds('2,4, 6')).toEqual([2, 4, 6]);
+  });
+
+  it('rejects non-integer / non-positive ids loudly', () => {
+    expect(() => parseFixIds('1,abc')).toThrow(UsageError);
+    expect(() => parseFixIds('0')).toThrow(/integer/);
   });
 });

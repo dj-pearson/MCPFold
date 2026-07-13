@@ -71,6 +71,13 @@ export {
 } from './onboarding/guided.js';
 export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';
 export {
+  runDoctorFix,
+  type DoctorFixData,
+  type DoctorFixOptions,
+  type AppliedFix,
+  type SkippedFix,
+} from './commands/doctor-fix.js';
+export {
   buildSpec,
   completionScript,
   completionValues,

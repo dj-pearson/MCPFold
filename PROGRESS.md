@@ -2306,3 +2306,15 @@ not speak Streamable HTTP) — AC[2] refined to record this. New public exports 
 isAutoApplicable) from index.ts; changeset added (patch, no behavior change). 8 new unit tests in
 test/autofix.test.ts. verify_all green (lint + typecheck + build + tests); the one full-suite failure
 was the pre-existing Windows DPAPI token-store timeout under parallel load, which passes standalone.
+
+DONE S25.2 — `mcpfold doctor --fix` repair engine (packages/cli/src/commands/doctor-fix.ts). Consumes
+the S25.1 autofix descriptors: previews per-finding by default (writes nothing), applies on `--fix --yes`,
+scopes with `--fix <ids>`. Auto-applicable `resync-client` fixes re-fold one client via `runSync({profile})`
+(backup + atomic write + re-validate by re-running doctor); a fix that raises the error count is rolled
+back from backup (restoreBackup), and a fix whose finding persists is reported failed — never a silent
+partial. Guided fixes (extract-secret, rewrite-transport) are reported/skipped, never auto-applied. `--json`
+reports applied/skipped/failed; exit reflects remaining errors. No secret value ever printed (consumes
+runDoctor's already-redacted findings; preview describes actions, not file contents). Wired `--fix [ids]`
++ `--yes` into cli.ts (+ `parseFixIds`). 9 engine tests + 3 parser tests; completion snapshots updated for
+the new `--fix` flag. Verified end-to-end on the built binary (inert-curation → re-folded through the
+`mcpfold run` shim). verify_all green (lint + typecheck + build + full 440-test suite).

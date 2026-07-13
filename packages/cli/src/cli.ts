@@ -6,6 +6,7 @@ import { runDiff } from './commands/diff.js';
 import { runInit } from './commands/init.js';
 import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
+import { runDoctorFix } from './commands/doctor-fix.js';
 import { runScan } from './commands/scan.js';
 import { runStatus } from './commands/status.js';
 import {
@@ -116,6 +117,22 @@ export function parseIntFlag(
     });
   }
   return n;
+}
+
+/**
+ * Parse the optional value of `doctor --fix [ids]` into a list of 1-based finding ids. `--fix` with
+ * no value (commander passes `true`), an empty string, or the literal `all` selects every fixable
+ * finding (undefined ids). `--fix 1,3` scopes to those; non-integers are rejected loudly.
+ * @internal
+ */
+export function parseFixIds(raw: string | boolean | undefined): number[] | undefined {
+  if (raw === undefined || raw === true || raw === '' || raw === 'all') return undefined;
+  const ids = String(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => parseIntFlag('--fix id', s, { min: 1 })!);
+  return ids.length > 0 ? ids : undefined;
 }
 
 export function buildProgram(writer?: Writer): { program: Command; getExitCode: () => ExitCode } {
@@ -297,10 +314,31 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   });
 
   addGlobalFlags(
-    program.command('doctor').description('validate config and catch silent failures'),
-  ).action(async (opts: GlobalFlags) => {
+    program
+      .command('doctor')
+      .description('validate config and catch silent failures')
+      .option(
+        '--fix [ids]',
+        'apply the deterministic fixes for the findings (all, or comma-separated ids). Preview by default; use --yes to write',
+      )
+      .option('--yes', 'apply fixes without an interactive confirmation (CI / scripted)', false),
+  ).action(async (opts: GlobalFlags & { fix?: string | boolean; yes?: boolean }) => {
     const ctx = resolve(opts);
-    setExit(await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer));
+    if (opts.fix === undefined) {
+      setExit(
+        await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer),
+      );
+      return;
+    }
+    const ids = parseFixIds(opts.fix);
+    setExit(
+      await runCommand(
+        'doctor',
+        ctx.json,
+        () => runDoctorFix({ cwd: ctx.cwd, ids, yes: opts.yes, dryRun: ctx.dryRun }),
+        writer,
+      ),
+    );
   });
 
   addGlobalFlags(
