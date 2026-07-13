@@ -2118,3 +2118,34 @@ Tests: `audit-default.test.ts` (per-OS path, opt-out, precedence, size sum, ref-
 secret value lands in the file); doctor S24.8 disclosure; status shape+audit. Full core (122) + schema
 (9) + cli (399) suites green; root lint + core purity clean. (The Windows DPAPI token-store test is a
 pre-existing load-flaky native-spawn timeout, unrelated.)
+
+---
+
+## S24.7 — Day-zero curation: interactive tool picker + discovery-backed recommendations
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p1, deps: S24.3, S24.6.
+
+A new user reaches an applied allow-list within their first session — no env vars, no waiting. Verified
+end-to-end: `mcpfold curate echo --tools alpha,beta` (no prior `inspect`) live-discovers the surface,
+prints "keeping 2 of 3 tools, ~69 → ~46 tokens (approx)", and writes the allow directive.
+
+- **`runCuratePick`** (curate.ts): the day-zero path for one server. Surface comes from a cached
+  discovery snapshot (S24.6) or live discovery (injected `discover`, wired in the CLI to
+  `discoverAndCacheServer` so `curate <server> --tools` needs no prior `inspect`). Selection: `--tools`
+  non-interactively, or an interactive multi-select on a TTY (injected `pick`, default readline). Impact
+  preview before writing; validates the selection is a subset of the real surface; writes the `allow`
+  directive through the S23.3 comment-preserving jsonc edit path.
+- **Usage precedence** (criterion 5): when audit data exists (and no explicit `--tools`), the picker
+  reports the recorded-usage recommendation read-only and says it takes precedence, pointing at
+  `--write` / `--tools`.
+- **CLI** (`curate <server> --tools <list>`, bare `curate <server>` day-zero): new `--tools` flag +
+  routing; `discoverAndCacheServer` extracted from `inspect` and shared.
+- **`add`** (criterion 2) and **`init --guided`** (criterion 3, skippable step) surface the picker via a
+  nudge to `mcpfold curate <server>` right after the add/sync step. DELIBERATE SCOPING: they point at
+  the live picker command rather than spawning the just-added server inline mid-wizard (fragile —
+  a fresh add may not be runnable yet). Flagged to the user for a fuller inline flow if wanted.
+
+Tests: `curate-pick.test.ts` (the two specified units — non-TTY `--tools` writes the exact directive +
+preserves comments; prompter-injected interactive path selects a subset and round-trips — plus usage
+precedence, decline-preview, unknown-tool + non-TTY guards); add nudge; guided step offered/declined.
+Full cli suite green (407 excl. the flaky DPAPI native-spawn test); lint clean; build clean.

@@ -256,9 +256,15 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
   }
 
   atomicWrite(configPath, newText);
+  // Day-zero curation offer (S24.7): a stdio server can be introspected and trimmed to just the tools
+  // you use, right now — the `curate` picker discovers its surface live and writes an allow-list.
+  const curateLine =
+    server.transport === 'stdio'
+      ? `\nCurate it to fewer tools: \`mcpfold curate ${configKey}\` (interactive) or \`mcpfold curate ${configKey} --tools <a,b,c>\`.`
+      : '';
   return {
     data: { name: configKey, server, configPath, wrote: true, signature, warnings },
-    human: `Added "${configKey}" (${server.transport}) to ${configPath}.${sigLine}${warnLines}\nRun \`mcpfold sync\` to fold it out.`,
+    human: `Added "${configKey}" (${server.transport}) to ${configPath}.${sigLine}${warnLines}\nRun \`mcpfold sync\` to fold it out.${curateLine}`,
   };
 }
 

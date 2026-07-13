@@ -41,7 +41,7 @@ describe('runAdd (S3.4)', () => {
   });
 
   it('adds a stdio npx server from --package with a pin', async () => {
-    await runAdd({
+    const result = await runAdd({
       cwd,
       name: 'pw',
       package: '@playwright/mcp@latest',
@@ -55,6 +55,8 @@ describe('runAdd (S3.4)', () => {
       expect(cfg.config.servers.pw?.args).toEqual(['-y', '@playwright/mcp@latest']);
       expect(cfg.config.servers.pw?.pin).toBe('1.4.2');
     }
+    // S24.7: a stdio add points at the day-zero curate picker.
+    expect(result.human).toContain('mcpfold curate pw');
   });
 
   it('rejects a raw token (must be a ${scheme:path} reference)', async () => {

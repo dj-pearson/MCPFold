@@ -8,11 +8,17 @@ import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
 import { runScan } from './commands/scan.js';
 import { runStatus } from './commands/status.js';
-import { runCurate, runCurateApply } from './commands/curate.js';
+import {
+  runCurate,
+  runCurateApply,
+  runCuratePick,
+  type CurateData,
+  type CuratePickData,
+} from './commands/curate.js';
 import { runInfo } from './commands/info.js';
 import { runUpdate } from './commands/update.js';
 import { runTest } from './commands/test.js';
-import { runInspect } from './commands/inspect.js';
+import { discoverAndCacheServer, runInspect } from './commands/inspect.js';
 import { runRestore } from './commands/restore.js';
 import {
   buildSpec,
@@ -324,6 +330,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       .option('--min-calls <n>', 'ignore tools called fewer than N times')
       .option('--write', 'apply the recommended allow-lists to the canonical config')
       .option('--apply', 'alias for --write')
+      .option('--tools <list>', 'day-zero: allow exactly these tools (comma-separated) for <server>')
       .option('-y, --yes', 'skip the confirmation prompt when writing'),
   ).action(
     async (
@@ -334,6 +341,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
         minCalls?: string;
         write?: boolean;
         apply?: boolean;
+        tools?: string;
         yes?: boolean;
       },
     ) => {
@@ -346,14 +354,32 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
         minCalls: parseIntFlag('--min-calls', opts.minCalls),
       };
       const write = Boolean(opts.write || opts.apply);
+      const toolsList = opts.tools
+        ? opts.tools.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined;
       setExit(
-        await runCommand(
+        await runCommand<CurateData | CuratePickData>(
           'curate',
           ctx.json,
-          () =>
-            write || ctx.dryRun
+          () => {
+            // Day-zero picker (S24.7): a specific server with --tools, or bare (no --write) so a fresh
+            // user without audit history still reaches an allow-list. Usage precedence lives inside.
+            if (server && (toolsList || !write)) {
+              return runCuratePick({
+                ...curateOpts,
+                server,
+                tools: toolsList,
+                yes: opts.yes,
+                dryRun: ctx.dryRun,
+                // Live discovery fallback: introspect on the spot when no snapshot is cached, so a
+                // fresh user needs no prior `mcpfold inspect`.
+                discover: (name) => discoverAndCacheServer({ cwd: ctx.cwd, server: name }),
+              });
+            }
+            return write || ctx.dryRun
               ? runCurateApply({ ...curateOpts, write: true, dryRun: ctx.dryRun, yes: opts.yes })
-              : runCurate(curateOpts),
+              : runCurate(curateOpts);
+          },
           writer,
         ),
       );

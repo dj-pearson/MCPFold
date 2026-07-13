@@ -5833,7 +5833,7 @@
       "epic": "E24",
       "order": 7,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [
         "S24.3",
         "S24.6"

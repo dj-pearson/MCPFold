@@ -212,7 +212,22 @@ export async function runGuided(
     result.synced = !dryRun;
   }
 
-  // --- Step 4: the payoff --------------------------------------------------------------------
+  // --- Step 4: day-zero curation (S24.7) -----------------------------------------------------
+  // Skippable, never blocks. Offer to trim uncurated stdio servers to just the tools they need.
+  try {
+    const { config } = loadConfigFromDisk(options.cwd);
+    const uncurated = Object.entries(config.servers)
+      .filter(([, s]) => s.transport === 'stdio' && !s.tools)
+      .map(([name]) => name);
+    if (uncurated.length > 0 && (await prompt.confirm('Curate your servers to just the tools you use?', false))) {
+      write('Curate each server to a tool allow-list (discovers its live surface):');
+      for (const name of uncurated) write(`  mcpfold curate ${name}`);
+    }
+  } catch {
+    // No readable config (e.g. a dry run that scaffolded nothing) — skip silently.
+  }
+
+  // --- Step 5: the payoff --------------------------------------------------------------------
   // Honest savings (S24.9): numbers are measured from THIS user's config (discovery snapshots) and
   // their curation — never the fixture benchmark presented as if it were theirs.
   try {

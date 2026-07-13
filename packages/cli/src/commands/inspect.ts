@@ -58,6 +58,36 @@ function targetsFor(
   });
 }
 
+/**
+ * Discover ONE server's tool surface live and cache it (S24.6/S24.7). Shared by `inspect` and the
+ * day-zero curate picker so a fresh user's `curate <server> --tools` can introspect on the spot with
+ * no prior `inspect`. Resolves secrets in memory only.
+ */
+export async function discoverAndCacheServer(options: {
+  cwd: string;
+  server: string;
+  timeoutMs?: number;
+  providers?: SecretProvider[];
+  transportFactory?: TransportFactory;
+  now?: () => Date;
+  cache?: CacheLocation;
+}): Promise<SurfaceSnapshot> {
+  const { config } = loadConfigFromDisk(options.cwd);
+  const [target] = targetsFor(config, { server: options.server });
+  const timeoutMs = options.timeoutMs ?? 10_000;
+  const [resolved] = await resolveSecrets([target!], {
+    providers: options.providers ?? defaultProviders(options.cwd),
+    timeoutMs,
+  });
+  const snapshot = await discoverSurface(resolved!, {
+    timeoutMs,
+    transportFactory: options.transportFactory,
+    now: options.now,
+  });
+  writeSnapshot(snapshot, options.cache);
+  return snapshot;
+}
+
 export async function runInspect(options: InspectOptions): Promise<CommandOutput<InspectData>> {
   const { config } = loadConfigFromDisk(options.cwd);
   if (options.profile && !config.profiles[options.profile]) {
