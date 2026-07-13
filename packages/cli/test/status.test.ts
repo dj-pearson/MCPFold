@@ -94,6 +94,7 @@ describe('runStatus (S10.1)', () => {
       'clients',
       'cloud',
       'curation',
+      'curationSummary',
       'health',
       'installedUnconfigured',
       'ok',
@@ -123,10 +124,12 @@ describe('runStatus (S10.1)', () => {
       outcome: 'ok',
     });
 
-    it('is null when no audit log is configured', async () => {
+    it('is null when no audit log is configured (but still nudges that nothing is curated)', async () => {
       const result = await runStatus({ cwd, osContext: ctx, backend: inMemoryBackend() });
       expect(result.data.curation).toBeNull();
-      expect(result.human).not.toContain('Curation:');
+      // S24.5: the sole server carries no `tools` directive, so status surfaces the "none configured" nudge.
+      expect(result.data.curationSummary).toEqual({ totalServers: 1, curatedServers: 0 });
+      expect(result.human).toContain('none configured');
     });
 
     it('surfaces a curatable server when the audit log shows unused tools', async () => {

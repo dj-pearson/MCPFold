@@ -1995,3 +1995,30 @@ established e2e idiom); the only injected seam is the client transport, so the p
 child, config resolution from the embedded cwd, and the tool filter are all the real production code
 paths. Verified the FILTER assertion actually fires by widening the allow-list. Full e2e suite (7 files,
 13 tests) green; e2e typecheck + lint clean. **E24 p0 blockers (S24.1–S24.4) all complete.**
+
+---
+
+## S24.5 — doctor + status: detect curation that is inactive, dropped, or absent
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p1, deps: S24.1.
+
+Extended `checks/curation.ts` (not duplicated) with two checks, both wired into `doctor`:
+
+- `checkCurationInactive(config, ctx)` — an **error** when a rendered client entry for a stdio
+  tools-directive server does not route through the `mcpfold run` shim (a file written before S24.1,
+  or hand-edited, that points a curated server straight at its real command). Reads each profile's
+  on-disk client file (both `mcpServers` and `servers` roots), and the hint is the exact `mcpfold sync`
+  resync. Remote tools-bearing servers stay owned by `checkUnenforcedToolsDirective`.
+- `checkNoCurationConfigured(config, configPath)` — an **info** when zero servers carry a `tools`
+  directive: "No tool curation configured — all N servers expose their full toolsets…" pointing at
+  `mcpfold curate`. Info-only, so it never fails a doctor-gated pipeline.
+
+`mcpfold status` surfaces the same "none configured" nudge via a new `curationSummary` field (shared
+`summarizeCuration` helper), rendered as a `Curation: none configured …` line — consistent with the
+doctor info and the existing S23.5 opportunity line. The inactive-curation error propagates to status
+through the existing doctor health count.
+
+Tests: 3 new doctor cases (curated+direct client entry → error; fully-shimmed → clean; no directives →
+info), status stable-shape + nudge updates, and the "clean config" doctor fixture is now curated so the
+new info doesn't fire. Full CLI suite green (383 pass; only the pre-existing stale-dist version test
+fails). Typecheck + lint clean.

@@ -11,6 +11,7 @@ import {
 import type { SecretProvider } from '@mcpfold/secrets';
 import { runDiff } from './diff.js';
 import { runDoctor } from './doctor.js';
+import { summarizeCuration } from '../checks/curation.js';
 import { detectClients } from '../util/detect-clients.js';
 import { loadConfigFromDisk } from '../util/config.js';
 import { readAuditLogLines } from '../util/audit-log.js';
@@ -62,6 +63,12 @@ export interface StatusData {
   cloud: StatusCloud | null;
   /** S23.5: curation opportunity from recorded usage, or null when none/unavailable. */
   curation: StatusCuration | null;
+  /**
+   * S24.5: how many servers are curated vs. total. When `curatedServers` is 0 (and there is at least
+   * one server) the headline feature is entirely unused — status nudges toward curation, mirroring the
+   * doctor `info`. Null only when the config could not be read.
+   */
+  curationSummary: { totalServers: number; curatedServers: number } | null;
   ok: boolean;
 }
 
@@ -159,6 +166,12 @@ function renderHuman(data: StatusData): string {
     lines.push(
       `${style.bold('Curation:')} ${style.yellow(`${n} server${n === 1 ? '' : 's'}`)} could be trimmed to your usage${trim} ${symbols.arrow} run \`mcpfold curate\``,
     );
+  } else if (data.curationSummary && data.curationSummary.curatedServers === 0 && data.curationSummary.totalServers > 0) {
+    // S24.5: no server is curated at all — the headline feature is unused. Mirror the doctor info.
+    const total = data.curationSummary.totalServers;
+    lines.push(
+      `${style.bold('Curation:')} ${style.yellow('none configured')} — all ${total} server${total === 1 ? '' : 's'} expose their full toolsets ${symbols.arrow} run \`mcpfold curate\``,
+    );
   }
   lines.push('');
   lines.push(
@@ -211,7 +224,24 @@ export async function runStatus(options: StatusOptions): Promise<CommandOutput<S
   // S23.5: curation opportunity from recorded usage — informational, never affects the exit code.
   const curation = computeCuration(options.cwd, ctx.env);
 
+  // S24.5: how many servers are curated at all — surfaces "no curation configured" the same way doctor
+  // does. Best-effort: an unreadable/invalid config (already reported by doctor) just omits the line.
+  let curationSummary: StatusData['curationSummary'] = null;
+  try {
+    curationSummary = summarizeCuration(loadConfigFromDisk(options.cwd).config);
+  } catch {
+    curationSummary = null;
+  }
+
   const ok = !diff.data.drift && health.errors === 0 && health.warnings === 0;
-  const data: StatusData = { clients, installedUnconfigured, health, cloud, curation, ok };
+  const data: StatusData = {
+    clients,
+    installedUnconfigured,
+    health,
+    cloud,
+    curation,
+    curationSummary,
+    ok,
+  };
   return { data, human: renderHuman(data), exit: ok ? EXIT.SUCCESS : EXIT.DIFF };
 }

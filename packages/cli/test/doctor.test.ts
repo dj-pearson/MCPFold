@@ -23,10 +23,11 @@ afterEach(() => {
 const write = (text: string) => writeFileSync(join(cwd, 'mcp.config.jsonc'), text);
 
 describe('runDoctor (S3.7)', () => {
-  it('a clean config passes with no findings, exit 0', () => {
+  it('a clean, curated config passes with no findings, exit 0', () => {
+    // Curated (a `tools` directive present) so the S24.5 "no curation configured" info does not fire.
     write(`{
       "version": 1,
-      "servers": { "pw": { "transport": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@1.4.2"], "tags": ["code"] } },
+      "servers": { "pw": { "transport": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@1.4.2"], "tools": { "mode": "allow", "list": ["browser_click"] }, "tags": ["code"] } },
       "profiles": { "cursor": { "client": "cursor", "scope": "user", "include": ["code"] } }
     }`);
     const result = runDoctor({ cwd, osContext: ctx });
@@ -49,6 +50,60 @@ describe('runDoctor (S3.7)', () => {
     expect(sse?.message).toContain('deprecated');
     // The oauth server carries no token/headers and must NOT trip any secret/token finding.
     expect(result.data.findings.some((f) => f.where === 'servers.modern')).toBe(false);
+  });
+
+  describe('inert-curation detection (S24.5)', () => {
+    // A curated stdio server whose profile folds to Cursor.
+    const CURATED = `{
+      "version": 1,
+      "servers": {
+        "pw": { "transport": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@1.4.2"], "tools": { "mode": "allow", "list": ["browser_click"] }, "tags": ["code"] }
+      },
+      "profiles": { "cursor": { "client": "cursor", "scope": "user", "include": ["code"] } }
+    }`;
+    const cursorFile = () => join(home, '.cursor', 'mcp.json');
+    const writeCursor = (pw: unknown) => {
+      mkdirSync(join(home, '.cursor'), { recursive: true });
+      writeFileSync(cursorFile(), JSON.stringify({ mcpServers: { pw } }));
+    };
+
+    it('errors when a curated server routes to its real command in a client file (stale/hand-edited)', () => {
+      write(CURATED);
+      // A stale client file: pw wired straight at its command, bypassing the proxy.
+      writeCursor({ command: 'npx', args: ['-y', '@playwright/mcp@1.4.2'] });
+      const result = runDoctor({ cwd, osContext: ctx });
+      const finding = result.data.findings.find((f) => f.where === 'mcpServers.pw');
+      expect(finding?.severity).toBe('error');
+      expect(finding?.message).toContain('bypassing the mcpfold proxy');
+      expect(finding?.fix).toContain('mcpfold sync');
+      expect(result.exit).toBe(EXIT.ERROR);
+    });
+
+    it('is clean when the curated server routes through the run shim', () => {
+      write(CURATED);
+      writeCursor({ command: 'mcpfold', args: ['run', 'pw', '--cwd', cwd] });
+      const result = runDoctor({ cwd, osContext: ctx });
+      expect(result.data.findings.some((f) => f.where === 'mcpServers.pw')).toBe(false);
+      expect(result.exit).toBe(EXIT.SUCCESS);
+    });
+
+    it('emits an info when no server carries a tools directive at all', () => {
+      write(`{
+        "version": 1,
+        "servers": {
+          "a": { "transport": "stdio", "command": "s", "tags": ["t"] },
+          "b": { "transport": "stdio", "command": "s2", "tags": ["t"] }
+        },
+        "profiles": { "cursor": { "client": "cursor", "scope": "user", "include": ["t"] } }
+      }`);
+      const result = runDoctor({ cwd, osContext: ctx });
+      const info = result.data.findings.find((f) => f.message.includes('No tool curation configured'));
+      expect(info?.severity).toBe('info');
+      expect(info?.message).toContain('all 2 servers');
+      expect(info?.fix).toContain('mcpfold curate');
+      // Info only — it must never fail a doctor-gated pipeline.
+      expect(result.exit).toBe(EXIT.SUCCESS);
+    });
   });
 
   it('explains the native-env → shim fallback for a non-env scheme (S19.4)', () => {
