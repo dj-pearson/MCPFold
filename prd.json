@@ -242,6 +242,11 @@
       "id": "E23",
       "title": "Curation intelligence - close the loop on the token-tax metric",
       "goal": "Turn the headline metric (cut tool-schema context via curation) from a manual chore into a data-driven, one-command result. The proxy already records every tools/call in the redacted audit log (S18.4); nothing consumes it. E23 adds a pure analysis engine and an `mcpfold curate` command that reads that log, reports which tools a server actually uses, and writes the recommended `allow` directive back to the canonical config - so users get the ~80% reduction without hand-authoring tool lists."
+    },
+    {
+      "id": "E24",
+      "title": "Functional activation - make curation deliver real savings end-to-end",
+      "goal": "Close the gaps found in the 2026-07-13 end-to-end audit: the config fan-out works, but the headline token-savings path is unreachable in the default flow. sync only shims secret-bearing servers (a secretless server's tools directive is silently dropped), the shim cannot find the canonical config when a GUI client launches it from another cwd, `mcpfold curate` lands via E23 while main's VS Code extension already calls it, curation has a cold-start chicken-and-egg (recommendations need audit data; auditing is opt-in and only records once the proxy runs; the proxy only runs once curation is wired), and onboarding prints a fixture-derived ~80% savings claim regardless of whether any curation is active. E24 makes the chain real: shim any curated server, make the shim self-locating, reconcile and land curate (E23), prove the chain with an e2e gate, add live tool-surface discovery for day-zero curation, default-on local audit, and honest measured savings reporting. E24 builds directly on the E23 curate epic (S24.3 lands it on main)."
     }
   ],
   "stories": [
@@ -5636,6 +5641,350 @@
       "definition_of_done": [
         "The daily `status` view surfaces trimmable tool-schema context when usage data exists, making curation discoverable without prior knowledge of the command."
       ]
+    },
+    {
+      "id": "S24.1",
+      "epic": "E24",
+      "order": 1,
+      "priority": "p0",
+      "status": "in_progress",
+      "dependencies": [],
+      "title": "sync: route every tools-directive server through the run shim (decouple shim from secrets)",
+      "user_story": "As a user who added a tools allow-list to a server, I want sync to route that server through the mcpfold proxy regardless of whether it has secrets, so my curation actually takes effect instead of being silently dropped.",
+      "context": "Audit finding (BLOCKER, verified 2026-07-13). packages/cli/src/sync/strategy.ts:110-122 transformSecret returns the server untouched when findSecretRefs() is empty - before any strategy selection - so a secretless server with tools:{mode,list} folds to its direct command. Adapters never emit tools into client files (packages/adapters/src/shared.ts toMcpEntry), so the directive vanishes and the proxy never runs: the headline curation feature is unreachable for secretless servers. An explicit secretStrategy:\"shim\" is also ignored when there are zero refs. NOTE: a fix for exactly this is in flight in a separate session (started 2026-07-13) - verify its landed PR against these criteria rather than re-implementing.",
+      "acceptance_criteria": [
+        "A server carrying a tools directive folds to the `mcpfold run <name>` shim in every shim-default adapter, regardless of secret refs.",
+        "An explicit server-level secretStrategy \"shim\" is honored even with zero secret refs.",
+        "A server with a tools directive AND env-only refs under a native-env profile override still folds to the shim (curation requires the proxy; doctor/sync output explains why native-env was not used).",
+        "A server with no tools directive and no secrets renders direct, byte-identical to today (existing fixture snapshots unchanged).",
+        "sync human output lists which servers were shimmed for curation (distinct from shimmed-for-secrets)."
+      ],
+      "files_hint": [
+        "packages/cli/src/sync/strategy.ts",
+        "packages/cli/src/commands/sync.ts",
+        "packages/adapters/src (fixture snapshots only)"
+      ],
+      "tests": [
+        "Unit: transformSecret/renderWithStrategy matrix - {tools yes/no} x {secrets yes/no} x {override shim/native-env/none} - asserting shim vs direct vs native-env.",
+        "Fixture snapshot: a curated secretless stdio server folds to the shim in at least one shim-default adapter."
+      ],
+      "definition_of_done": [
+        "No configuration exists in which a tools directive is silently inert at fold time.",
+        "verify_all green on the CI matrix."
+      ]
+    },
+    {
+      "id": "S24.2",
+      "epic": "E24",
+      "order": 2,
+      "priority": "p0",
+      "status": "in_progress",
+      "dependencies": [],
+      "title": "Self-locating shim: embed the config location at fold time; robust config resolution in run",
+      "user_story": "As a user whose client launches MCP servers from an arbitrary working directory (Claude Desktop et al.), I want the folded shim to find my canonical config reliably, so shimmed servers start instead of dying with \"No mcp.config.jsonc found\".",
+      "context": "Audit finding (BLOCKER, verified 2026-07-13). toShim writes command:\"mcpfold\", args:[\"run\",<name>] with no --cwd (packages/cli/src/sync/strategy.ts:56-68), and `mcpfold run` loads the canonical config strictly from process.cwd() - exact-directory match, no upward walk, no fallback (packages/cli/src/util/config.ts:19-39). GUI clients launch servers from arbitrary cwds, so even the secret-shim path that sync wires today likely fails at first real launch. NOTE: a fix is in flight in a separate session (started 2026-07-13) - verify its landed PR against these criteria rather than re-implementing.",
+      "acceptance_criteria": [
+        "The shim rendered by sync embeds the absolute directory of the canonical config (e.g. args [\"run\", <name>, \"--cwd\", <dir>]) computed at fold time.",
+        "`mcpfold run` without --cwd falls back to an upward directory search from process.cwd(), so pre-existing folded configs keep working.",
+        "Re-running sync upgrades stale shims in place (idempotence preserved: unchanged files still untouched).",
+        "The not-found error names every location searched and how to fix it."
+      ],
+      "files_hint": [
+        "packages/cli/src/sync/strategy.ts",
+        "packages/cli/src/util/config.ts",
+        "packages/cli/src/commands/run.ts",
+        "e2e/"
+      ],
+      "tests": [
+        "e2e: fold a config, then launch the rendered shim command verbatim from a different cwd; the server must start.",
+        "Unit: upward search stops at filesystem root and prefers the nearest config; exact-cwd behavior unchanged when a config is present."
+      ],
+      "definition_of_done": [
+        "A shimmed server launches successfully when spawned from any cwd on all three OSes.",
+        "verify_all green on the CI matrix."
+      ]
+    },
+    {
+      "id": "S24.3",
+      "epic": "E24",
+      "order": 3,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Land the E23 curate epic on main and reconcile the VS Code curation surface",
+      "user_story": "As a user who sees \"Curate to usage\" advertised in the VS Code extension, I want the underlying `mcpfold curate` command to actually exist in the released CLI, so the feature does something instead of silently rendering nothing.",
+      "context": "Audit finding (BLOCKER, verified 2026-07-13). `mcpfold curate` (branch stories S23.1-S23.5, epic E23) exists only on branch claude/tool-improvement-priorities-fnw93m; main has no packages/cli/src/commands/curate.ts and cli.ts registers no such command. Yet main's extension already ships a curation CodeLens that shells out to `mcpfold curate --json` (apps/vscode-extension/src/curationLens.ts, curation.ts) and degrades to nothing. Confusingly, the branch DELETES those extension files - the two lines of work diverged and must be reconciled deliberately, not merged blind.",
+      "acceptance_criteria": [
+        "The E23 branch is merged to main with S23.1-S23.5 and the E23 epic present in prd.json, all statuses accurate, CI green on the matrix.",
+        "One coherent decision for the extension surface: either the curation CodeLens is verified working against the real `curate --json` contract end-to-end, or it is removed along with its README section and settings (mcpfold.showCurateLens, mcpfold.auditLog) - no dead references either way.",
+        "`mcpfold curate` is documented in docs/ (what it reads, what it writes, the audit-log prerequisite until S24.8 lands).",
+        "PROGRESS.md records the reconciliation and any follow-ups."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/curate.ts",
+        "packages/core/src/curate.ts",
+        "apps/vscode-extension/src/curationLens.ts",
+        "apps/vscode-extension/src/curation.ts",
+        "prd.json",
+        "docs/"
+      ],
+      "tests": [
+        "The branch's own S23.x suites pass on main after merge.",
+        "If the CodeLens is kept: an extension test drives it against a fixture `curate --json` payload matching the real CLI output."
+      ],
+      "definition_of_done": [
+        "No advertised curation surface calls a command that does not exist.",
+        "verify_all green on the CI matrix."
+      ]
+    },
+    {
+      "id": "S24.4",
+      "epic": "E24",
+      "order": 4,
+      "priority": "p0",
+      "status": "todo",
+      "dependencies": [
+        "S24.1",
+        "S24.2"
+      ],
+      "title": "End-to-end activation gate: a fresh user demonstrably reaches a filtered tools/list",
+      "user_story": "As a maintainer, I want a CI-gated e2e test proving the whole promise - init, curate a server, sync, launch the folded entry like a real client would - so the savings chain can never silently regress again.",
+      "context": "Audit finding (2026-07-13): every link of the savings chain had tests, but nothing tested the chain. Existing e2e covers sync fidelity and run in place; no test launches the rendered client entry verbatim from a foreign cwd and asserts the client-visible toolset is the curated one. This story is the regression gate for \"the tool works as intended\".",
+      "acceptance_criteria": [
+        "An e2e test scaffolds a temp project (init), adds a secretless stdio fixture server plus a tools allow-list, syncs to a fixture client, then spawns the rendered entry's command/args verbatim from a DIFFERENT cwd and performs an MCP handshake.",
+        "tools/list returned to the simulated client contains exactly the allow-list - nothing more, nothing less.",
+        "Each chain link failure produces a distinct assertion message naming the broken link (fold, launch, filter).",
+        "Runs in CI on ubuntu, macos, and windows."
+      ],
+      "files_hint": [
+        "e2e/",
+        "packages/proxy/src (test fixtures only)"
+      ],
+      "tests": [
+        "The e2e described above is the deliverable."
+      ],
+      "definition_of_done": [
+        "CI fails if any future change breaks the init-to-filtered-tools/list chain on any OS."
+      ]
+    },
+    {
+      "id": "S24.5",
+      "epic": "E24",
+      "order": 5,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S24.1"
+      ],
+      "title": "doctor + status: detect curation that is inactive, dropped, or absent",
+      "user_story": "As a user, I want doctor to tell me when my curation is not actually in effect - or when I have none at all - so I never believe I am saving tokens while every client loads everything.",
+      "context": "Audit finding (2026-07-13): packages/cli/src/checks/servers.ts has no tools/shim check. A client file written before S24.1 (or hand-edited) can point a curated server straight at its real command with zero warning, and a config with no tools directives anywhere gets no nudge that the headline feature is unused. The E23 branch adds checks/curation.ts (audit-based opportunity nudge) - extend rather than duplicate it.",
+      "acceptance_criteria": [
+        "doctor error when a rendered client entry for a tools-directive server does not route through the shim (stale or hand-edited client file), with the exact resync fix in the hint.",
+        "doctor info when zero servers carry a tools directive: \"all N servers expose their full toolsets\" with the curate/discovery next step.",
+        "`mcpfold status` surfaces the same summary line.",
+        "Severities and fix hints follow the existing check conventions; doctor exit codes unchanged in meaning."
+      ],
+      "files_hint": [
+        "packages/cli/src/checks/curation.ts",
+        "packages/cli/src/checks/servers.ts",
+        "packages/cli/src/commands/status.ts"
+      ],
+      "tests": [
+        "Unit: fixture with curated server + direct client entry raises the error; fixture with no directives raises the info; fully-shimmed fixture is clean."
+      ],
+      "definition_of_done": [
+        "Inert curation is impossible to miss in doctor and status."
+      ]
+    },
+    {
+      "id": "S24.6",
+      "epic": "E24",
+      "order": 6,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [],
+      "title": "Live tool-surface discovery: collect real tools/list + token estimates per configured server",
+      "user_story": "As a user, I want mcpfold to introspect my actual servers and tell me how many tools and roughly how many tokens each one costs, so curation decisions and savings numbers rest on my real config - not fixtures or assumptions.",
+      "context": "Audit finding (2026-07-13): the tool universe is only known from opt-in audit history. curate cannot recommend without usage data (packages/core curate: \"we don't know the full tool list without a live tools/list\"), the extension token CodeLens assumes 15 tools/server (apps/vscode-extension/src/tokenBudget.ts), and S21.4's leaderboard is blocked on collected data. `mcpfold test` (S10.4) already performs a live MCP handshake - extend that machinery to capture the tool surface. This one capability fixes curate's cold start, makes the CodeLens exact via its toolCountFor injector, and unblocks S21.4 collection.",
+      "acceptance_criteria": [
+        "A discovery routine launches a configured stdio server (secrets resolved in memory, never logged), captures tools/list, and writes a redacted surface snapshot - tool names + per-tool and per-server token estimates (benchmark method, exact tokenizer counts where available) - to a local per-user cache.",
+        "`mcpfold inspect <server>` (or `test --tools`) prints the surface human-readably and as --json.",
+        "Remote servers are attempted via the pinned mcp-remote bridge; where infeasible the error is coded and explains the limitation.",
+        "Discovery snapshots populate knownTools for allow-mode, deny-mode, AND no-directive servers in the curate engine.",
+        "No secret value or tool-call payload ever lands in the cache (ref-only invariant harness extended to cover it)."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/test.ts",
+        "packages/cli/src/commands/inspect.ts",
+        "packages/proxy/src/",
+        "packages/core/src/curate.ts"
+      ],
+      "tests": [
+        "Unit: snapshot shape, token estimation against the committed benchmark method, cache read/write.",
+        "Integration: discovery against a fixture MCP server yields its exact tool names and stable estimates."
+      ],
+      "definition_of_done": [
+        "Real per-server tool counts and token estimates exist locally for any stdio server the user can launch."
+      ]
+    },
+    {
+      "id": "S24.7",
+      "epic": "E24",
+      "order": 7,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S24.3",
+        "S24.6"
+      ],
+      "title": "Day-zero curation: interactive tool picker + discovery-backed recommendations (kill the cold start)",
+      "user_story": "As a brand-new user with no usage history, I want to pick or accept a recommended toolset the moment I add a server, so I get savings on day zero instead of after weeks of opt-in audit logging.",
+      "context": "Audit finding (2026-07-13): curation is chicken-and-egg. curate recommends only from the audit log; auditing is opt-in and records only when the proxy runs; the proxy runs only once curation is wired. A fresh user can never produce their first recommendation. With S24.6 the live surface is known, so audit history should refine recommendations, not gate them.",
+      "acceptance_criteria": [
+        "`mcpfold curate <server>` with no audit data falls back to the discovered surface: interactive multi-select on a TTY, --tools <list> non-interactively; either path writes the allow directive through the comment-preserving jsonc edit path (S23.3).",
+        "`mcpfold add` offers the same picker right after discovery succeeds.",
+        "`mcpfold init --guided` gains a curation step (skippable; never blocks the wizard).",
+        "Before writing, the user sees the impact preview: \"keeping N of M tools, ~X -> ~Y tokens (approx)\".",
+        "When audit data IS present, usage-based recommendations take precedence and say so."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/curate.ts",
+        "packages/cli/src/commands/add.ts",
+        "packages/cli/src/onboarding/guided.ts"
+      ],
+      "tests": [
+        "Unit: non-TTY --tools path writes the exact directive and preserves comments.",
+        "Unit: prompter-injected interactive path (existing guided prompter pattern) selects a subset and round-trips."
+      ],
+      "definition_of_done": [
+        "A new user reaches an applied allow-list within their first session, with no env vars and no waiting period."
+      ]
+    },
+    {
+      "id": "S24.8",
+      "epic": "E24",
+      "order": 8,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S24.3"
+      ],
+      "title": "Default-on local audit trail so usage-based curation has data",
+      "user_story": "As a user, I want the proxy to record which tools my agents actually call by default - locally, names only - so `mcpfold curate` has real usage data the first time I run it.",
+      "context": "Audit finding (2026-07-13): the audit sink activates only via MCPFOLD_AUDIT_LOG / --audit-log (packages/proxy/src/audit.ts:10-11; run.ts wiring), so the usage feedback loop never starts for anyone who did not pre-configure an env var. The log already carries tool NAMES only (redacted, S18.4), so the privacy cost of default-on is minimal - but it must be clearly disclosed and separable from telemetry, which stays opt-in.",
+      "acceptance_criteria": [
+        "When the proxy runs, tool-call names are recorded by default to a per-user platform data directory (rotating, size-capped, redacted names-only - never args or results).",
+        "Opt-out via env var and config key; --audit-log/MCPFOLD_AUDIT_LOG still override the path.",
+        "doctor/status show where the log lives and its size.",
+        "docs/telemetry.md draws the line explicitly: local audit (default-on, never leaves the machine) vs telemetry (opt-in, allow-listed fields); DO_NOT_TRACK continues to govern telemetry only.",
+        "curate and status resolve the default path with zero flags."
+      ],
+      "files_hint": [
+        "packages/proxy/src/audit.ts",
+        "packages/cli/src/commands/run.ts",
+        "packages/cli/src/commands/curate.ts",
+        "docs/telemetry.md"
+      ],
+      "tests": [
+        "Unit: default path resolution per OS; opt-out honored; rotation cap enforced.",
+        "Ref-only invariant: no secret value or call payload can appear in the audit file."
+      ],
+      "definition_of_done": [
+        "A user who has simply been using their shimmed servers gets a meaningful `mcpfold curate` report with no prior setup."
+      ]
+    },
+    {
+      "id": "S24.9",
+      "epic": "E24",
+      "order": 9,
+      "priority": "p1",
+      "status": "todo",
+      "dependencies": [
+        "S24.6"
+      ],
+      "title": "Honest savings reporting: measured numbers on the user's own config, or no claim at all",
+      "user_story": "As a user, I want every savings number mcpfold shows me to be computed from MY servers and MY curation, so I can trust the tool's headline instead of being shown a fixture benchmark as if it were mine.",
+      "context": "Audit finding (2026-07-13): `init --guided` prints \"Typical context savings: ~80% fewer tool-schema tokens (7,476 -> 1,497)\" (packages/cli/src/onboarding/guided.ts:100-101, emitted at :217) after a sync that wired zero curation; the extension CodeLens assumes 15 tools/server. The product claims savings it is not delivering, in numbers it does not measure. With S24.6 discovery data, real numbers are computable.",
+      "acceptance_criteria": [
+        "Fixture-derived savings claims are removed from guided/CLI output; the benchmark figure appears only where it is labeled as the benchmark.",
+        "With curation active and a discovery snapshot present, sync/status print the measured reduction per server and in total (\"github: 9 of 35 tools, ~5.8k -> ~1.4k tokens (approx)\"), approximation labeled per the benchmark-honesty convention.",
+        "With no curation active, output says exactly that (\"no curation active - full toolsets loaded\") instead of implying savings.",
+        "The extension token CodeLens consumes real per-server counts via its existing toolCountFor injector whenever a discovery cache exists, dropping the 15-tool assumption."
+      ],
+      "files_hint": [
+        "packages/cli/src/onboarding/guided.ts",
+        "packages/cli/src/commands/sync.ts",
+        "packages/cli/src/commands/status.ts",
+        "apps/vscode-extension/src/tokenBudget.ts"
+      ],
+      "tests": [
+        "Unit: savings line rendered from a fixture discovery snapshot + directive; absence path renders the no-curation line.",
+        "Extension unit: toolCountFor injection path with a discovery cache fixture."
+      ],
+      "definition_of_done": [
+        "No user-facing surface states or implies savings that were not computed from that user's config."
+      ]
+    },
+    {
+      "id": "S24.10",
+      "epic": "E24",
+      "order": 10,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S24.1"
+      ],
+      "title": "Remote-server curation: run the filtering proxy on the bridge path",
+      "user_story": "As a user of remote (streamable-http) MCP servers, I want tool curation to apply to them too, so the flagship feature covers the direction the ecosystem is moving.",
+      "context": "Audit finding (2026-07-13): planRemoteRun always bridges remotes via pinned mcp-remote (packages/cli/src/commands/run.ts:141-186) and the proxy engages only on the stdio path (run.ts:104 shouldUseProxy), so a remote server can never be curated. The bridge is itself stdio-facing, so the filtering proxy can wrap the bridge child (proxy -> mcp-remote -> remote) without a native remote transport.",
+      "acceptance_criteria": [
+        "A remote server with a tools directive runs behind the filtering proxy by composing it over the bridge child's stdio; the client-visible tools/list is the curated set.",
+        "Audit logging and tool-definition pinning work identically on the bridged path.",
+        "Bridge-missing and remote-unreachable failures surface as coded errors naming the layer that failed.",
+        "docs coverage/limitation notes updated: remote curation supported via bridge; native remote transport remains future work."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/run.ts",
+        "packages/proxy/src/"
+      ],
+      "tests": [
+        "Integration: fixture bridge process + tools directive yields a filtered handshake; failure modes produce the coded errors."
+      ],
+      "definition_of_done": [
+        "Curation is no longer stdio-only."
+      ]
+    },
+    {
+      "id": "S24.11",
+      "epic": "E24",
+      "order": 11,
+      "priority": "p2",
+      "status": "todo",
+      "dependencies": [
+        "S24.6"
+      ],
+      "title": "Allow-list staleness: surface new upstream tools instead of hiding them forever",
+      "user_story": "As a user with a curated server, I want to be told when the server ships new tools my allow-list predates, so useful new capabilities are a conscious choice instead of silently invisible.",
+      "context": "Audit finding (2026-07-13): filterTools keeps only listed names (packages/proxy/src/filter.ts:52-56), so any tool added upstream after curation is invisible with no signal, indefinitely. Tool-definition pinning (S18.1) already diffs the live surface against a stored one (diffToolSurface/hasToolDrift in packages/proxy/src/proxy.ts) - that drift machinery is not connected to curation allow-lists.",
+      "acceptance_criteria": [
+        "When the proxy or a discovery refresh observes tools not covered by an allow directive, the delta is recorded to the local surface cache.",
+        "doctor and status report \"N new tools since this allow-list was written\" per affected server.",
+        "`mcpfold curate --refresh` re-runs the recommendation including new tools and shows the diff before writing; it never widens an allow-list without explicit consent.",
+        "Deny-mode directives are unaffected (new tools already pass through by construction)."
+      ],
+      "files_hint": [
+        "packages/proxy/src/proxy.ts",
+        "packages/proxy/src/filter.ts",
+        "packages/core/src/curate.ts",
+        "packages/cli/src/checks/curation.ts"
+      ],
+      "tests": [
+        "Unit: surface delta detection against a cached snapshot; refresh diff rendering; consent gate on widening."
+      ],
+      "definition_of_done": [
+        "A curated server's new upstream tools always produce a visible, actionable signal."
+      ]
     }
   ],
   "milestones": [
@@ -5801,6 +6150,24 @@
         "S21.6"
       ],
       "goal": "Publish the VS Code extension and its inline token budget, upgrade the benchmark to exact tokenizers with a real server token-cost leaderboard, and instrument the web funnel so channel-to-install conversion is measured, not guessed."
+    },
+    {
+      "name": "functional activation",
+      "spec_ref": "post-PRD gap audit 2026-07-13",
+      "stories": [
+        "S24.1",
+        "S24.2",
+        "S24.3",
+        "S24.4",
+        "S24.5",
+        "S24.6",
+        "S24.7",
+        "S24.8",
+        "S24.9",
+        "S24.10",
+        "S24.11"
+      ],
+      "goal": "Make the token-savings promise real end-to-end: any curated server routes through the proxy, the shim launches from any cwd, curate is on main and works from day zero via live discovery, auditing feeds it by default, and every savings number shown is measured from the user's own config. Gated by a cross-OS e2e that walks the whole chain."
     }
   ]
 }
