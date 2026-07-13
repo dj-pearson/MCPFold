@@ -95,7 +95,9 @@ interface Frame {
  */
 export function computeConfigBudget(
   text: string,
-  toolCountFor: (name: string) => number = () => REPRESENTATIVE_TOOL_COUNT,
+  // Real per-server tool count, or `undefined` when unknown (falls back to the representative
+  // assumption and marks the entry approximate). Defaults to "always unknown" (S24.9).
+  toolCountFor: (name: string) => number | undefined = () => undefined,
 ): ConfigBudget {
   const servers: ServerBudget[] = [];
   let serversLine = -1;
@@ -164,13 +166,15 @@ export function computeConfigBudget(
         const parent = frames.length > 0 ? frames[frames.length - 1].introKey : null;
         if (frames.length === 1 && lastString === 'servers') serversLine = lastStringLine;
         if (parent === 'servers') {
-          const count = toolCountFor(lastString);
+          const real = toolCountFor(lastString);
+          const count = real ?? REPRESENTATIVE_TOOL_COUNT;
           servers.push({
             name: lastString,
             line: lastStringLine,
             toolCount: count,
             tokens: estimateServerTokens(lastString, count),
-            approximate: true,
+            // Real counts (from a discovery snapshot) are exact; only the representative fallback is approximate.
+            approximate: real === undefined,
           });
         }
         pendingKey = lastString;

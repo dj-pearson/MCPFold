@@ -50,7 +50,11 @@ describe('runGuided (S10.3)', () => {
     // It folded out to the client.
     expect(existsSync(cursorFile())).toBe(true);
     expect(result.synced).toBe(true);
-    expect(writes.some((l) => l.includes('~80%'))).toBe(true);
+    // S24.9: with nothing curated, the flow says so honestly instead of quoting the fixture as "typical
+    // savings"; the ~80% figure appears only labeled as the benchmark.
+    expect(writes.some((l) => l.includes('No curation active'))).toBe(true);
+    expect(writes.some((l) => l.includes('benchmark') && l.includes('~80%'))).toBe(true);
+    expect(writes.some((l) => l.includes('Typical context savings'))).toBe(false);
   });
 
   it('aborts cleanly with no partial writes when overwrite is declined', async () => {

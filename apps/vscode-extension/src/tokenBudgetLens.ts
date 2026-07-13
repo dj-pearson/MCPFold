@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { computeConfigBudget } from './tokenBudget';
+import { cacheToolCountFor } from './discoveryCache';
 
 /**
  * Inline tool-token-budget CodeLens for mcp.config.jsonc (S21.2). Above the `servers` block it shows
@@ -34,28 +35,36 @@ export class TokenBudgetLensProvider implements vscode.CodeLensProvider {
     // Belt-and-suspenders alongside the selector: never annotate a non-MCP file.
     if (!/mcp\.config\.jsonc?$/.test(document.fileName)) return [];
 
-    const budget = computeConfigBudget(document.getText());
+    // S24.9: use real per-server tool counts from the discovery cache (`mcpfold inspect`) when present,
+    // dropping the representative 15-tool assumption. Servers without a snapshot stay approximate.
+    const budget = computeConfigBudget(document.getText(), cacheToolCountFor());
     if (budget.servers.length === 0) return [];
 
     const lenses: vscode.CodeLens[] = [];
 
     if (budget.serversLine >= 0) {
       const plural = budget.servers.length === 1 ? '' : 's';
+      const anyApprox = budget.servers.some((s) => s.approximate);
+      const label = anyApprox ? ' (approx)' : ' (measured)';
       lenses.push(
         new vscode.CodeLens(this.lineRange(document, budget.serversLine), {
-          title: `$(dashboard) ~${fmt(budget.totalTokens)} tool-schema tokens across ${budget.servers.length} server${plural} (approx) — open calculator`,
-          tooltip:
-            'Estimated tokens these servers’ tool schemas add to every model request. Approximate until mcpfold collects each server’s real tools/list (S21.4). Click to open the full token calculator.',
+          title: `$(dashboard) ~${fmt(budget.totalTokens)} tool-schema tokens across ${budget.servers.length} server${plural}${label} — open calculator`,
+          tooltip: anyApprox
+            ? 'Estimated tokens these servers’ tool schemas add to every model request. Approximate for servers mcpfold has not yet introspected — run `mcpfold inspect` to measure them. Click to open the full token calculator.'
+            : 'Tokens these servers’ tool schemas add to every model request, measured from each server’s real tools/list (`mcpfold inspect`). Click to open the full token calculator.',
           command: 'mcpfold.openCalculator',
         }),
       );
     }
 
     for (const server of budget.servers) {
+      const label = server.approximate ? ' (approx)' : ' (measured)';
       lenses.push(
         new vscode.CodeLens(this.lineRange(document, server.line), {
-          title: `~${fmt(server.tokens)} tokens · ~${server.toolCount} tools (approx)`,
-          tooltip: `Estimated tool-schema tokens “${server.name}” adds to the model context window, assuming ~${server.toolCount} tools. Approximate until mcpfold collects this server’s real tools/list. Click to open the token calculator.`,
+          title: `~${fmt(server.tokens)} tokens · ${server.toolCount} tools${label}`,
+          tooltip: server.approximate
+            ? `Estimated tool-schema tokens “${server.name}” adds to context, assuming ~${server.toolCount} tools. Run \`mcpfold inspect ${server.name}\` to measure its real surface. Click to open the token calculator.`
+            : `Tool-schema tokens “${server.name}” adds to context, based on its real ${server.toolCount}-tool surface (\`mcpfold inspect\`). Click to open the token calculator.`,
           command: 'mcpfold.openCalculator',
         }),
       );

@@ -12,6 +12,7 @@ import type { SecretProvider } from '@mcpfold/secrets';
 import { runDiff } from './diff.js';
 import { runDoctor } from './doctor.js';
 import { summarizeCuration } from '../checks/curation.js';
+import { curatedServerSavings, renderServerSavingsLine } from '../discover/savings.js';
 import { detectClients } from '../util/detect-clients.js';
 import { loadConfigFromDisk } from '../util/config.js';
 import { readAuditLogLines } from '../util/audit-log.js';
@@ -69,6 +70,12 @@ export interface StatusData {
    * doctor `info`. Null only when the config could not be read.
    */
   curationSummary: { totalServers: number; curatedServers: number } | null;
+  /**
+   * S24.9: measured per-server savings lines for curated servers that have a discovery snapshot —
+   * computed from the user's own config, never a fixture. Empty when nothing is curated or no
+   * snapshot exists yet.
+   */
+  savings: string[];
   ok: boolean;
 }
 
@@ -173,6 +180,11 @@ function renderHuman(data: StatusData): string {
       `${style.bold('Curation:')} ${style.yellow('none configured')} — all ${total} server${total === 1 ? '' : 's'} expose their full toolsets ${symbols.arrow} run \`mcpfold curate\``,
     );
   }
+  if (data.savings.length > 0) {
+    // S24.9: measured savings on the user's own config (only for curated servers with a snapshot).
+    lines.push(`${style.bold('Savings')} ${style.dim('(measured on your config):')}`);
+    for (const line of data.savings) lines.push(`  ${style.green(line)}`);
+  }
   lines.push('');
   lines.push(
     data.ok
@@ -227,8 +239,11 @@ export async function runStatus(options: StatusOptions): Promise<CommandOutput<S
   // S24.5: how many servers are curated at all — surfaces "no curation configured" the same way doctor
   // does. Best-effort: an unreadable/invalid config (already reported by doctor) just omits the line.
   let curationSummary: StatusData['curationSummary'] = null;
+  let savings: string[] = [];
   try {
-    curationSummary = summarizeCuration(loadConfigFromDisk(options.cwd).config);
+    const cfg = loadConfigFromDisk(options.cwd).config;
+    curationSummary = summarizeCuration(cfg);
+    savings = curatedServerSavings(cfg.servers).map(renderServerSavingsLine);
   } catch {
     curationSummary = null;
   }
@@ -241,6 +256,7 @@ export async function runStatus(options: StatusOptions): Promise<CommandOutput<S
     cloud,
     curation,
     curationSummary,
+    savings,
     ok,
   };
   return { data, human: renderHuman(data), exit: ok ? EXIT.SUCCESS : EXIT.DIFF };

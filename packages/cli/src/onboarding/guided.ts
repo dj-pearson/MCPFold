@@ -10,6 +10,7 @@ import { runInit } from '../commands/init.js';
 import { runImport } from '../commands/import.js';
 import { runDoctor } from '../commands/doctor.js';
 import { runSync } from '../commands/sync.js';
+import { renderSavingsBlock } from '../discover/savings.js';
 
 /**
  * Guided first-run onboarding (S10.3): walk a newcomer from zero to synced — detect clients,
@@ -97,8 +98,6 @@ export interface GuidedResult {
   aborted: boolean;
 }
 
-const SAVINGS =
-  'Typical context savings: ~80% fewer tool-schema tokens (7,476 → 1,497). See docs/benchmark.md.';
 
 export async function runGuided(
   options: GuidedOptions,
@@ -214,7 +213,14 @@ export async function runGuided(
   }
 
   // --- Step 4: the payoff --------------------------------------------------------------------
-  write(SAVINGS);
+  // Honest savings (S24.9): numbers are measured from THIS user's config (discovery snapshots) and
+  // their curation — never the fixture benchmark presented as if it were theirs.
+  try {
+    const { config } = loadConfigFromDisk(options.cwd);
+    for (const line of renderSavingsBlock(config.servers)) write(line);
+  } catch {
+    // No readable config (e.g. a dry run that scaffolded nothing) — skip the savings block silently.
+  }
   write('Done. Try `mcpfold status` any time to check your setup.');
   write(
     'Need to hand a tool the flat standard file? `mcpfold export --mcp-json` writes a .mcp.json.',

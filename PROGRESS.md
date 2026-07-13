@@ -2054,3 +2054,33 @@ Tests: core `tokens.test.ts`; cli `discover.test.ts` (cache round-trip, inspect 
 estimates, ref-only invariant that no secret/env lands in the cache, coded failure on no-handshake,
 curate-uses-snapshot integration). Snapshots for the completion scripts regenerated. Full core (122) +
 cli (389) suites green; `pnpm --filter mcpfold build` clean; typecheck + lint clean.
+
+---
+
+## S24.9 — Honest savings reporting: measured numbers on the user's own config, or no claim
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p1, deps: S24.6.
+
+No user-facing surface states or implies savings that were not computed from that user's config.
+
+- **Removed the fixture claim**: guided onboarding's "Typical context savings: ~80% (7,476 → 1,497)"
+  is gone. `packages/cli/src/discover/savings.ts` computes measured savings from a discovery snapshot
+  (S24.6) + the server's directive: `serverSavings`, `renderServerSavingsLine`
+  ("github: 9 of 35 tools, ~5.8k → ~1.4k tokens (approx)"), and `renderSavingsBlock`.
+- **guided** now prints, from the user's own config: measured per-server + total savings when snapshots
+  exist; a nudge to `mcpfold inspect` when curated but not yet introspected; and an honest
+  "No curation active — every server exposes its full toolset" line when nothing is curated, with the
+  ~80% figure appearing only labeled as the benchmark.
+- **sync** footer and **status** now print the measured per-server reduction for curated servers that
+  have a snapshot (new `savings` field on StatusData). Verified end-to-end against the fixture server:
+  `status`/`sync` show "echo: 2 of 3 tools, ~69 → ~46 tokens (approx)".
+- **Extension CodeLens** (criterion 4): new `apps/vscode-extension/src/discoveryCache.ts` reads the
+  CLI's per-user discovery cache; `computeConfigBudget`'s `toolCountFor` injector now returns
+  `number | undefined` (undefined → representative + `approximate: true`; a real count → exact,
+  `approximate: false`). `tokenBudgetLens` feeds it `cacheToolCountFor()`, so an introspected server
+  shows "(measured)" with its real count and the 15-tool assumption is dropped where data exists.
+
+Tests: cli `savings.test.ts` (measure/deny/format/block paths incl. the no-curation and no-snapshot
+lines), guided honesty assertions, status shape + savings, extension `discoveryCache.test.ts`
+(toolCountFor injection: cached → exact, uncached → approximate). Full cli (396) + extension (19) +
+core suites green; root lint + core purity clean; `mcpfold` build clean.
