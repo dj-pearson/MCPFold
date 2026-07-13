@@ -84,7 +84,14 @@ describe('runRun routing (S5.3)', () => {
   it('routes a directive-less remote server through the plain bridge (no proxy overhead)', async () => {
     const proxySpawnFn = vi.fn<ProxySpawner>(async () => 0);
     const spawnFn = vi.fn<Spawner>(async () => 0);
-    await runRun({ cwd, name: 'remotePlain', providers: [], spawnFn, proxySpawnFn, trust: trustAll });
+    await runRun({
+      cwd,
+      name: 'remotePlain',
+      providers: [],
+      spawnFn,
+      proxySpawnFn,
+      trust: trustAll,
+    });
     expect(spawnFn).toHaveBeenCalledTimes(1);
     expect(proxySpawnFn).not.toHaveBeenCalled();
   });

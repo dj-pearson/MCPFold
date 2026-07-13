@@ -77,8 +77,7 @@ describe('curate --json ↔ VS Code CodeLens contract (S24.3)', () => {
     const report = ext.parseCurateReport(stdout);
     expect(report).not.toBeNull();
     const github = report!.get('github') as
-      | { usedCount: number; unusedCount: number; alreadyCurated: boolean }
-      | undefined;
+      { usedCount: number; unusedCount: number; alreadyCurated: boolean } | undefined;
     expect(github).toBeDefined();
     // The parser read the CLI's fields: recommended.list → usedCount, unusedAllowed → unusedCount.
     expect(github!.usedCount).toBe(2);

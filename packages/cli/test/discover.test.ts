@@ -38,7 +38,8 @@ const TOOLS = [
 function mockServer(): MessageTransport {
   let onMsg: ((m: JsonRpcMessage) => void) | undefined;
   const reply = (method: string, id: JsonRpcId): JsonRpcMessage | null => {
-    if (method === 'initialize') return { jsonrpc: '2.0', id, result: { protocolVersion: '2025-06-18' } };
+    if (method === 'initialize')
+      return { jsonrpc: '2.0', id, result: { protocolVersion: '2025-06-18' } };
     if (method === 'tools/list') return { jsonrpc: '2.0', id, result: { tools: TOOLS } };
     return null;
   };
@@ -105,9 +106,10 @@ describe('runInspect (S24.6)', () => {
     // Exact names, sorted; each token estimate matches the benchmark method on the tool's JSON.
     expect(snap.tools.map((t) => t.name)).toEqual(['create_pr', 'delete_repo', 'search_code']);
     expect(snap.toolCount).toBe(3);
-    const expectedFor = (name: string) =>
-      estimateToolTokens(TOOLS.find((t) => t.name === name));
-    expect(snap.tools.find((t) => t.name === 'search_code')!.tokens).toBe(expectedFor('search_code'));
+    const expectedFor = (name: string) => estimateToolTokens(TOOLS.find((t) => t.name === name));
+    expect(snap.tools.find((t) => t.name === 'search_code')!.tokens).toBe(
+      expectedFor('search_code'),
+    );
     expect(snap.totalTokens).toBe(TOOLS.reduce((s, t) => s + estimateToolTokens(t), 0));
     // The snapshot was persisted to the (temp) cache.
     expect(cachedToolNames('gh', { dir: cacheDir })).toEqual([

@@ -107,7 +107,10 @@ describe('renderWithStrategy — tools directive forces the shim (S5.3)', () => 
       { osContext: ctx, strategyOverride: 'native-env' },
     );
     const parsed = JSON.parse(file.contents);
-    expect(parsed.mcpServers.playwright).toEqual({ command: 'mcpfold', args: ['run', 'playwright'] });
+    expect(parsed.mcpServers.playwright).toEqual({
+      command: 'mcpfold',
+      args: ['run', 'playwright'],
+    });
     // The native-env placeholder never reaches the file — the launch goes through the proxy.
     expect(file.contents).not.toContain('GH_TOKEN');
   });

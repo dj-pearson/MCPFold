@@ -98,7 +98,6 @@ export interface GuidedResult {
   aborted: boolean;
 }
 
-
 export async function runGuided(
   options: GuidedOptions,
   deps: {
@@ -219,7 +218,10 @@ export async function runGuided(
     const uncurated = Object.entries(config.servers)
       .filter(([, s]) => s.transport === 'stdio' && !s.tools)
       .map(([name]) => name);
-    if (uncurated.length > 0 && (await prompt.confirm('Curate your servers to just the tools you use?', false))) {
+    if (
+      uncurated.length > 0 &&
+      (await prompt.confirm('Curate your servers to just the tools you use?', false))
+    ) {
       write('Curate each server to a tool allow-list (discovers its live surface):');
       for (const name of uncurated) write(`  mcpfold curate ${name}`);
     }

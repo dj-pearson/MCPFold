@@ -331,8 +331,14 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       .option('--min-calls <n>', 'ignore tools called fewer than N times')
       .option('--write', 'apply the recommended allow-lists to the canonical config')
       .option('--apply', 'alias for --write')
-      .option('--tools <list>', 'day-zero: allow exactly these tools (comma-separated) for <server>')
-      .option('--refresh', 'surface tools <server> ships that its allow-list predates, and add them with consent')
+      .option(
+        '--tools <list>',
+        'day-zero: allow exactly these tools (comma-separated) for <server>',
+      )
+      .option(
+        '--refresh',
+        'surface tools <server> ships that its allow-list predates, and add them with consent',
+      )
       .option('-y, --yes', 'skip the confirmation prompt when writing'),
   ).action(
     async (
@@ -358,7 +364,10 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       };
       const write = Boolean(opts.write || opts.apply);
       const toolsList = opts.tools
-        ? opts.tools.split(',').map((s) => s.trim()).filter(Boolean)
+        ? opts.tools
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
         : undefined;
       setExit(
         await runCommand<CurateData | CuratePickData>(
@@ -443,7 +452,9 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   addGlobalFlags(
     program
       .command('inspect [server]')
-      .description("introspect a server's live tool surface and cache tool counts + token estimates")
+      .description(
+        "introspect a server's live tool surface and cache tool counts + token estimates",
+      )
       .option('--timeout <ms>', 'per-server connect timeout in milliseconds (default: 10000)'),
   ).action(async (server: string | undefined, opts: GlobalFlags & { timeout?: string }) => {
     const ctx = resolve(opts);

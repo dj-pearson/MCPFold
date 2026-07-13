@@ -200,7 +200,11 @@ function renderHuman(data: StatusData): string {
     lines.push(
       `${style.bold('Curation:')} ${style.yellow(`${n} server${n === 1 ? '' : 's'}`)} could be trimmed to your usage${trim} ${symbols.arrow} run \`mcpfold curate\``,
     );
-  } else if (data.curationSummary && data.curationSummary.curatedServers === 0 && data.curationSummary.totalServers > 0) {
+  } else if (
+    data.curationSummary &&
+    data.curationSummary.curatedServers === 0 &&
+    data.curationSummary.totalServers > 0
+  ) {
     // S24.5: no server is curated at all — the headline feature is unused. Mirror the doctor info.
     const total = data.curationSummary.totalServers;
     lines.push(

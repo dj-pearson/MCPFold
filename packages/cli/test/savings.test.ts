@@ -81,7 +81,10 @@ describe('renderSavingsBlock', () => {
   });
 
   it('nudges to inspect when curated but no snapshot is cached yet', () => {
-    const lines = renderSavingsBlock({ github: { tools: { mode: 'allow', list: ['a'] } } }, { dir: cacheDir });
+    const lines = renderSavingsBlock(
+      { github: { tools: { mode: 'allow', list: ['a'] } } },
+      { dir: cacheDir },
+    );
     expect(lines.join('\n')).toContain('mcpfold inspect');
     expect(lines.join('\n')).not.toContain('Measured');
   });

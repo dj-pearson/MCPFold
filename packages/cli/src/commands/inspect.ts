@@ -1,4 +1,9 @@
-import { resolveProfile, UnknownProfileError, UsageError, type ResolvedServer } from '@mcpfold/core';
+import {
+  resolveProfile,
+  UnknownProfileError,
+  UsageError,
+  type ResolvedServer,
+} from '@mcpfold/core';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
 import { loadConfigFromDisk } from '../util/config.js';
 import { discoverSurface, type TransportFactory } from '../discover/surface.js';
@@ -54,7 +59,13 @@ function targetsFor(
   return names.map((name) => {
     const server = config.servers[name];
     if (!server) throw new UsageError(`No server "${name}" in the canonical config.`);
-    return { name, ...server, tags: server.tags ?? [], client: 'cursor', scope: 'user' } as ResolvedServer;
+    return {
+      name,
+      ...server,
+      tags: server.tags ?? [],
+      client: 'cursor',
+      scope: 'user',
+    } as ResolvedServer;
   });
 }
 
@@ -139,7 +150,9 @@ function renderHuman(results: InspectServerResult[]): string {
   const lines: string[] = [];
   for (const r of results) {
     if (!r.ok || !r.snapshot) {
-      lines.push(`${style.red(symbols.err)} ${style.bold(r.server)}: ${r.error ?? 'discovery failed'}`);
+      lines.push(
+        `${style.red(symbols.err)} ${style.bold(r.server)}: ${r.error ?? 'discovery failed'}`,
+      );
       continue;
     }
     const s = r.snapshot;

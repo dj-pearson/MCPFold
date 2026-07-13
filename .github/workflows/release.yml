@@ -207,21 +207,23 @@ jobs:
           path: build
           pattern: binaries-*
           merge-multiple: true
-      - name: Create/attach the release (once, no race)
-        uses: softprops/action-gh-release@v3
-        with:
-          # On the push path this tag doesn't exist yet: softprops creates the tag + Release at the
-          # checked-out commit (main HEAD, which carries the version bump). On the manual path it
-          # updates the existing Release. generate_release_notes only fills notes at creation time,
-          # so it won't clobber a human-authored body on the manual path.
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: ${{ steps.tag.outputs.tag }}
-          generate_release_notes: true
-          files: |
-            build/mcpfold-*-*
-            build/mcpfold-*.sha256
+      - name: Create the release + attach binaries (idempotent, race-free)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # softprops/action-gh-release@v3 raced when it created the tag + Release and uploaded assets in
+        # ONE call: GitHub's tag/asset eventual-consistency produced "Release is not yet discoverable by
+        # tag" retries and a 404 on asset-metadata update, and the action exited non-zero leaving a stuck
+        # DRAFT (the v1.2.0 failure). The gh CLI is idempotent and race-free by construction: create the
+        # Release once (which also creates the tag at this commit), then upload with --clobber so a
+        # re-run heals a partial upload. On the manual-Release path the Release already exists, so we
+        # skip creation (and never clobber a human-authored body) and only (re)attach the binaries.
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists — (re)attaching its assets."
+          else
+            gh release create "$TAG" --title "$TAG" --generate-notes --latest --target "$GITHUB_SHA"
+          fi
+          gh release upload "$TAG" build/mcpfold-* --clobber
       - name: Render Homebrew formula + Scoop manifest
         run: node scripts/render-packaging.mjs "$TAG"
       - name: Push to homebrew-tap + scoop-bucket

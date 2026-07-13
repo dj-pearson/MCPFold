@@ -205,7 +205,10 @@ export async function runSync(options: SyncOptions): Promise<CommandOutput<SyncD
   // user can confirm curation is live rather than silently inert.
   const curated = [
     ...new Set(
-      [...keptServers.values()].flat().filter((s) => s.tools).map((s) => s.name),
+      [...keptServers.values()]
+        .flat()
+        .filter((s) => s.tools)
+        .map((s) => s.name),
     ),
   ].sort();
 

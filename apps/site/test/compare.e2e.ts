@@ -76,7 +76,10 @@ test('/compare/mcp-config-manager: honest positioning respects the non-goals (no
 const NEW_COMPARISONS = [
   { id: 'reduce-mcp-token-usage', h1: 'How to reduce MCP token usage' },
   { id: 'mcpfold-vs-tool-search', h1: 'mcpfold vs native tool-search' },
-  { id: 'open-source-mcp-gateway', h1: 'An open-source, local-first alternative to an MCP gateway' },
+  {
+    id: 'open-source-mcp-gateway',
+    h1: 'An open-source, local-first alternative to an MCP gateway',
+  },
 ] as const;
 
 for (const c of NEW_COMPARISONS) {

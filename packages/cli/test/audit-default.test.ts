@@ -21,7 +21,9 @@ const cfg = (audit?: Config['audit']): Pick<Config, 'audit'> => ({ audit });
 describe('defaultAuditLogPath (per-OS)', () => {
   it('uses %LOCALAPPDATA%\\mcpfold on Windows', () => {
     expect(
-      defaultAuditLogPath('C:\\Users\\me', 'win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }),
+      defaultAuditLogPath('C:\\Users\\me', 'win32', {
+        LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local',
+      }),
     ).toBe('C:\\Users\\me\\AppData\\Local\\mcpfold\\audit.log');
     // Falls back under the home dir when LOCALAPPDATA is unset.
     expect(defaultAuditLogPath('C:\\Users\\me', 'win32', {})).toBe(
@@ -52,9 +54,9 @@ describe('resolveActiveAuditLog', () => {
   it('prefers explicit, then MCPFOLD_AUDIT_LOG, then the default path', () => {
     expect(resolveActiveAuditLog({ explicit: '/x/a.log', env: {} })).toBe('/x/a.log');
     expect(resolveActiveAuditLog({ env: { MCPFOLD_AUDIT_LOG: '/y/b.log' } })).toBe('/y/b.log');
-    expect(
-      resolveActiveAuditLog({ env: {}, home: '/home/me', platform: 'linux' }),
-    ).toBe('/home/me/.local/state/mcpfold/audit.log');
+    expect(resolveActiveAuditLog({ env: {}, home: '/home/me', platform: 'linux' })).toBe(
+      '/home/me/.local/state/mcpfold/audit.log',
+    );
   });
 
   it('returns undefined only when opted out and no explicit path is given', () => {
@@ -99,7 +101,10 @@ describe('ref-only invariant: no secret value in the audit file (S24.8)', () => 
       now: () => 0,
     });
     // A tools/call whose arguments carry a secret value.
-    rec.callStart(1, 'create_pr', { name: 'create_pr', arguments: { token: 'supersecret-abc123' } });
+    rec.callStart(1, 'create_pr', {
+      name: 'create_pr',
+      arguments: { token: 'supersecret-abc123' },
+    });
     rec.callEnd(1, 'ok');
 
     const raw = readFileSync(path, 'utf8');
