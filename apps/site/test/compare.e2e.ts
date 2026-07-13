@@ -71,10 +71,47 @@ test('/compare/mcp-config-manager: honest positioning respects the non-goals (no
   expect(html.toLowerCase()).toContain('values never synced');
 });
 
+// S21.6 — the three token-focused comparison pages shipped without e2e. Each must serve its intro,
+// table, related links, and TechArticle + BreadcrumbList structured data in the initial no-JS HTML.
+const NEW_COMPARISONS = [
+  { id: 'reduce-mcp-token-usage', h1: 'How to reduce MCP token usage' },
+  { id: 'mcpfold-vs-tool-search', h1: 'mcpfold vs native tool-search' },
+  { id: 'open-source-mcp-gateway', h1: 'An open-source, local-first alternative to an MCP gateway' },
+] as const;
+
+for (const c of NEW_COMPARISONS) {
+  test(`/compare/${c.id}: intro + table + related + TechArticle (no-JS)`, async ({ request }) => {
+    const html = await rawHtml(request, `/compare/${c.id}`);
+    expect(html).toContain(c.h1);
+    expect(html).toContain(`<title>`);
+    // Core content blocks are server-rendered.
+    expect(html).toContain('data-testid="compare-intro"');
+    expect(html).toContain('data-testid="compare-table"');
+    expect(html).toContain('data-testid="compare-related"');
+
+    const blocks = jsonLdBlocks(html);
+    const article = blocks.find((b) => b['@type'] === 'TechArticle');
+    expect(article, `TechArticle JSON-LD on /compare/${c.id}`).toBeTruthy();
+    expect(article!.headline).toBe(c.h1);
+
+    const crumb = blocks.find((b) => b['@type'] === 'BreadcrumbList');
+    expect(crumb, `BreadcrumbList JSON-LD on /compare/${c.id}`).toBeTruthy();
+    const trail = crumb!.itemListElement as Array<Record<string, unknown>>;
+    expect(trail[0]!.name).toBe('Compare');
+  });
+}
+
 test('every comparison page is in the sitemap', async ({ request }) => {
   const sitemap = await allSitemaps(request);
   expect(sitemap).toContain('https://mcpfold.com/compare');
-  for (const id of ['manual-vs-mcpfold', 'mcp-config-manager']) {
+  const ids = [
+    'manual-vs-mcpfold',
+    'mcp-config-manager',
+    'reduce-mcp-token-usage',
+    'mcpfold-vs-tool-search',
+    'open-source-mcp-gateway',
+  ];
+  for (const id of ids) {
     expect(sitemap, `sitemap lists /compare/${id}`).toContain(`/compare/${id}`);
   }
 });

@@ -2213,3 +2213,28 @@ judged unnecessary given the snapshot already captures the full surface.
 Tests: `curate-refresh.test.ts` (newUpstreamTools/staleAllowlists incl. deny; refresh consent gate,
 widen-on-yes, no-op-when-covered, deny no-op); doctor staleness info; status shape. Completions
 snapshots regenerated for `--refresh`. Full cli suite green (416); root lint + core purity clean.
+
+---
+
+## S21.6 — e2e coverage for the token calculator and new comparison pages
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p2, deps: none.
+Status was stale-`blocked` — all deps satisfied and the pages already shipped; flipped to done only
+after building + running both Playwright configs green.
+
+- **`apps/site/test/calculator.e2e.ts`** (new, dev-server config — the calculator is interactive):
+  asserts compute outputs from the default presets (`tools-out` = "56 → 16"; tokens pair; a positive
+  reduction %), the keep slider (20 → "56 → 56" / 0%; 0 → "56 → 0"), config-paste parsing (2 servers →
+  "30 → 8", `role=status` "Loaded 2 servers"; bad input → "Could not parse" without clobbering),
+  quick-add / remove (row count changes), and the client-injected WebApplication + FAQPage JSON-LD
+  (Seo.tsx). **5 tests pass** against the real Vite dev server.
+- **`apps/site/test/compare.e2e.ts`** (prerender config, built dist): added the three token-focused
+  comparison pages (`reduce-mcp-token-usage`, `mcpfold-vs-tool-search`, `open-source-mcp-gateway`) —
+  each asserts `compare-intro` / `compare-table` / `compare-related` in the no-JS HTML plus a
+  TechArticle (headline === h1) and BreadcrumbList JSON-LD node — and extended the sitemap test to all
+  five comparisons. **7 tests pass** against the built dist.
+
+Verified: `tsc --noEmit` clean; `pnpm --filter @mcpfold/site build` green (142 routes prerendered);
+calculator e2e 5/5 (dev server), compare e2e 7/7 (prerender). (Env note: `gsap` was declared but not
+installed in this workspace — `pnpm install` pulled it; a pre-existing gsap-less tsc error in
+TheFold.tsx was the missing dep, not a code fault.)

@@ -4741,7 +4741,7 @@
       "epic": "E21",
       "order": 6,
       "priority": "p2",
-      "status": "blocked",
+      "status": "done",
       "dependencies": [],
       "title": "e2e coverage for the token calculator and new comparison pages",
       "user_story": "As CI, I want the new /mcp-token-calculator and the new /compare token pages covered by tests, so their behavior and structured data can't silently regress.",
