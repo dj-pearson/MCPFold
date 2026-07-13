@@ -6,6 +6,7 @@ import { UsageError } from '@mcpfold/core';
 import { loadConfig } from '@mcpfold/core';
 import { runCurate, runCurateApply, resolveAuditLogPath } from '../src/commands/curate.js';
 import { checkCurationOpportunity } from '../src/checks/curation.js';
+import { readAuditLogLines } from '../src/util/audit-log.js';
 
 const CONFIG = `{
   "version": 1,
@@ -231,5 +232,50 @@ describe('checkCurationOpportunity (S23.3 doctor hint)', () => {
     const cfg = loadConfig(CONFIG);
     if (!cfg.ok) return;
     expect(checkCurationOpportunity(cfg.config, 'mcp.config.jsonc', {})).toEqual([]);
+  });
+});
+
+describe('readAuditLogLines (S23.4 rotated logs)', () => {
+  it('merges the primary log and its rotated siblings', () => {
+    // Simulate a rotation: an older call lives only in a rotated sibling.
+    writeFileSync(
+      `${logPath}.1234.0.deadbeef`,
+      call('github', 'list_issues', 'ok', '2026-06-01T00:00:00.000Z'),
+    );
+    const lines = readAuditLogLines(logPath);
+    const text = lines.join('\n');
+    expect(text).toContain('list_issues'); // from the rotated file
+    expect(text).toContain('search_code'); // from the primary
+  });
+
+  it('curate counts a tool that only appears in a rotated log', () => {
+    writeFileSync(
+      `${logPath}.1234.0.deadbeef`,
+      call('github', 'list_issues', 'ok', '2026-06-01T00:00:00.000Z'),
+    );
+    const { data } = runCurate({ cwd, auditLogPath: logPath, now: NOW });
+    const gh = data.servers.find((s) => s.server === 'github')!;
+    expect(gh.recommended.list).toContain('list_issues');
+  });
+
+  it('read order does not change the merged result', () => {
+    writeFileSync(
+      `${logPath}.aaaa.0.1111`,
+      call('github', 'a_tool', 'ok', '2026-06-01T00:00:00.000Z'),
+    );
+    writeFileSync(
+      `${logPath}.bbbb.1.2222`,
+      call('github', 'b_tool', 'ok', '2026-06-02T00:00:00.000Z'),
+    );
+    const sorted = [...new Set(readAuditLogLines(logPath))].sort();
+    expect(sorted.some((l) => l.includes('a_tool'))).toBe(true);
+    expect(sorted.some((l) => l.includes('b_tool'))).toBe(true);
+  });
+
+  it('ignores unrelated files in the same directory', () => {
+    writeFileSync(join(cwd, 'audit.jsonlOTHER'), call('evil', 'nope', 'ok', 't')); // no dot separator
+    writeFileSync(join(cwd, 'unrelated.log'), call('evil', 'nope2', 'ok', 't'));
+    const text = readAuditLogLines(logPath).join('\n');
+    expect(text).not.toContain('nope');
   });
 });

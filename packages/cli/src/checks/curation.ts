@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { analyzeUsage, parseAuditEvents, type Config } from '@mcpfold/core';
+import { readAuditLogLines } from '../util/audit-log.js';
 import type { Finding } from './types.js';
 
 /**
@@ -18,7 +19,7 @@ export function checkCurationOpportunity(
 
   let events;
   try {
-    events = parseAuditEvents(readFileSync(logPath, 'utf8').split('\n'));
+    events = parseAuditEvents(readAuditLogLines(logPath));
   } catch {
     return [];
   }

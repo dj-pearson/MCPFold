@@ -13,6 +13,7 @@ import {
   type ToolsDirective,
 } from '@mcpfold/core';
 import { findConfigPath, loadConfigFromDisk } from '../util/config.js';
+import { readAuditLogLines } from '../util/audit-log.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
@@ -204,8 +205,8 @@ export function buildCurateData(opts: CurateOptions): CurateData {
     opts.sinceDays !== undefined ? now() - opts.sinceDays * 24 * 60 * 60 * 1000 : undefined;
   const minCalls = opts.minCalls ?? 1;
 
-  const contents = readFileSync(logPath, 'utf8');
-  const events = parseAuditEvents(contents.split('\n'));
+  // Read the primary log plus any rotated siblings so usage reflects the full history (S23.4).
+  const events = parseAuditEvents(readAuditLogLines(logPath));
   const byServer = analyzeUsage(events, { sinceMs, minCalls });
 
   const wanted = opts.server;

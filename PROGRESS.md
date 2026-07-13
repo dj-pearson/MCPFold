@@ -1833,3 +1833,23 @@ green — lint + core purity, typecheck across all packages, full test suite (16
 them), and build.
 
 **All E23 stories (S23.1–S23.3) complete.**
+
+## S23.4 — curate reads rotated audit logs (full-history correctness)
+
+Started/done: 2026-07-13. E23 story 4. Closes a correctness gap in S23.2/S23.3: the audit sink
+(S18.4/S22.24) rotates at maxBytes to a unique sibling `${path}.<pid>.<seq>.<rand>` and starts a
+fresh primary, but curate read only the primary — so after any rotation the recommendation came from
+a partial history, and `curate --write` could drop a still-used tool (a real footgun).
+
+**What.** New shared reader `packages/cli/src/util/audit-log.ts` `readAuditLogLines(primaryPath)`:
+lists the log's directory, matches the primary basename plus rotated siblings (name === basename OR
+startsWith(basename + '.') — scoped to THIS log, never unrelated files), reads each best-effort
+(a sibling removed/unreadable between scan and read is skipped), and returns the combined lines.
+Aggregation downstream is order-independent (counts sum, lastTs takes max), so read order is
+irrelevant. Wired into both `buildCurateData` (curate) and `checkCurationOpportunity` (the doctor
+hint) so the report and the hint always agree on the full history.
+
+Verified end-to-end: a `create_pr` living only in a rotated sibling now appears in the recommendation
+alongside the active log's `search_code`. Tests (4 new, 20 in the curate file): primary+rotated
+merge, a tool only in a rotated log surfaces in the recommendation, read-order independence, and
+unrelated same-dir files ignored. Lint, typecheck, prettier clean.
