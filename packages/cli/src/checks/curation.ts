@@ -93,6 +93,7 @@ export function checkCurationInactive(config: Config, ctx: OsContext): Finding[]
           where: `${rootKey}.${name}`,
           message: `Curated server "${name}" (profile "${profileName}") launches its real command directly in this client file, bypassing the mcpfold proxy — its \`tools\` directive has no effect and every tool loads into context.`,
           fix: `Run \`mcpfold sync\` to re-fold "${name}" through the \`mcpfold run\` proxy shim (this file predates the fix, or was hand-edited).`,
+          autofix: { kind: 'resync-client', profile: profileName, client: profile.client, path },
         });
       }
     }

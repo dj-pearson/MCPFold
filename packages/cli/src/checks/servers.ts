@@ -24,6 +24,8 @@ export function checkDeprecatedTransports(config: Config, file: string): Finding
         where: `servers.${name}`,
         message: `Server "${name}" uses the deprecated "sse" transport (MCP deprecated HTTP+SSE on 2025-11-25).`,
         fix: 'Switch to "transport": "streamable-http" once the server supports it.',
+        // Guided (not auto): the edit is deterministic but the server may not speak Streamable HTTP yet.
+        autofix: { kind: 'rewrite-transport', server: name, from: 'sse', to: 'streamable-http' },
       });
     }
   }
@@ -74,12 +76,17 @@ export function checkHardcodedSecrets(config: Config, file: string): Finding[] {
       for (const [key, value] of Object.entries(record ?? {})) {
         if (isSecretRef(value)) continue;
         if (SUSPICIOUS_KEY.test(key)) {
+          const envName = key.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+          const suggestedRef = `\${env:${envName}}`;
           findings.push({
             severity: 'error',
             file,
             where: `servers.${name}.${kind}.${key}`,
             message: `"${key}" in server "${name}" looks like a hardcoded secret value.`,
-            fix: `Replace the literal with a reference, e.g. "\${env:${key.toUpperCase().replace(/[^A-Z0-9]/g, '_')}}".`,
+            fix: `Replace the literal with a reference, e.g. "${suggestedRef}".`,
+            // Guided repair (S25.3): moving the value needs a provider choice, so this is not
+            // auto-applied under `--yes`. The descriptor carries where the value lives + the default ref.
+            autofix: { kind: 'extract-secret', server: name, field: kind, key, suggestedRef },
           });
         }
       }

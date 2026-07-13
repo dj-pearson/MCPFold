@@ -2283,3 +2283,26 @@ never publishes by surprise). Fails fast if the tag version ≠ package.json; `w
 REMAINING (user-only, cannot be automated): the manual Extension-Development-Host smoke run on macOS +
 Windows (criterion 2), and creating the PearsonMedia Marketplace publisher + first publish + listing
 verification (criterion 3, needs an Azure DevOps PAT). Story stays in_progress until those land.
+
+---
+
+## E25 — Guided configuration assistance (diagnose → repair)
+
+### S25.1 — Machine-applicable fix model on the doctor Finding contract [in_progress]
+START: extend the CLI `Finding` contract with an optional deterministic `autofix` descriptor
+(discriminated union: `resync-client` for the VS Code root-key trap / inert curation / unpinned
+mcp-remote bridge, and `extract-secret` for hardcoded tokens — the latter applied later by the
+S25.3 guided flow). Populate it on the unambiguous checks; leave ambiguous findings advisory-only.
+No change to doctor's rendered output. Branch `story/S25.1-autofix-model`.
+
+DONE S25.1 — added `autofix?: FixAction` to the doctor `Finding` contract (packages/cli/src/checks/types.ts):
+a discriminated union of `resync-client` (auto-applicable — VS Code root-key trap, inert curation,
+unpinned/vulnerable mcp-remote bridge, malformed client file), `extract-secret` (guided — hardcoded
+token), and `rewrite-transport` (guided — deprecated sse). Populated the unambiguous checks in
+servers.ts / clients.ts / curation.ts; `isAutoApplicable()` classifies auto vs guided. Deviation from
+the original AC: unpinned `@latest` stays **advisory** (no descriptor) because pinning needs a
+non-deterministic online version resolve, and deprecated `sse` is **guided** not auto (the server may
+not speak Streamable HTTP) — AC[2] refined to record this. New public exports (FixAction + variants,
+isAutoApplicable) from index.ts; changeset added (patch, no behavior change). 8 new unit tests in
+test/autofix.test.ts. verify_all green (lint + typecheck + build + tests); the one full-suite failure
+was the pre-existing Windows DPAPI token-store timeout under parallel load, which passes standalone.

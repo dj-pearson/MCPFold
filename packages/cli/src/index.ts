@@ -134,7 +134,15 @@ export {
   type SecretScheme,
 } from './registry/map.js';
 export { detectClients, type DetectedClient } from './util/detect-clients.js';
-export type { Finding, Severity } from './checks/types.js';
+export {
+  isAutoApplicable,
+  type Finding,
+  type Severity,
+  type FixAction,
+  type ResyncClientFix,
+  type ExtractSecretFix,
+  type RewriteTransportFix,
+} from './checks/types.js';
 
 // Secret strategies + shim launcher + secret command (E4)
 export {
