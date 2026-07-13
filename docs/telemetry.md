@@ -7,14 +7,14 @@ designed to be impossible to tie back to you.
 
 Do not confuse the **local audit trail** with **telemetry**. They are governed independently:
 
-| | Local audit trail (S24.8) | Telemetry (this page) |
-| --- | --- | --- |
-| **Default** | **On** | **Off** (opt-in) |
-| **Leaves your machine?** | **Never** — a local file only | Only if you opt in and wire a sink |
-| **Contents** | Tool-call **names** + argument *shapes* (key → type), never values or results | A fixed allow-list of non-identifying fields |
-| **Where** | Per-user data dir (`%LOCALAPPDATA%\mcpfold\audit.log` / `$XDG_STATE_HOME/mcpfold/audit.log`); rotating, size-capped | A sink you inject; none ships by default |
-| **Turn off** | `audit.enabled: false` in `mcp.config.jsonc`, or `MCPFOLD_NO_AUDIT=1` | see below |
-| **Governed by `DO_NOT_TRACK`?** | **No** | **Yes** |
+|                                 | Local audit trail (S24.8)                                                                                           | Telemetry (this page)                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Default**                     | **On**                                                                                                              | **Off** (opt-in)                             |
+| **Leaves your machine?**        | **Never** — a local file only                                                                                       | Only if you opt in and wire a sink           |
+| **Contents**                    | Tool-call **names** + argument _shapes_ (key → type), never values or results                                       | A fixed allow-list of non-identifying fields |
+| **Where**                       | Per-user data dir (`%LOCALAPPDATA%\mcpfold\audit.log` / `$XDG_STATE_HOME/mcpfold/audit.log`); rotating, size-capped | A sink you inject; none ships by default     |
+| **Turn off**                    | `audit.enabled: false` in `mcp.config.jsonc`, or `MCPFOLD_NO_AUDIT=1`                                               | see below                                    |
+| **Governed by `DO_NOT_TRACK`?** | **No**                                                                                                              | **Yes**                                      |
 
 The audit trail exists so `mcpfold curate` has real usage the first time you run it — it feeds only
 local commands (`curate`, `status`). `mcpfold status` shows exactly where it lives and its size.

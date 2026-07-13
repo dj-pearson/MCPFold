@@ -382,6 +382,12 @@ and submits them to `microsoft/winget-pkgs`. You only do the **one-time setup**:
    Until it's set, the release renders the WinGet manifests but **skips the winget-pkgs submission**
    (it won't fail the release). Once set, every release opens the update PR automatically.
 
+**VS Code Marketplace (optional, tag-triggered):** the `vscode-extension-publish.yml` workflow
+publishes the editor extension to the Marketplace on a `vscode-v*` tag, gated on the repo secret
+**`VSCE_PAT`** (an Azure DevOps PAT with **Marketplace → Manage** scope). Until it's set the workflow
+is inert — it builds and packages the `.vsix` but never publishes. See
+`apps/vscode-extension/PUBLISHING.md` for the one-time publisher setup and release steps.
+
 After that, `brew install dj-pearson/tap/mcpfold` and `scoop install mcpfold` track every release.
 Version parity is kept green automatically: `scripts/sync-packaging-version.mjs` runs during the
 "Version Packages" step to bump the template versions, and `pnpm check:version-parity` (CI) enforces

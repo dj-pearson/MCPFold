@@ -33,10 +33,13 @@ test.beforeEach(async ({ page }) => {
 test('copying an install command fires "Install command copied"', async ({ page }) => {
   await page.goto('/install');
   await page.getByTestId('copy-button').first().click();
-  const captured = await events(page);
-  const copy = captured.find((e) => e.event === 'Install command copied');
-  expect(copy, 'Install command copied event').toBeTruthy();
-  expect(typeof copy!.props.command).toBe('string');
+  // CopyBlock.copy() awaits navigator.clipboard before track() fires; in headless CI that resolves
+  // after the click promise, so poll for the event rather than reading immediately.
+  await expect
+    .poll(async () => (await events(page)).some((e) => e.event === 'Install command copied'))
+    .toBe(true);
+  const copy = (await events(page)).find((e) => e.event === 'Install command copied')!;
+  expect(typeof copy.props.command).toBe('string');
 });
 
 test('the calculator fires "config pasted" and "install clicked", segmented by ref', async ({
