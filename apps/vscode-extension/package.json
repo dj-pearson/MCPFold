@@ -1,7 +1,7 @@
 {
   "name": "mcpfold-vscode",
-  "displayName": "mcpfold — MCP config manager",
-  "description": "Manage your MCP servers from one config and fold it out to every client — sync, diff, doctor, and a live drift indicator, right in VS Code.",
+  "displayName": "mcpfold \u2014 MCP config manager",
+  "description": "Manage your MCP servers from one config and fold it out to every client \u2014 sync, diff, doctor, and a live drift indicator, right in VS Code.",
   "version": "0.1.0",
   "private": true,
   "publisher": "PearsonMedia",
@@ -84,6 +84,26 @@
         "command": "mcpfold.openCalculator",
         "title": "Open the MCP token calculator",
         "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.curate",
+        "title": "Curate tools to your usage",
+        "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.curateApply",
+        "title": "Curate: apply recommended tool-lists",
+        "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.curateServer",
+        "title": "Curate a server to your usage",
+        "category": "mcpfold"
+      },
+      {
+        "command": "mcpfold.refreshCuration",
+        "title": "Curate: refresh usage report",
+        "category": "mcpfold"
       }
     ],
     "configuration": {
@@ -108,8 +128,30 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Show an inline estimate of each server's tool-schema token cost (and a file total) above the entries in `mcp.config.jsonc`. Estimates are approximate until mcpfold collects real `tools/list` data."
+        },
+        "mcpfold.showCurateLens": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show an inline \"Curate to usage\" CodeLens above each server in `mcp.config.jsonc`, using real recorded proxy usage (`mcpfold curate`). Requires an audit log (`mcpfold.auditLog` or the `MCPFOLD_AUDIT_LOG` environment variable)."
+        },
+        "mcpfold.auditLog": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the proxy tool-call audit log that powers curation. When set, the extension runs `mcpfold curate --audit-log <path>`; leave empty to use the `MCPFOLD_AUDIT_LOG` environment variable instead."
         }
       }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "mcpfold.curateServer",
+          "when": "false"
+        },
+        {
+          "command": "mcpfold.refreshCuration",
+          "when": "false"
+        }
+      ]
     }
   },
   "scripts": {
