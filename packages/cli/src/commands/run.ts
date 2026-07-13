@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { dirname } from 'node:path';
 import {
   MCP_REMOTE_SPEC,
   UsageError,
@@ -186,10 +187,16 @@ function remoteInvocation(server: ResolvedServer): { args: string[]; env: NodeJS
 }
 
 export async function runRun(options: RunOptions): Promise<number> {
-  const providers = options.providers ?? defaultProviders(options.cwd);
   const spawner = options.spawnFn ?? defaultSpawner;
 
-  const { config } = loadConfigFromDisk(options.cwd);
+  // Resolve the canonical config by walking up from cwd (S24.2): sync embeds `--cwd <configDir>`
+  // so the exact directory is searched first, but a bare shim (no `--cwd`) launched by a GUI client
+  // from an arbitrary cwd still finds the nearest config up-tree. Secrets (.env) and org policy
+  // resolve from the config's own directory, not the launch cwd.
+  const { path: configPath, config } = loadConfigFromDisk(options.cwd, { upward: true });
+  const configDir = dirname(configPath);
+  const providers = options.providers ?? defaultProviders(configDir);
+
   const server = config.servers[options.name];
   if (!server) {
     throw new UsageError(`No server "${options.name}" in the canonical config.`, {
@@ -200,7 +207,7 @@ export async function runRun(options: RunOptions): Promise<number> {
   // Org policy (S18.3): deny always wins over local trust — a denied server never launches,
   // regardless of TOFU approval. Evaluated before the trust gate so policy can't be bypassed.
   const policyCtx = options.osContext ?? realOsContext();
-  const violation = checkServer(loadPolicy(options.cwd, policyCtx), options.name, server);
+  const violation = checkServer(loadPolicy(configDir, policyCtx), options.name, server);
   if (violation) {
     throw new UsageError(`Refusing to run "${options.name}": ${violation.decision.reason}.`, {
       hint: `Org policy blocks this server — ${describeViolation(violation)}. Contact your platform team.`,

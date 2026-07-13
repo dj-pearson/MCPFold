@@ -98,6 +98,20 @@ describe('renderWithStrategy — tools directive forces the shim (S5.3)', () => 
     expect(parsed.servers.playwright.args).toEqual(['run', 'playwright']);
   });
 
+  it('shims a tools-bearing server with env-only refs even under a native-env override (S24.1)', async () => {
+    // native-env would let the client resolve the ${env:} ref itself — but curation only runs
+    // inside `mcpfold run`, so the tools directive forces the shim regardless of the override.
+    const file = await renderWithStrategy(
+      cursorAdapter,
+      [{ ...curated, env: { TOKEN: '${env:GH_TOKEN}' } }],
+      { osContext: ctx, strategyOverride: 'native-env' },
+    );
+    const parsed = JSON.parse(file.contents);
+    expect(parsed.mcpServers.playwright).toEqual({ command: 'mcpfold', args: ['run', 'playwright'] });
+    // The native-env placeholder never reaches the file — the launch goes through the proxy.
+    expect(file.contents).not.toContain('GH_TOKEN');
+  });
+
   it('honors an explicit secretStrategy "shim" even with zero secret refs', async () => {
     const file = await renderWithStrategy(
       cursorAdapter,

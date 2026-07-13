@@ -96,6 +96,36 @@ describe('runSync (S3.5)', () => {
   });
 });
 
+describe('runSync reports curation-shimmed servers (S24.1)', () => {
+  const CURATED_CONFIG = `{
+  "version": 1,
+  "servers": {
+    "playwright": { "transport": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@latest"], "tags": ["code"], "tools": { "mode": "allow", "list": ["browser_navigate"] } }
+  },
+  "profiles": {
+    "cursor-user": { "client": "cursor", "scope": "user", "include": ["code"] }
+  }
+}`;
+
+  it('names the tools-directive server in data.curated and the human summary', async () => {
+    writeFileSync(join(cwd, 'mcp.config.jsonc'), CURATED_CONFIG);
+    const result = await runSync({ cwd, osContext: ctx });
+    expect(result.data.curated).toEqual(['playwright']);
+    expect(result.human).toContain('Tool curation active');
+    expect(result.human).toContain('playwright');
+    // The server folds to the proxy shim, not its direct command — curation only runs there.
+    const written = JSON.parse(readFileSync(join(home, '.cursor', 'mcp.json'), 'utf8'));
+    expect(written.mcpServers.playwright.command).toBe('mcpfold');
+    expect(written.mcpServers.playwright.args.slice(0, 2)).toEqual(['run', 'playwright']);
+  });
+
+  it('omits the curation section when no server carries a tools directive', async () => {
+    const result = await runSync({ cwd, osContext: ctx });
+    expect(result.data.curated).toEqual([]);
+    expect(result.human).not.toContain('Tool curation active');
+  });
+});
+
 describe('runSync into a shared config file (S19.2)', () => {
   const GOOSE_CONFIG = `{
   "version": 1,
