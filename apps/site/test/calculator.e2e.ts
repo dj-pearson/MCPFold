@@ -11,7 +11,9 @@ import { expect, test } from '@playwright/test';
 test.describe('/mcp-token-calculator', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/mcp-token-calculator');
-    await expect(page.getByRole('heading', { name: 'MCP token calculator', level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'MCP token calculator', level: 1 }),
+    ).toBeVisible();
   });
 
   test('computes tools / tokens / reduction from the default presets', async ({ page }) => {

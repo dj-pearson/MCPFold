@@ -64,10 +64,7 @@ export function channelRef(): string | undefined {
  * and preview builds never phone home), it attaches the first-touch `ref` so the funnel can be
  * segmented by channel. Never pass PII — only coarse, non-identifying props.
  */
-export function track(
-  event: string,
-  props: Record<string, string | number | boolean> = {},
-): void {
+export function track(event: string, props: Record<string, string | number | boolean> = {}): void {
   if (typeof window === 'undefined' || typeof window.plausible !== 'function') return;
   const ref = channelRef();
   window.plausible(event, { props: ref ? { ...props, ref } : props });

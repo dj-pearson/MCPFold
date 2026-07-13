@@ -107,7 +107,9 @@ describe('activation gate: init → sync → launch → filtered tools/list (S24
 
     // 2. FOLD — sync renders the client entry as the self-locating proxy shim, not the direct command.
     await runSync({ cwd, osContext: ctx });
-    const written = JSON.parse(readFileSync(cursorAdapter.resolvePath('user', undefined, ctx), 'utf8'));
+    const written = JSON.parse(
+      readFileSync(cursorAdapter.resolvePath('user', undefined, ctx), 'utf8'),
+    );
     const entry = written.mcpServers.echo;
     expect(entry, 'FOLD: the curated server did not fold to the `mcpfold run` proxy shim').toEqual({
       command: 'mcpfold',
@@ -152,13 +154,25 @@ describe('activation gate: init → sync → launch → filtered tools/list (S24
       jsonrpc: '2.0',
       id: 1,
       method: 'initialize',
-      params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '0' } },
+      params: {
+        protocolVersion: '2025-06-18',
+        capabilities: {},
+        clientInfo: { name: 'e2e', version: '0' },
+      },
     });
-    expect(initRes.result, 'LAUNCH: the launched server did not complete an MCP initialize').toBeDefined();
+    expect(
+      initRes.result,
+      'LAUNCH: the launched server did not complete an MCP initialize',
+    ).toBeDefined();
 
     // 4. FILTER — the client-visible tools/list is exactly the allow-list: nothing more (gamma dropped),
     //    nothing less. This is the whole promise — the client's context only ever sees curated tools.
-    const listRes = await client!.request({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
+    const listRes = await client!.request({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/list',
+      params: {},
+    });
     const toolNames = ((listRes.result as { tools: { name: string }[] }).tools ?? [])
       .map((t) => t.name)
       .sort();

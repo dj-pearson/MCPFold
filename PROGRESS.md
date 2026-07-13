@@ -1926,11 +1926,10 @@ tools-bearing server under EVERY strategy before strategy selection, and `transf
 explicit `secretStrategy: "shim"` even with zero secret refs. This entry closes the remaining
 acceptance gap: **criterion 5** — sync now reports which servers were shimmed for curation. `runSync`
 collects every kept server carrying a `tools` directive into `data.curated` (JSON) and a
-`Tool curation active (filtered via \`mcpfold run\` proxy): …` footer line (human), distinct from
+`Tool curation active (filtered via \`mcpfold run\` proxy): …`footer line (human), distinct from
 shimmed-for-secrets, so a user can confirm curation is live rather than silently inert. Added a
-strategy test proving a tools-bearing server with env-only refs still shims even under a `native-env`
-override (curation requires the proxy), plus two sync tests for the report. Full CLI suite green
-(pre-existing `version.test.ts` stale-dist failure unrelated).
+strategy test proving a tools-bearing server with env-only refs still shims even under a`native-env`override (curation requires the proxy), plus two sync tests for the report. Full CLI suite green
+(pre-existing`version.test.ts` stale-dist failure unrelated).
 
 ---
 
@@ -2195,7 +2194,7 @@ silently invisible.
 
 - **`discover/staleness.ts`**: `newUpstreamTools(directive, snapshot)` = surface tools an `allow` list
   omits (deny/none → empty, criterion 4 — new tools already pass through). `staleAllowlists(config,
-  cache)` maps it over every allow-mode server with a cached snapshot.
+cache)` maps it over every allow-mode server with a cached snapshot.
 - **doctor** (`checkAllowlistStaleness`, cache scoped to the OsContext for determinism) emits one
   `info` per affected server: "N new tools its allow-list was written before: …" → `curate --refresh`.
   **status** adds a `New tools:` line + a `staleAllowlists` data field.

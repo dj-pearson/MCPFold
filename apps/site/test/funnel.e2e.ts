@@ -13,13 +13,16 @@ type CapturedEvent = { event: string; props: Record<string, unknown> };
 async function mockAnalytics(page: Page): Promise<void> {
   await page.addInitScript(() => {
     (window as unknown as { __events: CapturedEvent[] }).__events = [];
-    (window as unknown as { plausible: (e: string, o?: { props?: Record<string, unknown> }) => void }).plausible =
-      (event, options) => {
-        (window as unknown as { __events: CapturedEvent[] }).__events.push({
-          event,
-          props: options?.props ?? {},
-        });
-      };
+    (
+      window as unknown as {
+        plausible: (e: string, o?: { props?: Record<string, unknown> }) => void;
+      }
+    ).plausible = (event, options) => {
+      (window as unknown as { __events: CapturedEvent[] }).__events.push({
+        event,
+        props: options?.props ?? {},
+      });
+    };
   });
 }
 
@@ -72,7 +75,13 @@ test('outbound clicks to npm/GitHub fire "Outbound link" with the host', async (
   await expect(npm).toBeVisible();
   // The link opens in a new tab (target=_blank); the delegated listener records the event on click,
   // before the popup opens, so the current page keeps its captured events.
-  await Promise.all([page.context().waitForEvent('page').catch(() => null), npm.click()]);
+  await Promise.all([
+    page
+      .context()
+      .waitForEvent('page')
+      .catch(() => null),
+    npm.click(),
+  ]);
 
   const captured = await events(page);
   const out = captured.find((e) => e.event === 'Outbound link');

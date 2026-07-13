@@ -33,7 +33,10 @@ function snapshotFile(dir: string, server: string): string {
  * exists / it is unreadable / it lacks a numeric `toolCount`. `undefined` is the signal the budget
  * estimator falls back to its representative assumption for that server.
  */
-export function cachedToolCount(server: string, dir: string = discoveryCacheDir()): number | undefined {
+export function cachedToolCount(
+  server: string,
+  dir: string = discoveryCacheDir(),
+): number | undefined {
   const path = snapshotFile(dir, server);
   if (!existsSync(path)) return undefined;
   try {
@@ -45,6 +48,8 @@ export function cachedToolCount(server: string, dir: string = discoveryCacheDir(
 }
 
 /** A `toolCountFor` injector for `computeConfigBudget`, backed by the discovery cache. */
-export function cacheToolCountFor(dir: string = discoveryCacheDir()): (name: string) => number | undefined {
+export function cacheToolCountFor(
+  dir: string = discoveryCacheDir(),
+): (name: string) => number | undefined {
   return (name) => cachedToolCount(name, dir);
 }

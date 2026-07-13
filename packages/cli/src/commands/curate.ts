@@ -226,9 +226,12 @@ export function buildCurateData(opts: CurateOptions): CurateData {
   // --audit-log / MCPFOLD_AUDIT_LOG still overrides.
   const logPath = resolveActiveAuditLog({ explicit: opts.auditLogPath, config, env: opts.env });
   if (!logPath) {
-    throw new UsageError('The local audit trail is disabled, so there is no recorded usage to curate.', {
-      hint: `Re-enable it (remove \`audit.enabled: false\` / unset ${AUDIT_OPT_OUT_ENV}), or pass --audit-log <path>.`,
-    });
+    throw new UsageError(
+      'The local audit trail is disabled, so there is no recorded usage to curate.',
+      {
+        hint: `Re-enable it (remove \`audit.enabled: false\` / unset ${AUDIT_OPT_OUT_ENV}), or pass --audit-log <path>.`,
+      },
+    );
   }
   if (!existsSync(logPath)) {
     throw new UsageError(`No recorded tool usage yet at ${logPath}.`, {
@@ -442,7 +445,10 @@ async function defaultPick(server: string, tools: ToolTokenEstimate[]): Promise<
     ).trim();
     if (!answer || answer.toLowerCase() === 'all') return tools.map((t) => t.name);
     const picked = new Set<string>();
-    for (const token of answer.split(',').map((s) => s.trim()).filter(Boolean)) {
+    for (const token of answer
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)) {
       const asNum = Number(token);
       if (Number.isInteger(asNum) && asNum >= 1 && asNum <= tools.length) {
         picked.add(tools[asNum - 1]!.name);
@@ -524,10 +530,9 @@ export async function runCuratePick(
   } else if (isTTY) {
     selected = await (opts.pick ?? defaultPick)(opts.server, snapshot.tools);
   } else {
-    throw new UsageError(
-      `"${opts.server}" has no recorded usage to recommend from.`,
-      { hint: `Pass \`--tools <a,b,c>\` to pick from its ${snapshot.tools.length} tools, or run on a terminal to choose interactively.` },
-    );
+    throw new UsageError(`"${opts.server}" has no recorded usage to recommend from.`, {
+      hint: `Pass \`--tools <a,b,c>\` to pick from its ${snapshot.tools.length} tools, or run on a terminal to choose interactively.`,
+    });
   }
 
   const known = new Set(snapshot.tools.map((t) => t.name));

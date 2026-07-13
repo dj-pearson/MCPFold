@@ -50,7 +50,9 @@ describe('runDoctor (S3.7)', () => {
 
     // Opting out flips the disclosure and does not change the exit code.
     const off = runDoctor({ cwd, osContext: { ...ctx, env: { MCPFOLD_NO_AUDIT: '1' } } });
-    expect(off.data.findings.some((f) => f.message.includes('Local audit trail is off'))).toBe(true);
+    expect(off.data.findings.some((f) => f.message.includes('Local audit trail is off'))).toBe(
+      true,
+    );
     expect(off.exit).toBe(EXIT.SUCCESS);
   });
 
@@ -116,7 +118,9 @@ describe('runDoctor (S3.7)', () => {
         "profiles": { "cursor": { "client": "cursor", "scope": "user", "include": ["t"] } }
       }`);
       const result = runDoctor({ cwd, osContext: ctx });
-      const info = result.data.findings.find((f) => f.message.includes('No tool curation configured'));
+      const info = result.data.findings.find((f) =>
+        f.message.includes('No tool curation configured'),
+      );
       expect(info?.severity).toBe('info');
       expect(info?.message).toContain('all 2 servers');
       expect(info?.fix).toContain('mcpfold curate');
@@ -138,7 +142,13 @@ describe('runDoctor (S3.7)', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, 'gh.json'),
-      JSON.stringify({ server: 'gh', tools: [{ name: 'a', tokens: 10 }, { name: 'b', tokens: 10 }] }),
+      JSON.stringify({
+        server: 'gh',
+        tools: [
+          { name: 'a', tokens: 10 },
+          { name: 'b', tokens: 10 },
+        ],
+      }),
     );
     const result = runDoctor({ cwd, osContext: ctx });
     const info = result.data.findings.find((f) => f.message.includes('new tool'));

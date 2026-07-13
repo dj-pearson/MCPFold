@@ -74,7 +74,10 @@ describe('runGuided (S10.3)', () => {
     const writes: string[] = [];
     // Accept every step EXCEPT the curation one — proving it is genuinely skippable.
     const prompt = { confirm: (q: string) => Promise.resolve(!q.includes('Curate your servers')) };
-    const result = await runGuided({ cwd, osContext: ctx }, { prompt, write: (l) => writes.push(l) });
+    const result = await runGuided(
+      { cwd, osContext: ctx },
+      { prompt, write: (l) => writes.push(l) },
+    );
     expect(result.aborted).toBe(false);
     expect(writes.some((l) => l.includes('mcpfold curate gh'))).toBe(false);
   });

@@ -58,7 +58,11 @@ const base = () => ({ cwd, env: {} as NodeJS.ProcessEnv, cache: { dir: cacheDir 
 
 describe('runCuratePick — non-interactive --tools (S24.7)', () => {
   it('writes the exact allow directive and preserves comments', async () => {
-    const out = await runCuratePick({ ...base(), server: 'github', tools: ['search_code', 'create_pr'] });
+    const out = await runCuratePick({
+      ...base(),
+      server: 'github',
+      tools: ['search_code', 'create_pr'],
+    });
     expect(out.data.applied).toBe(true);
     expect(out.data.source).toBe('discovery');
     expect(out.human).toContain('keeping 2 of 3 tools'); // impact preview
@@ -81,9 +85,9 @@ describe('runCuratePick — non-interactive --tools (S24.7)', () => {
   });
 
   it('refuses non-interactively with no --tools and no usage, naming the surface size', async () => {
-    await expect(
-      runCuratePick({ ...base(), server: 'github', isTTY: false }),
-    ).rejects.toThrow(/no recorded usage/i);
+    await expect(runCuratePick({ ...base(), server: 'github', isTTY: false })).rejects.toThrow(
+      /no recorded usage/i,
+    );
   });
 });
 
@@ -93,13 +97,17 @@ describe('runCuratePick — interactive picker (S24.7)', () => {
       ...base(),
       server: 'github',
       isTTY: true,
-      pick: async (_server, tools) => tools.filter((t) => t.name === 'search_code').map((t) => t.name),
+      pick: async (_server, tools) =>
+        tools.filter((t) => t.name === 'search_code').map((t) => t.name),
       confirm: async () => true,
     });
     expect(out.data.applied).toBe(true);
     expect(out.data.selected).toEqual(['search_code']);
     const cfg = loadConfig(readFileSync(configPath(), 'utf8'));
-    expect(cfg.ok && cfg.config.servers.github?.tools).toEqual({ mode: 'allow', list: ['search_code'] });
+    expect(cfg.ok && cfg.config.servers.github?.tools).toEqual({
+      mode: 'allow',
+      list: ['search_code'],
+    });
   });
 
   it('previews without writing when confirmation is declined', async () => {
