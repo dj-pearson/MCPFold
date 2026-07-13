@@ -144,7 +144,7 @@ describe('runDoctor (S3.7)', () => {
     expect(result.data.findings.some((f) => f.where?.includes('envsrv'))).toBe(false);
   });
 
-  it('warns when a remote server carries a tools directive (proxy curates stdio only)', () => {
+  it('does NOT warn about a remote tools directive — remote curation is enforced via the bridge (S24.10)', () => {
     write(`{
       "version": 2,
       "servers": {
@@ -154,10 +154,9 @@ describe('runDoctor (S3.7)', () => {
       "profiles": { "cursor": { "client": "cursor", "scope": "user", "include": ["t"] } }
     }`);
     const result = runDoctor({ cwd, osContext: ctx });
-    const f = result.data.findings.find((x) => x.where === 'servers.gh.tools');
-    expect(f?.severity).toBe('warning');
-    expect(f?.message).toContain('proxy');
-    // The stdio server's directive IS enforced (sync shims it through `mcpfold run`) — no finding.
+    // Both directives are enforced now (stdio directly, remote via the mcp-remote bridge proxy) — no
+    // "unenforced tools directive" warning for either.
+    expect(result.data.findings.some((x) => x.where === 'servers.gh.tools')).toBe(false);
     expect(result.data.findings.some((x) => x.where === 'servers.pw.tools')).toBe(false);
   });
 

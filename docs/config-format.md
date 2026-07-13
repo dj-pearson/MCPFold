@@ -125,6 +125,13 @@ The context-window saver. Restrict a server to just the tools you use:
 proxy applies the filter at `tools/list` time, so the client only ever sees the curated
 set — see the [benchmark](./benchmark.md) for the ~80% token reduction this buys.
 
+Curation is **not stdio-only**. A remote (`streamable-http`/`sse`) server is filtered too: `mcpfold
+run` composes the proxy over the `mcp-remote` bridge's stdio (proxy → mcp-remote → remote), so a
+curated remote server's client-visible `tools/list` is the curated set, with audit logging and
+tool-definition pinning working identically. A native remote transport (no bridge) remains future
+work; until then a bridge-spawn or remote-connection failure surfaces through the bridge's own output
+and a nonzero exit.
+
 ### Seeing what a server actually costs (`mcpfold inspect`)
 
 `mcpfold inspect [server]` opens a real MCP session to a configured server (secrets resolved in

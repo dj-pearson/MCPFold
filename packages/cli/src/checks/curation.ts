@@ -55,8 +55,9 @@ function isShimEntry(entry: unknown): boolean {
  * `sync` routes every stdio tools-bearing server through the shim (S24.1). But a client file written
  * before S24.1 — or hand-edited — can point a curated server straight at its real command, so the
  * directive silently does nothing and every tool still loads. This reads each profile's on-disk client
- * file and raises an ERROR for any stdio+tools server whose rendered entry is not the shim, with the
- * exact resync fix. (Remote tools-bearing servers are handled by `checkUnenforcedToolsDirective`.)
+ * file and raises an ERROR for any tools-directive server whose rendered entry is not the shim, with
+ * the exact resync fix. Since S24.10 this covers remote (bridged) curated servers too — they also fold
+ * to the `mcpfold run` shim, which proxies the mcp-remote bridge.
  */
 export function checkCurationInactive(config: Config, ctx: OsContext): Finding[] {
   const findings: Finding[] = [];
@@ -81,7 +82,7 @@ export function checkCurationInactive(config: Config, ctx: OsContext): Finding[]
       if (!root || typeof root !== 'object') continue;
       for (const [name, entry] of Object.entries(root as Record<string, unknown>)) {
         const server = config.servers[name];
-        // Only curated stdio servers must route through the shim; remote curation is a separate check.
+        // Any curated server (stdio or remote/bridged since S24.10) must route through the run shim.
         if (!server || !server.tools || !shouldUseProxy(server)) continue;
         if (isShimEntry(entry)) continue;
         findings.push({

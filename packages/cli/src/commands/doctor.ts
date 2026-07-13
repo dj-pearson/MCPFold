@@ -17,7 +17,6 @@ import {
   checkNativeEnvFallback,
   checkPinIntegrity,
   checkSecretSchemes,
-  checkUnenforcedToolsDirective,
   checkUnpinnedLatest,
 } from '../checks/servers.js';
 import type { Finding } from '../checks/types.js';
@@ -72,7 +71,6 @@ export function runDoctor(options: DoctorOptions): CommandOutput<DoctorData> {
       findings.push(...checkHardcodedSecrets(config, configPath));
       findings.push(...checkSecretSchemes(config, configPath));
       findings.push(...checkNativeEnvFallback(config, configPath));
-      findings.push(...checkUnenforcedToolsDirective(config, configPath));
       findings.push(...checkCurationOpportunity(config, configPath, ctx.env));
       findings.push(...checkNoCurationConfigured(config, configPath));
       findings.push(...checkCurationInactive(config, ctx));

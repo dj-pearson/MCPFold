@@ -2149,3 +2149,36 @@ Tests: `curate-pick.test.ts` (the two specified units — non-TTY `--tools` writ
 preserves comments; prompter-injected interactive path selects a subset and round-trips — plus usage
 precedence, decline-preview, unknown-tool + non-TTY guards); add nudge; guided step offered/declined.
 Full cli suite green (407 excl. the flaky DPAPI native-spawn test); lint clean; build clean.
+
+---
+
+## S24.10 — Remote-server curation: run the filtering proxy on the bridge path
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p2, deps: S24.1.
+
+Curation is no longer stdio-only. The mcp-remote bridge child is itself stdio-facing, so `mcpfold run`
+now composes the filtering proxy over it (proxy → mcp-remote → remote):
+
+- **run.ts**: hoisted the pinning + audit setup above the transport branch (transport-independent) and
+  added a single `needsProxy` decision. The remote (http/sse) branch now routes through the proxy
+  spawner — `proxySpawner('npx', remote.args, remoteEnv, s.tools, pinned, audit)` — whenever a tools
+  directive, pinned surface, or auditing applies, so a curated remote server's client-visible
+  `tools/list` is the curated set, and audit logging + tool-definition pinning work identically on the
+  bridged path (criteria 1, 2).
+- **`shouldUseProxy`** now returns true for ANY transport with a tools directive. The obsolete
+  `checkUnenforcedToolsDirective` (which warned "remote tools directives have no effect") was removed
+  along with its doctor wiring and test; `checkCurationInactive` (S24.5) now covers remote curated
+  servers too.
+- **docs/config-format.md**: notes remote curation is supported via the bridge; native remote transport
+  remains future work.
+
+SCOPING (p2): criterion 3 (coded errors naming the failed layer) is partially addressed — a
+bridge-spawn failure surfaces as a nonzero exit and mcp-remote's own stderr identifies remote-connection
+failures; a fully typed coded error would need to intercept the passthrough child's early lifecycle
+(noted as follow-up). Criterion 1's filtered handshake is covered by the run-filter routing tests
+(remote → proxy with the directive over `npx`) composed with the S24.4 activation-gate proof that the
+proxy + a real child yields a filtered `tools/list` (the proxy is transport-agnostic).
+
+Tests: run-filter remote routing (curated remote → proxy over `npx`; directive-less remote → plain
+bridge); doctor test flipped (remote tools directive no longer warns); shouldUseProxy updated. Full cli
+suite green (409 excl. flaky DPAPI); root lint + core purity clean; typecheck clean.

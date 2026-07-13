@@ -22,7 +22,9 @@ const CONFIG = `{
   "version": 1,
   "servers": {
     "curated": { "transport": "stdio", "command": "srv", "args": ["--x"], "tools": { "mode": "allow", "list": ["read", "search"] }, "tags": ["t"] },
-    "plain": { "transport": "stdio", "command": "srv2", "tags": ["t"] }
+    "plain": { "transport": "stdio", "command": "srv2", "tags": ["t"] },
+    "remote": { "transport": "streamable-http", "url": "https://x/mcp", "tools": { "mode": "allow", "list": ["read"] }, "tags": ["t"] },
+    "remotePlain": { "transport": "streamable-http", "url": "https://y/mcp", "tags": ["t"] }
   },
   "profiles": { "c": { "client": "cursor", "scope": "user", "include": ["t"] } }
 }`;
@@ -34,10 +36,12 @@ beforeEach(() => {
 afterEach(() => rmSync(cwd, { recursive: true, force: true }));
 
 describe('shouldUseProxy (S5.3)', () => {
-  it('is true only for a stdio server with a tools directive', () => {
+  it('is true for any transport with a tools directive (remote curation via the bridge, S24.10)', () => {
     expect(shouldUseProxy({ transport: 'stdio', tools: { mode: 'allow', list: [] } })).toBe(true);
     expect(shouldUseProxy({ transport: 'stdio' })).toBe(false);
-    expect(shouldUseProxy({ transport: 'http', tools: { mode: 'allow', list: [] } })).toBe(false);
+    // Remote servers are now curated too — the proxy composes over the mcp-remote bridge's stdio.
+    expect(shouldUseProxy({ transport: 'http', tools: { mode: 'allow', list: [] } })).toBe(true);
+    expect(shouldUseProxy({ transport: 'streamable-http' })).toBe(false);
   });
 });
 
@@ -57,6 +61,30 @@ describe('runRun routing (S5.3)', () => {
     const proxySpawnFn = vi.fn<ProxySpawner>(async () => 0);
     const spawnFn = vi.fn<Spawner>(async () => 0);
     await runRun({ cwd, name: 'plain', providers: [], spawnFn, proxySpawnFn, trust: trustAll });
+    expect(spawnFn).toHaveBeenCalledTimes(1);
+    expect(proxySpawnFn).not.toHaveBeenCalled();
+  });
+
+  // S24.10: a REMOTE server with a tools directive composes the filtering proxy over the mcp-remote
+  // bridge child's stdio — the directive flows through, so the client-visible tools/list is curated.
+  it('routes a remote server with a tools directive through the proxy over the mcp-remote bridge', async () => {
+    let bridgeCommand: string | undefined;
+    const proxySpawnFn = vi.fn<ProxySpawner>(async (command, _a, _e, tools) => {
+      bridgeCommand = command;
+      expect(tools).toEqual({ mode: 'allow', list: ['read'] });
+      return 0;
+    });
+    const spawnFn = vi.fn<Spawner>(async () => 0);
+    await runRun({ cwd, name: 'remote', providers: [], spawnFn, proxySpawnFn, trust: trustAll });
+    expect(proxySpawnFn).toHaveBeenCalledTimes(1);
+    expect(bridgeCommand).toBe('npx'); // the pinned mcp-remote bridge, wrapped by the proxy
+    expect(spawnFn).not.toHaveBeenCalled();
+  });
+
+  it('routes a directive-less remote server through the plain bridge (no proxy overhead)', async () => {
+    const proxySpawnFn = vi.fn<ProxySpawner>(async () => 0);
+    const spawnFn = vi.fn<Spawner>(async () => 0);
+    await runRun({ cwd, name: 'remotePlain', providers: [], spawnFn, proxySpawnFn, trust: trustAll });
     expect(spawnFn).toHaveBeenCalledTimes(1);
     expect(proxySpawnFn).not.toHaveBeenCalled();
   });
