@@ -1,7 +1,16 @@
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSecretRef, UsageError, type ResolvedServer } from '@mcpfold/core';
+import { createInterface } from 'node:readline/promises';
+import { applyEdits, modify } from 'jsonc-parser';
+import { loadConfig, parseSecretRef, UsageError, type ResolvedServer } from '@mcpfold/core';
 import { defaultProviders, resolveSecrets, type SecretProvider } from '@mcpfold/secrets';
+import { realOsContext, type OsContext } from '@mcpfold/adapters';
+import { atomicWrite } from '../io/atomic-write.js';
+import { backupIfExists } from '../io/backup.js';
+import { findConfigPath } from '../util/config.js';
+import { checkHardcodedSecrets } from '../checks/servers.js';
+import type { ExtractSecretFix } from '../checks/types.js';
+import type { SecretScheme } from '../registry/map.js';
 import { EXIT } from '../output/exit-codes.js';
 import type { CommandOutput } from '../output/render.js';
 
@@ -97,6 +106,241 @@ export function runSecretSet(options: SecretSetOptions): CommandOutput<SecretSet
   throw new UsageError(`\`secret set\` for scheme "${parsed.scheme}" is not implemented yet.`, {
     hint: 'Supported now: dotenv (stores to .env). env/keychain/op arrive with their providers.',
   });
+}
+
+/**
+ * `mcpfold secret extract <server>` (S25.3) — the guided repair for a hardcoded token. It reuses the
+ * doctor detector (`checkHardcodedSecrets`) to find literal secret values in a server's `env` /
+ * `auth.headers`, moves each into a provider (default `dotenv`, or `--scheme` / an interactive
+ * chooser), rewrites the config value to a `${scheme:path}` reference via a comment-preserving jsonc
+ * edit (re-validated), and backs the config up first. `dotenv` persists the value to `.env`; every
+ * other scheme prints the exact store-it command with a `<value>` PLACEHOLDER — the raw value is
+ * never echoed to stdout or logs, and stays recoverable from the config backup. Once the value is a
+ * reference, `mcpfold sync` folds it through the run shim / native indirection, so it never lands in
+ * any client file.
+ */
+
+export type ExtractPrompt = (question: string, fallback?: string) => Promise<string>;
+
+const EXTRACT_SCHEMES: readonly SecretScheme[] = ['dotenv', 'env', 'keychain', 'infisical', 'op'];
+
+export interface ExtractedRef {
+  /** Where the literal lived. */
+  field: ExtractSecretFix['field'];
+  key: string;
+  /** The reference now written into the config. */
+  ref: string;
+  scheme: SecretScheme;
+  /** File the value was persisted to (dotenv), else null. */
+  storedTo: string | null;
+  /** Command the user must run to store the value (value shown as `<value>`), else null. */
+  storeCommand: string | null;
+}
+
+export interface SecretExtractData {
+  server: string;
+  configPath: string;
+  extracted: ExtractedRef[];
+  wrote: boolean;
+  backup: string | null;
+}
+
+export interface SecretExtractOptions {
+  cwd: string;
+  server: string;
+  /** Target provider. Omitted → interactive prompt (default dotenv), or dotenv when non-interactive. */
+  scheme?: SecretScheme;
+  /** Extract only this key (default: every hardcoded secret in the server). */
+  key?: string;
+  dryRun?: boolean;
+  /** Injectable prompt for the scheme chooser; default reads the TTY. */
+  prompt?: ExtractPrompt;
+  /** Injectable clock for deterministic backup names. */
+  now?: Date;
+  /** OS context (for the keychain store-command platform); defaults to the real environment. */
+  osContext?: OsContext;
+}
+
+/** The sanitized env-style name for a secret key (matches the doctor `extract-secret` suggestion). */
+function envNameFor(key: string): string {
+  return key.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+}
+
+function defaultExtractPrompt(): ExtractPrompt {
+  return async (question, fallback) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    try {
+      const suffix = fallback ? ` [${fallback}]` : '';
+      const answer = (await rl.question(`${question}${suffix}: `)).trim();
+      return answer || fallback || '';
+    } finally {
+      rl.close();
+    }
+  };
+}
+
+/** The exact command a user runs to store `<value>` under `path` for a non-dotenv scheme. */
+function storeCommandFor(scheme: SecretScheme, path: string, platform: NodeJS.Platform): string {
+  switch (scheme) {
+    case 'env':
+      return `export ${path}=<value>`;
+    case 'keychain':
+      if (platform === 'darwin')
+        return `security add-generic-password -U -s mcpfold -a ${path} -w <value>`;
+      if (platform === 'win32')
+        return `New-StoredCredential -Target 'mcpfold:${path}' -UserName mcpfold -Password <value> -Persist LocalMachine`;
+      return `secret-tool store --label=mcpfold service mcpfold account ${path}   # then type <value>`;
+    case 'infisical':
+      return `infisical secrets set ${path}=<value>`;
+    case 'op':
+      return `op item create --category=password --title='${path}' password=<value>`;
+    case 'dotenv':
+      return `# stored automatically in .env`;
+  }
+}
+
+export async function runSecretExtract(
+  options: SecretExtractOptions,
+): Promise<CommandOutput<SecretExtractData>> {
+  const ctx = options.osContext ?? realOsContext();
+  const configPath = findConfigPath(options.cwd);
+  if (!configPath) {
+    throw new UsageError(`No mcp.config.jsonc found in ${options.cwd}.`, {
+      hint: 'Run `mcpfold init` first.',
+    });
+  }
+  const text = readFileSync(configPath, 'utf8');
+  const loaded = loadConfig(text);
+  if (!loaded.ok) {
+    throw new UsageError(`Config at ${configPath} is invalid; run \`mcpfold doctor\` first.`);
+  }
+  const server = loaded.config.servers[options.server];
+  if (!server) {
+    throw new UsageError(`No server named "${options.server}" in the config.`, {
+      hint: `Known servers: ${Object.keys(loaded.config.servers).join(', ') || 'none'}.`,
+    });
+  }
+
+  // Reuse the doctor detector so "what counts as a hardcoded secret" has a single source of truth.
+  const hits = checkHardcodedSecrets(loaded.config, configPath)
+    .map((f) => f.autofix)
+    .filter((a): a is ExtractSecretFix => a?.kind === 'extract-secret' && a.server === options.server)
+    .filter((a) => !options.key || a.key === options.key);
+
+  if (hits.length === 0) {
+    const scope = options.key ? ` for key "${options.key}"` : '';
+    return {
+      data: { server: options.server, configPath, extracted: [], wrote: false, backup: null },
+      human: `No hardcoded secrets found in "${options.server}"${scope}.`,
+    };
+  }
+
+  // Pick the provider once for the whole extraction: explicit --scheme wins; otherwise prompt on a
+  // TTY (default dotenv), and fall back to dotenv when non-interactive.
+  let scheme = options.scheme;
+  if (!scheme) {
+    const prompt = options.prompt ?? (process.stdin.isTTY ? defaultExtractPrompt() : undefined);
+    if (prompt) {
+      const answer = await prompt(
+        `Provider to move ${hits.length} secret(s) into (${EXTRACT_SCHEMES.join('/')})`,
+        'dotenv',
+      );
+      scheme = EXTRACT_SCHEMES.includes(answer as SecretScheme) ? (answer as SecretScheme) : 'dotenv';
+    }
+  }
+  scheme ??= 'dotenv';
+
+  const readValue = (a: ExtractSecretFix): string => {
+    const record = a.field === 'env' ? server.env : server.auth?.headers;
+    return String(record?.[a.key] ?? '');
+  };
+  const jsonPathFor = (a: ExtractSecretFix): (string | number)[] =>
+    a.field === 'env'
+      ? ['servers', options.server, 'env', a.key]
+      : ['servers', options.server, 'auth', 'headers', a.key];
+
+  // Build the plan (no writes yet): a ref per hit + where its value will live.
+  const warnings: string[] = [];
+  const extracted: ExtractedRef[] = [];
+  let newText = text;
+  for (const a of hits) {
+    const path = envNameFor(a.key);
+    const ref = `\${${scheme}:${path}}`;
+    const value = readValue(a);
+    let storedTo: string | null = null;
+    let storeCommand: string | null = null;
+
+    if (scheme === 'dotenv') {
+      storedTo = join(options.cwd, '.env');
+      if (!options.dryRun) upsertDotenv(storedTo, path, value);
+    } else {
+      storeCommand = storeCommandFor(scheme, path, ctx.platform);
+      warnings.push(
+        `Value for "${a.key}" was NOT stored automatically — run \`${storeCommand}\` (the value is recoverable from the config backup until you do).`,
+      );
+    }
+
+    // Comment-preserving structural replacement of the literal with the reference.
+    newText = applyEdits(
+      newText,
+      modify(newText, jsonPathFor(a), ref, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
+    );
+    extracted.push({ field: a.field, key: a.key, ref, scheme, storedTo, storeCommand });
+  }
+
+  // Re-validate the rewritten config before we ever touch disk.
+  const revalidated = loadConfig(newText);
+  if (!revalidated.ok) {
+    throw new UsageError(
+      `Extraction would make the config invalid: ${revalidated.errors[0]?.message}`,
+    );
+  }
+
+  if (options.dryRun) {
+    return {
+      data: { server: options.server, configPath, extracted, wrote: false, backup: null },
+      human: renderExtract(options.server, configPath, extracted, { wrote: false, backup: null }),
+      warnings,
+    };
+  }
+
+  const backup = backupIfExists(configPath, options.now);
+  atomicWrite(configPath, newText);
+  return {
+    data: { server: options.server, configPath, extracted, wrote: true, backup },
+    human: renderExtract(options.server, configPath, extracted, { wrote: true, backup }),
+    warnings,
+  };
+}
+
+function renderExtract(
+  server: string,
+  configPath: string,
+  extracted: ExtractedRef[],
+  meta: { wrote: boolean; backup: string | null },
+): string {
+  const verb = meta.wrote ? 'Extracted' : 'Would extract';
+  const lines = extracted.map((e) => {
+    const where = e.storedTo
+      ? `stored in ${e.storedTo}`
+      : `run: ${e.storeCommand}`;
+    return `  ${e.field}.${e.key} → ${e.ref}   (${where})`;
+  });
+  const footer: string[] = [];
+  if (meta.wrote) {
+    if (meta.backup) footer.push(`Config backup: ${meta.backup}`);
+    footer.push(
+      'Run `mcpfold sync` to fold these out — the value stays off every client file (resolved via the run shim at launch).',
+    );
+  } else {
+    footer.push('Dry run — nothing written.');
+  }
+  return [
+    `${verb} ${extracted.length} secret(s) from "${server}" in ${configPath}:`,
+    ...lines,
+    '',
+    ...footer,
+  ].join('\n');
 }
 
 /**

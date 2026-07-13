@@ -169,8 +169,12 @@ export {
 export {
   runSecretSet,
   runSecretTest,
+  runSecretExtract,
   type SecretSetData,
   type SecretTestData,
+  type SecretExtractData,
+  type SecretExtractOptions,
+  type ExtractedRef,
 } from './commands/secret.js';
 
 // Config-as-code trust + version signing (S9.2)

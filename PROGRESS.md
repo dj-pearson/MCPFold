@@ -2318,3 +2318,22 @@ runDoctor's already-redacted findings; preview describes actions, not file conte
 + `--yes` into cli.ts (+ `parseFixIds`). 9 engine tests + 3 parser tests; completion snapshots updated for
 the new `--fix` flag. Verified end-to-end on the built binary (inert-curation → re-folded through the
 `mcpfold run` shim). verify_all green (lint + typecheck + build + full 440-test suite).
+
+### S25.3 — Guided secret extraction (hardcoded token → provider ref + shim) [in_progress]
+START: add `mcpfold secret extract <server>` — reuse checkHardcodedSecrets to locate hardcoded
+env/header values, pick a provider (default dotenv; --scheme or interactive), rewrite each value to a
+`${scheme:path}` ref via jsonc modify (comments preserved, re-validated), back up the config first.
+dotenv persists to .env; other schemes print the exact store-it command with a `<value>` placeholder
+(value never printed/logged; recoverable from the config backup). The ref keeps the value off every
+client file on the next sync (shim/native-input). On branch story/e25-config-assistance.
+
+DONE S25.3 — `mcpfold secret extract <server>` (packages/cli/src/commands/secret.ts). Reuses
+checkHardcodedSecrets to locate literal env/header secrets, picks a provider (default dotenv; --scheme
+or interactive TTY chooser), rewrites each value to a `${scheme:path}` ref via comment-preserving jsonc
+modify (backup + re-validate), and moves the value: dotenv → .env (upsertDotenv); env/keychain/infisical/op
+→ prints the exact store-it command with a `<value>` placeholder + a warning (value never echoed/logged,
+recoverable from the config backup). On the next sync the ref folds through the run shim so no value hits
+a client file. Wired `secret extract` (+ --scheme/--key) into cli.ts with `parseSecretScheme`. 7 command
+tests + 2 parser tests. Verified end-to-end on the built binary (dotenv persist + comment preserved + 0
+value leakage). This is the command `doctor --fix` already points to for a hardcoded-secret finding, closing
+the guided loop. verify_all green (lint + typecheck + build + full 450-test suite).

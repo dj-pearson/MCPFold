@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { run, parseIntFlag, parseFixIds } from '../src/cli.js';
+import { run, parseIntFlag, parseFixIds, parseSecretScheme } from '../src/cli.js';
 import { UsageError } from '@mcpfold/core';
 import { EXIT } from '../src/output/exit-codes.js';
 import type { Writer } from '../src/output/render.js';
@@ -103,5 +103,19 @@ describe('parseFixIds (S25.2)', () => {
   it('rejects non-integer / non-positive ids loudly', () => {
     expect(() => parseFixIds('1,abc')).toThrow(UsageError);
     expect(() => parseFixIds('0')).toThrow(/integer/);
+  });
+});
+
+describe('parseSecretScheme (S25.3)', () => {
+  it('passes through undefined and every known scheme', () => {
+    expect(parseSecretScheme(undefined)).toBeUndefined();
+    for (const s of ['env', 'dotenv', 'infisical', 'keychain', 'op']) {
+      expect(parseSecretScheme(s)).toBe(s);
+    }
+  });
+
+  it('rejects an unknown scheme loudly', () => {
+    expect(() => parseSecretScheme('vault')).toThrow(UsageError);
+    expect(() => parseSecretScheme('vault')).toThrow(/Unknown secret scheme/);
   });
 });

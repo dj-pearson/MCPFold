@@ -46,7 +46,8 @@ import { runSearch } from './commands/search.js';
 import { runRun } from './commands/run.js';
 import { runMigrate } from './commands/migrate.js';
 import { scaffoldAdapter } from './commands/scaffold-adapter.js';
-import { runSecretSet, runSecretTest } from './commands/secret.js';
+import { runSecretExtract, runSecretSet, runSecretTest } from './commands/secret.js';
+import type { SecretScheme } from './registry/map.js';
 import { runLogin } from './commands/login.js';
 import { runPush } from './commands/push.js';
 import { runPull } from './commands/pull.js';
@@ -133,6 +134,24 @@ export function parseFixIds(raw: string | boolean | undefined): number[] | undef
     .filter(Boolean)
     .map((s) => parseIntFlag('--fix id', s, { min: 1 })!);
   return ids.length > 0 ? ids : undefined;
+}
+
+const SECRET_SCHEMES: readonly SecretScheme[] = ['env', 'dotenv', 'infisical', 'keychain', 'op'];
+
+/**
+ * Validate a `--scheme` flag value against the known secret providers (S25.3). Undefined passes
+ * through (the command prompts / defaults); an unknown scheme is rejected loudly rather than silently
+ * producing a `${bogus:...}` reference the resolver can never satisfy.
+ * @internal
+ */
+export function parseSecretScheme(raw: string | undefined): SecretScheme | undefined {
+  if (raw === undefined) return undefined;
+  if (!SECRET_SCHEMES.includes(raw as SecretScheme)) {
+    throw new UsageError(`Unknown secret scheme "${raw}".`, {
+      hint: `Use one of: ${SECRET_SCHEMES.join(', ')}.`,
+    });
+  }
+  return raw as SecretScheme;
 }
 
 export function buildProgram(writer?: Writer): { program: Command; getExitCode: () => ExitCode } {
@@ -633,6 +652,29 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
         'secret set',
         ctx.json,
         () => runSecretSet({ cwd: ctx.cwd, ref, value: opts.value }),
+        writer,
+      ),
+    );
+  });
+
+  addGlobalFlags(
+    secretCmd
+      .command('extract')
+      .description('move a server’s hardcoded secret(s) into a provider reference (never on disk)')
+      .argument('<server>', 'canonical server name to de-hardcode')
+      .option(
+        '--scheme <scheme>',
+        'provider to store into: dotenv | env | keychain | infisical | op (default: dotenv, or prompt)',
+      )
+      .option('--key <key>', 'extract only this env/header key (default: all hardcoded secrets)'),
+  ).action(async (server: string, opts: GlobalFlags & { scheme?: string; key?: string }) => {
+    const ctx = resolve(opts);
+    const scheme = parseSecretScheme(opts.scheme);
+    setExit(
+      await runCommand(
+        'secret extract',
+        ctx.json,
+        () => runSecretExtract({ cwd: ctx.cwd, server, scheme, key: opts.key, dryRun: ctx.dryRun }),
         writer,
       ),
     );
