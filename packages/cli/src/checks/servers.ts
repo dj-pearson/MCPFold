@@ -24,6 +24,9 @@ export function checkDeprecatedTransports(config: Config, file: string): Finding
         where: `servers.${name}`,
         message: `Server "${name}" uses the deprecated "sse" transport (MCP deprecated HTTP+SSE on 2025-11-25).`,
         fix: 'Switch to "transport": "streamable-http" once the server supports it.',
+        explain: 'deprecated-sse',
+        // Guided (not auto): the edit is deterministic but the server may not speak Streamable HTTP yet.
+        autofix: { kind: 'rewrite-transport', server: name, from: 'sse', to: 'streamable-http' },
       });
     }
   }
@@ -43,6 +46,7 @@ export function checkUnpinnedLatest(config: Config, file: string): Finding[] {
         where: `servers.${name}`,
         message: `Server "${name}" runs an unpinned @latest package.`,
         fix: `Add a "pin" (e.g. "pin": "1.4.2") so mcpfold rewrites @latest to a fixed version at fold time.`,
+        explain: 'unpinned-latest',
       });
     }
   }
@@ -60,6 +64,7 @@ export function checkPinIntegrity(config: Config, file: string): Finding[] {
         where: `servers.${name}.integrity`,
         message: `Server "${name}" has a malformed integrity hash "${server.integrity}".`,
         fix: 'Use an SRI hash like "sha512-<base64>" (or remove the field).',
+        explain: 'pin-integrity',
       });
     }
   }
@@ -74,12 +79,18 @@ export function checkHardcodedSecrets(config: Config, file: string): Finding[] {
       for (const [key, value] of Object.entries(record ?? {})) {
         if (isSecretRef(value)) continue;
         if (SUSPICIOUS_KEY.test(key)) {
+          const envName = key.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+          const suggestedRef = `\${env:${envName}}`;
           findings.push({
             severity: 'error',
             file,
             where: `servers.${name}.${kind}.${key}`,
             message: `"${key}" in server "${name}" looks like a hardcoded secret value.`,
-            fix: `Replace the literal with a reference, e.g. "\${env:${key.toUpperCase().replace(/[^A-Z0-9]/g, '_')}}".`,
+            fix: `Replace the literal with a reference, e.g. "${suggestedRef}".`,
+            explain: 'hardcoded-secret',
+            // Guided repair (S25.3): moving the value needs a provider choice, so this is not
+            // auto-applied under `--yes`. The descriptor carries where the value lives + the default ref.
+            autofix: { kind: 'extract-secret', server: name, field: kind, key, suggestedRef },
           });
         }
       }
@@ -102,6 +113,7 @@ export function checkSecretSchemes(config: Config, file: string): Finding[] {
           where: `servers.${name}.${ref.location}`,
           message: `Unknown secret-provider scheme "${ref.scheme}" in server "${name}".`,
           fix: `Use a supported scheme: env, dotenv, infisical, keychain, or op.`,
+          explain: 'unknown-secret-scheme',
         });
       }
     }
@@ -126,6 +138,7 @@ export function checkNativeEnvFallback(config: Config, file: string): Finding[] 
       where,
       message: `Server "${name}" requests native-env but uses a non-env secret scheme the client can't resolve — it folds via the \`mcpfold run\` shim instead (safe, automatic).`,
       fix: `Nothing required. To fold shim-free, use only \${env:...} refs on native-env servers; or set this server's secretStrategy to "shim" to make the choice explicit.`,
+      explain: 'native-env-fallback',
     });
   };
   // Per-server native-env opt-in with a non-env scheme.

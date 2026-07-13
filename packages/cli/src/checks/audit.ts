@@ -38,6 +38,7 @@ export function checkAuditTrail(config: Config, ctx: OsContext): Finding[] {
       fix: enabled
         ? 'Disable with `audit.enabled: false` in mcp.config.jsonc or MCPFOLD_NO_AUDIT=1. It powers `mcpfold curate`.'
         : 'Re-enable by removing `audit.enabled: false` / unsetting MCPFOLD_NO_AUDIT so usage-based curation has data.',
+      explain: 'audit-trail',
     },
   ];
 }

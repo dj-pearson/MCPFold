@@ -6,6 +6,8 @@ import { runDiff } from './commands/diff.js';
 import { runInit } from './commands/init.js';
 import { autoPrompter, runGuided, ttyPrompter } from './onboarding/guided.js';
 import { runDoctor } from './commands/doctor.js';
+import { runDoctorFix } from './commands/doctor-fix.js';
+import { runExplain } from './commands/explain.js';
 import { runScan } from './commands/scan.js';
 import { runStatus } from './commands/status.js';
 import {
@@ -45,7 +47,8 @@ import { runSearch } from './commands/search.js';
 import { runRun } from './commands/run.js';
 import { runMigrate } from './commands/migrate.js';
 import { scaffoldAdapter } from './commands/scaffold-adapter.js';
-import { runSecretSet, runSecretTest } from './commands/secret.js';
+import { runSecretExtract, runSecretSet, runSecretTest } from './commands/secret.js';
+import type { SecretScheme } from './registry/map.js';
 import { runLogin } from './commands/login.js';
 import { runPush } from './commands/push.js';
 import { runPull } from './commands/pull.js';
@@ -116,6 +119,40 @@ export function parseIntFlag(
     });
   }
   return n;
+}
+
+/**
+ * Parse the optional value of `doctor --fix [ids]` into a list of 1-based finding ids. `--fix` with
+ * no value (commander passes `true`), an empty string, or the literal `all` selects every fixable
+ * finding (undefined ids). `--fix 1,3` scopes to those; non-integers are rejected loudly.
+ * @internal
+ */
+export function parseFixIds(raw: string | boolean | undefined): number[] | undefined {
+  if (raw === undefined || raw === true || raw === '' || raw === 'all') return undefined;
+  const ids = String(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => parseIntFlag('--fix id', s, { min: 1 })!);
+  return ids.length > 0 ? ids : undefined;
+}
+
+const SECRET_SCHEMES: readonly SecretScheme[] = ['env', 'dotenv', 'infisical', 'keychain', 'op'];
+
+/**
+ * Validate a `--scheme` flag value against the known secret providers (S25.3). Undefined passes
+ * through (the command prompts / defaults); an unknown scheme is rejected loudly rather than silently
+ * producing a `${bogus:...}` reference the resolver can never satisfy.
+ * @internal
+ */
+export function parseSecretScheme(raw: string | undefined): SecretScheme | undefined {
+  if (raw === undefined) return undefined;
+  if (!SECRET_SCHEMES.includes(raw as SecretScheme)) {
+    throw new UsageError(`Unknown secret scheme "${raw}".`, {
+      hint: `Use one of: ${SECRET_SCHEMES.join(', ')}.`,
+    });
+  }
+  return raw as SecretScheme;
 }
 
 export function buildProgram(writer?: Writer): { program: Command; getExitCode: () => ExitCode } {
@@ -297,10 +334,31 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   });
 
   addGlobalFlags(
-    program.command('doctor').description('validate config and catch silent failures'),
-  ).action(async (opts: GlobalFlags) => {
+    program
+      .command('doctor')
+      .description('validate config and catch silent failures')
+      .option(
+        '--fix [ids]',
+        'apply the deterministic fixes for the findings (all, or comma-separated ids). Preview by default; use --yes to write',
+      )
+      .option('--yes', 'apply fixes without an interactive confirmation (CI / scripted)', false),
+  ).action(async (opts: GlobalFlags & { fix?: string | boolean; yes?: boolean }) => {
     const ctx = resolve(opts);
-    setExit(await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer));
+    if (opts.fix === undefined) {
+      setExit(
+        await runCommand('doctor', ctx.json, () => runDoctor({ cwd: ctx.cwd }), writer),
+      );
+      return;
+    }
+    const ids = parseFixIds(opts.fix);
+    setExit(
+      await runCommand(
+        'doctor',
+        ctx.json,
+        () => runDoctorFix({ cwd: ctx.cwd, ids, yes: opts.yes, dryRun: ctx.dryRun }),
+        writer,
+      ),
+    );
   });
 
   addGlobalFlags(
@@ -310,6 +368,16 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   ).action(async (opts: GlobalFlags) => {
     const ctx = resolve(opts);
     setExit(await runCommand('scan', ctx.json, () => runScan({ cwd: ctx.cwd }), writer));
+  });
+
+  addGlobalFlags(
+    program
+      .command('explain')
+      .description('explain a doctor finding or a core concept (offline; run bare to list topics)')
+      .argument('[topic]', 'a doctor finding id (see the `see:` line) or a concept'),
+  ).action(async (topic: string | undefined, opts: GlobalFlags) => {
+    const ctx = resolve(opts);
+    setExit(await runCommand('explain', ctx.json, () => runExplain({ topic }), writer));
   });
 
   addGlobalFlags(
@@ -601,6 +669,29 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
   });
 
   addGlobalFlags(
+    secretCmd
+      .command('extract')
+      .description('move a server’s hardcoded secret(s) into a provider reference (never on disk)')
+      .argument('<server>', 'canonical server name to de-hardcode')
+      .option(
+        '--scheme <scheme>',
+        'provider to store into: dotenv | env | keychain | infisical | op (default: dotenv, or prompt)',
+      )
+      .option('--key <key>', 'extract only this env/header key (default: all hardcoded secrets)'),
+  ).action(async (server: string, opts: GlobalFlags & { scheme?: string; key?: string }) => {
+    const ctx = resolve(opts);
+    const scheme = parseSecretScheme(opts.scheme);
+    setExit(
+      await runCommand(
+        'secret extract',
+        ctx.json,
+        () => runSecretExtract({ cwd: ctx.cwd, server, scheme, key: opts.key, dryRun: ctx.dryRun }),
+        writer,
+      ),
+    );
+  });
+
+  addGlobalFlags(
     program
       .command('scaffold-adapter')
       .description('generate a new client adapter module + test (contributor on-ramp)')
@@ -644,7 +735,12 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       .option('--pin <version>', 'pin a stdio package to a fixed version')
       .option('--tag <tag...>', 'tag(s) to attach')
       .option('--token-ref <ref>', 'auth token as a ${scheme:path} reference (never a raw token)')
-      .option('--auth-type <t>', 'bearer | header | none', 'bearer'),
+      .option('--auth-type <t>', 'bearer | header | none', 'bearer')
+      .option(
+        '--probe',
+        'opt-in: probe a --url server to auto-detect transport + whether auth is required (network; off by default)',
+        false,
+      ),
   ).action(
     async (
       name: string,
@@ -661,6 +757,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
         tag?: string[];
         tokenRef?: string;
         authType?: 'bearer' | 'header' | 'none';
+        probe?: boolean;
       },
     ) => {
       const ctx = resolve(opts);
@@ -684,6 +781,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
               tags: opts.tag,
               tokenRef: opts.tokenRef,
               authType: opts.authType,
+              probe: opts.probe,
               dryRun: ctx.dryRun,
             }),
           writer,

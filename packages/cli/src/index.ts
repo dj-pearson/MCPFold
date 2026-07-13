@@ -71,6 +71,21 @@ export {
 } from './onboarding/guided.js';
 export { runDoctor, type DoctorData, type DoctorOptions } from './commands/doctor.js';
 export {
+  runExplain,
+  hasExplain,
+  EXPLAIN,
+  type ExplainEntry,
+  type ExplainData,
+  type ExplainOptions,
+} from './commands/explain.js';
+export {
+  runDoctorFix,
+  type DoctorFixData,
+  type DoctorFixOptions,
+  type AppliedFix,
+  type SkippedFix,
+} from './commands/doctor-fix.js';
+export {
   buildSpec,
   completionScript,
   completionValues,
@@ -113,9 +128,12 @@ export {
 export {
   runAdd,
   deriveLocalName,
+  defaultProbe,
   type AddData,
   type AddOptions,
   type Prompt,
+  type ProbeResult,
+  type UrlProber,
 } from './commands/add.js';
 export { runSearch, type SearchData, type SearchOptions } from './commands/search.js';
 export {
@@ -134,7 +152,15 @@ export {
   type SecretScheme,
 } from './registry/map.js';
 export { detectClients, type DetectedClient } from './util/detect-clients.js';
-export type { Finding, Severity } from './checks/types.js';
+export {
+  isAutoApplicable,
+  type Finding,
+  type Severity,
+  type FixAction,
+  type ResyncClientFix,
+  type ExtractSecretFix,
+  type RewriteTransportFix,
+} from './checks/types.js';
 
 // Secret strategies + shim launcher + secret command (E4)
 export {
@@ -154,8 +180,12 @@ export {
 export {
   runSecretSet,
   runSecretTest,
+  runSecretExtract,
   type SecretSetData,
   type SecretTestData,
+  type SecretExtractData,
+  type SecretExtractOptions,
+  type ExtractedRef,
 } from './commands/secret.js';
 
 // Config-as-code trust + version signing (S9.2)

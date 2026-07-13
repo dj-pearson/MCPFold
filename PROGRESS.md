@@ -2283,3 +2283,97 @@ never publishes by surprise). Fails fast if the tag version ≠ package.json; `w
 REMAINING (user-only, cannot be automated): the manual Extension-Development-Host smoke run on macOS +
 Windows (criterion 2), and creating the PearsonMedia Marketplace publisher + first publish + listing
 verification (criterion 3, needs an Azure DevOps PAT). Story stays in_progress until those land.
+
+---
+
+## E25 — Guided configuration assistance (diagnose → repair)
+
+### S25.1 — Machine-applicable fix model on the doctor Finding contract [in_progress]
+START: extend the CLI `Finding` contract with an optional deterministic `autofix` descriptor
+(discriminated union: `resync-client` for the VS Code root-key trap / inert curation / unpinned
+mcp-remote bridge, and `extract-secret` for hardcoded tokens — the latter applied later by the
+S25.3 guided flow). Populate it on the unambiguous checks; leave ambiguous findings advisory-only.
+No change to doctor's rendered output. Branch `story/S25.1-autofix-model`.
+
+DONE S25.1 — added `autofix?: FixAction` to the doctor `Finding` contract (packages/cli/src/checks/types.ts):
+a discriminated union of `resync-client` (auto-applicable — VS Code root-key trap, inert curation,
+unpinned/vulnerable mcp-remote bridge, malformed client file), `extract-secret` (guided — hardcoded
+token), and `rewrite-transport` (guided — deprecated sse). Populated the unambiguous checks in
+servers.ts / clients.ts / curation.ts; `isAutoApplicable()` classifies auto vs guided. Deviation from
+the original AC: unpinned `@latest` stays **advisory** (no descriptor) because pinning needs a
+non-deterministic online version resolve, and deprecated `sse` is **guided** not auto (the server may
+not speak Streamable HTTP) — AC[2] refined to record this. New public exports (FixAction + variants,
+isAutoApplicable) from index.ts; changeset added (patch, no behavior change). 8 new unit tests in
+test/autofix.test.ts. verify_all green (lint + typecheck + build + tests); the one full-suite failure
+was the pre-existing Windows DPAPI token-store timeout under parallel load, which passes standalone.
+
+DONE S25.2 — `mcpfold doctor --fix` repair engine (packages/cli/src/commands/doctor-fix.ts). Consumes
+the S25.1 autofix descriptors: previews per-finding by default (writes nothing), applies on `--fix --yes`,
+scopes with `--fix <ids>`. Auto-applicable `resync-client` fixes re-fold one client via `runSync({profile})`
+(backup + atomic write + re-validate by re-running doctor); a fix that raises the error count is rolled
+back from backup (restoreBackup), and a fix whose finding persists is reported failed — never a silent
+partial. Guided fixes (extract-secret, rewrite-transport) are reported/skipped, never auto-applied. `--json`
+reports applied/skipped/failed; exit reflects remaining errors. No secret value ever printed (consumes
+runDoctor's already-redacted findings; preview describes actions, not file contents). Wired `--fix [ids]`
++ `--yes` into cli.ts (+ `parseFixIds`). 9 engine tests + 3 parser tests; completion snapshots updated for
+the new `--fix` flag. Verified end-to-end on the built binary (inert-curation → re-folded through the
+`mcpfold run` shim). verify_all green (lint + typecheck + build + full 440-test suite).
+
+### S25.3 — Guided secret extraction (hardcoded token → provider ref + shim) [in_progress]
+START: add `mcpfold secret extract <server>` — reuse checkHardcodedSecrets to locate hardcoded
+env/header values, pick a provider (default dotenv; --scheme or interactive), rewrite each value to a
+`${scheme:path}` ref via jsonc modify (comments preserved, re-validated), back up the config first.
+dotenv persists to .env; other schemes print the exact store-it command with a `<value>` placeholder
+(value never printed/logged; recoverable from the config backup). The ref keeps the value off every
+client file on the next sync (shim/native-input). On branch story/e25-config-assistance.
+
+DONE S25.3 — `mcpfold secret extract <server>` (packages/cli/src/commands/secret.ts). Reuses
+checkHardcodedSecrets to locate literal env/header secrets, picks a provider (default dotenv; --scheme
+or interactive TTY chooser), rewrites each value to a `${scheme:path}` ref via comment-preserving jsonc
+modify (backup + re-validate), and moves the value: dotenv → .env (upsertDotenv); env/keychain/infisical/op
+→ prints the exact store-it command with a `<value>` placeholder + a warning (value never echoed/logged,
+recoverable from the config backup). On the next sync the ref folds through the run shim so no value hits
+a client file. Wired `secret extract` (+ --scheme/--key) into cli.ts with `parseSecretScheme`. 7 command
+tests + 2 parser tests. Verified end-to-end on the built binary (dotenv persist + comment preserved + 0
+value leakage). This is the command `doctor --fix` already points to for a hardcoded-secret finding, closing
+the guided loop. verify_all green (lint + typecheck + build + full 450-test suite).
+
+DONE S25.6 — docs + cross-OS e2e gate for the diagnose→repair loop. Added docs/config-assistance.md
+(the full doctor --fix + secret extract surface, incl. the honest "what it won't auto-fix" table) and
+linked it from docs/index.md. Added e2e/config-assistance.test.ts: one fixture with all three footguns
+(VS Code root-key trap, unpinned @latest, hardcoded token) driven through secret extract + doctor --fix,
+asserting the canonical config re-validates, is byte-stable (idempotent re-run + no home/abs paths → OS-
+independent), and leaks no secret value in the config or the folded client file. Runs in the @mcpfold/e2e
+suite on the existing cross-OS CI matrix. Reconciled AC[1] with the S25.1 reality: unpinned @latest is
+advisory (no deterministic autofix), so the fixture supplies a pin to reach a clean doctor. No changeset
+(docs + test only; the commands were already announced by the S25.2/S25.3 changesets). verify_all green
+across the whole workspace (core/adapters/proxy/cli/e2e).
+
+DONE S25.4 — `mcpfold add --url <url> --probe` (packages/cli/src/commands/add.ts). Opt-in, offline-by-
+default probe: POSTs a minimal MCP initialize, reads content-type (text/event-stream → sse, else
+streamable-http) and auth status (401/403 or WWW-Authenticate). On an auth challenge it scaffolds a
+placeholder `${env:<NAME>_TOKEN}` ref (never a value). Timeout-bounded (AbortController, 5s default) and
+best-effort — any error/timeout/ambiguity falls back to the S17.5 default with a note, never blocking
+the add; an explicit --transport wins. The prober is injectable (tests) and defaults to a fetch probe.
+Probing only affects add-time writes, never sync output (test proves a probed add is byte-identical to a
+plain add). Wired --probe into cli.ts; exported ProbeResult/UrlProber/defaultProbe. 6 unit tests +
+completion snapshots refreshed. Verified on the built binary (closed port → fast fallback, no hang).
+verify_all green (lint + typecheck + build + 456 cli tests).
+
+### S25.5 — `mcpfold explain <topic|finding-id>` [in_progress]
+START: add an offline `explain` command with an authored entry per doctor finding class + core concept;
+add an optional `explain?` topic id to the Finding contract, populate it in each check, and have doctor
+print a `see: mcpfold explain <id>` pointer. `--json` returns the structured entry; unknown key lists
+topics. Static in-repo content, no network/generation. On branch story/e25-config-assistance.
+
+DONE S25.5 — `mcpfold explain <topic|finding-id>` (packages/cli/src/commands/explain.ts). Offline authored
+catalog (EXPLAIN) with an entry per doctor finding class + core concept (shim, curation, secret-refs,
+config-format). Added optional `explain?` id to the Finding contract, populated it across every check
+(servers/clients/config/curation/audit), and doctor now prints a `see: mcpfold explain <id>` pointer per
+finding. Bare `explain` lists topics; a known topic prints the entry; an unknown key is a loud UsageError;
+`--json` returns the structured entry. 6 unit tests incl. a no-orphans guard (every finding's explain id
+resolves; related links resolve). Wired `explain` into cli.ts; exported runExplain/EXPLAIN/hasExplain;
+added an explain section to docs/config-assistance.md. Completion snapshots refreshed for the new command.
+Verified on the binary. verify_all green (lint + typecheck + build + 462 cli tests).
+
+*** E25 (Guided configuration assistance) COMPLETE — all 6 stories done. ***

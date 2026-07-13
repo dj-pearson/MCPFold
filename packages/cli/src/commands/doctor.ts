@@ -110,11 +110,14 @@ function renderHuman(
   } as const;
   const lines = findings.map((f) => {
     const loc = f.where ? ` (${f.where})` : '';
-    return [
+    const rows = [
       `${icon[f.severity]} ${style.bold(`${f.file}${loc}`)}`,
       `    ${f.message}`,
       `    ${style.dim('fix:')} ${f.fix}`,
-    ].join('\n');
+    ];
+    // S25.5: point at the offline explainer so a user can learn why this footgun matters.
+    if (f.explain) rows.push(`    ${style.dim('see:')} mcpfold explain ${f.explain}`);
+    return rows.join('\n');
   });
   return [
     ...lines,

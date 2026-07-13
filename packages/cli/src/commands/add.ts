@@ -56,6 +56,56 @@ export interface AddOptions {
   prompt?: Prompt;
   /** OS context for org-policy discovery (S18.3); defaults to the real environment. */
   osContext?: OsContext;
+  /**
+   * Opt-in: probe a URL server to auto-detect its transport (streamable-http vs sse) and whether it
+   * requires auth (S25.4). OFF by default — an add stays fully offline unless this is set. The probe
+   * only influences what is written at add time; it never affects `sync` output.
+   */
+  probe?: boolean;
+  /** Injectable URL prober (S25.4); defaults to a fetch-based, best-effort probe. */
+  prober?: UrlProber;
+  /** Probe timeout in ms (default 5000); the probe aborts and falls back to defaults past this. */
+  probeTimeoutMs?: number;
+}
+
+/** What a URL probe learned about a remote MCP endpoint (S25.4). */
+export interface ProbeResult {
+  transport: 'streamable-http' | 'sse';
+  /** True when the endpoint answered with an auth challenge (401/403 or a WWW-Authenticate header). */
+  authRequired: boolean;
+}
+
+/** A best-effort URL prober; returns null on any error/timeout/ambiguity so the add falls back. */
+export type UrlProber = (url: string, signal: AbortSignal) => Promise<ProbeResult | null>;
+
+/**
+ * Default probe (S25.4): POST a minimal MCP `initialize` and read the response shape. A
+ * `text/event-stream` content-type signals the legacy SSE transport; anything else is treated as
+ * Streamable HTTP. A 401/403 or a `WWW-Authenticate` header signals auth. Any network error or timeout
+ * resolves to null (the caller keeps its defaults) — the probe never blocks or fails an add.
+ */
+export const defaultProbe: UrlProber = async (url, signal) => {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'initialize', params: {} }),
+      signal,
+    });
+    const contentType = res.headers.get('content-type') ?? '';
+    const transport = contentType.includes('text/event-stream') ? 'sse' : 'streamable-http';
+    const authRequired =
+      res.status === 401 || res.status === 403 || res.headers.has('www-authenticate');
+    return { transport, authRequired };
+  } catch {
+    return null; // DNS failure, timeout (abort), TLS error, offline — degrade to defaults
+  }
+};
+
+/** A placeholder `${env:...}` token ref synthesized for a probed auth challenge (never a value). */
+function placeholderTokenRef(name: string): string {
+  const envName = name.toUpperCase().replace(/[^A-Z0-9]/g, '_') || 'SERVER';
+  return `\${env:${envName}_TOKEN}`;
 }
 
 /** A clean local server key from a reverse-DNS registry name (`ns/pkg` → `pkg`, `a.b.c` → `c`). */
@@ -130,6 +180,7 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
   let signature: McpbSignature | undefined;
   let warnings: string[] | undefined;
   let derivedName = options.name;
+  let probeNote: string | undefined;
 
   if (options.fromMcpb) {
     // S17.8/S22.9: parse the .mcpb → a canonical, ref-only stdio server; verify integrity against the
@@ -186,9 +237,38 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
     }
     if (url) {
       // S17.5: the canonical remote transport is `streamable-http` (the spec's HTTP transport).
-      const transport = options.transport === 'sse' ? 'sse' : 'streamable-http';
+      let transport: 'sse' | 'streamable-http' = options.transport === 'sse' ? 'sse' : 'streamable-http';
+      // S25.4: opt-in probe to auto-detect transport + auth. Best-effort and timeout-bounded — any
+      // failure keeps the defaults. It only affects what is written now, never `sync` output.
+      let probedAuthRequired = false;
+      if (options.probe) {
+        const prober = options.prober ?? defaultProbe;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), options.probeTimeoutMs ?? 5000);
+        let result: ProbeResult | null;
+        try {
+          result = await prober(url, controller.signal);
+        } catch {
+          result = null;
+        } finally {
+          clearTimeout(timer);
+        }
+        if (result) {
+          // An explicit --transport wins; otherwise adopt what the probe saw.
+          if (!options.transport) transport = result.transport;
+          probedAuthRequired = result.authRequired;
+          probeNote = `probe: detected ${result.transport}${result.authRequired ? ', auth required' : ', no auth challenge'}`;
+        } else {
+          probeNote = 'probe: no usable response — kept defaults (offline-safe)';
+        }
+      }
       server = { transport, url, tags };
       let tokenRef = options.tokenRef;
+      // A probed auth challenge scaffolds a placeholder ref (never a value) the user then fills in.
+      if (!tokenRef && probedAuthRequired) {
+        tokenRef = placeholderTokenRef(options.name);
+        probeNote = `${probeNote}; scaffolded ${tokenRef} — set it before \`mcpfold sync\``;
+      }
       if (!tokenRef && prompt) {
         const answer = await prompt('Auth token reference (${scheme:path}, blank for none)');
         tokenRef = answer || undefined;
@@ -247,11 +327,13 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
   // S17.8: surface the bundle's signature status + any mapping caveats.
   const sigLine = signature ? `\n${describeSignature(signature)}` : '';
   const warnLines = warnings?.length ? `\n${warnings.map((w) => `  ⚠ ${w}`).join('\n')}` : '';
+  // S25.4: what the opt-in probe detected (or that it kept defaults).
+  const probeLine = probeNote ? `\n  ${probeNote}` : '';
 
   if (options.dryRun) {
     return {
       data: { name: configKey, server, configPath, wrote: false, signature, warnings },
-      human: `Would add "${configKey}" to ${configPath}:${sigLine}${warnLines}\n\n${newText}`,
+      human: `Would add "${configKey}" to ${configPath}:${sigLine}${probeLine}${warnLines}\n\n${newText}`,
     };
   }
 
@@ -264,7 +346,7 @@ export async function runAdd(options: AddOptions): Promise<CommandOutput<AddData
       : '';
   return {
     data: { name: configKey, server, configPath, wrote: true, signature, warnings },
-    human: `Added "${configKey}" (${server.transport}) to ${configPath}.${sigLine}${warnLines}\nRun \`mcpfold sync\` to fold it out.${curateLine}`,
+    human: `Added "${configKey}" (${server.transport}) to ${configPath}.${sigLine}${probeLine}${warnLines}\nRun \`mcpfold sync\` to fold it out.${curateLine}`,
   };
 }
 

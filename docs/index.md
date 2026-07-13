@@ -54,6 +54,7 @@ The full walkthrough is in the [Quickstart](./quickstart.md).
 - **[Quickstart](./quickstart.md)** — install → init → import → sync → diff in five minutes.
 - **[Config format](./config-format.md)** — the canonical `mcp.config.jsonc` reference.
 - **[Secrets](./secrets.md)** — references, providers, and the three storage strategies.
+- **[Configuration assistance](./config-assistance.md)** — `doctor --fix` and `secret extract`: diagnose → repair, deterministically.
 - **[Adapters](./adapters.md)** — add a new client in one PR.
 - **[Benchmark](./benchmark.md)** — the context-window measurement, reproduced.
 - **[CLI contract](./cli-contract.md)** — exit codes, `--json` envelope, redaction.

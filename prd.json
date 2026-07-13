@@ -20,7 +20,8 @@
       "Server-side enterprise gateway features (RBAC, org audit, hosted servers) \u2014 that is the Composio/MintMCP space, not ours.",
       "Naming the CLI binary `fold` (shadows POSIX fold).",
       "Syncing secret VALUES to the cloud \u2014 only config with secret REFERENCES is ever synced.",
-      "Implying official MCP endorsement in any copy."
+      "Implying official MCP endorsement in any copy.",
+      "An AI/LLM-powered configuration \"assistant\" or server-recommendation engine - configuration assistance is deterministic, offline, previewable codemods only (see E25). mcpfold helps you reach a correct canonical config; it never decides what belongs in it."
     ]
   },
   "stack": {
@@ -247,6 +248,11 @@
       "id": "E24",
       "title": "Functional activation - make curation deliver real savings end-to-end",
       "goal": "Close the gaps found in the 2026-07-13 end-to-end audit: the config fan-out works, but the headline token-savings path is unreachable in the default flow. sync only shims secret-bearing servers (a secretless server's tools directive is silently dropped), the shim cannot find the canonical config when a GUI client launches it from another cwd, `mcpfold curate` lands via E23 while main's VS Code extension already calls it, curation has a cold-start chicken-and-egg (recommendations need audit data; auditing is opt-in and only records once the proxy runs; the proxy only runs once curation is wired), and onboarding prints a fixture-derived ~80% savings claim regardless of whether any curation is active. E24 makes the chain real: shim any curated server, make the shim self-locating, reconcile and land curate (E23), prove the chain with an e2e gate, add live tool-surface discovery for day-zero curation, default-on local audit, and honest measured savings reporting. E24 builds directly on the E23 curate epic (S24.3 lands it on main)."
+    },
+    {
+      "id": "E25",
+      "title": "Guided configuration assistance - close the diagnose-to-repair loop",
+      "goal": "doctor already names every footgun (VS Code servers-vs-mcpServers, unpinned @latest, hardcoded tokens, unknown secret schemes) and prints a human `fix:` string, but the user must hand-apply every one - there is no --fix, codemod, or repair surface anywhere in the CLI. E25 closes the loop with deterministic, offline, previewable, consent-gated repairs: a machine-applicable fix descriptor on the Finding contract, `doctor --fix` with dry-run + backup + re-validate, and the marquee differentiator (pull a hardcoded token into a provider ref + shim so the value leaves disk) as one guided flow. Assistance here means helping the user reach a correct, byte-stable canonical config faster - never an AI/LLM engine that decides what belongs in it (see non_goals). Builds on the existing doctor checks (packages/cli/src/checks/*), the atomic-write/backup IO, and the run shim."
     }
   ],
   "stories": [
@@ -5985,6 +5991,189 @@
       "definition_of_done": [
         "A curated server's new upstream tools always produce a visible, actionable signal."
       ]
+    },
+    {
+      "id": "S25.1",
+      "epic": "E25",
+      "order": 1,
+      "priority": "p1",
+      "status": "done",
+      "dependencies": [],
+      "title": "Machine-applicable fix model on the doctor Finding contract",
+      "user_story": "As a maintainer, I want each doctor finding to optionally carry a deterministic, machine-applicable fix descriptor, so a repair engine can apply it without re-deriving the fix from prose.",
+      "context": "Today every Finding (packages/cli/src/checks/types.ts) carries only a human `fix:` string; checks like checkHardcodedSecrets/checkUnpinnedLatest (checks/servers.ts) and checkClientFiles (checks/clients.ts) describe the fix in English (\"run mcpfold sync to rewrite it\"). Nothing can apply it. This story adds an optional structured `autofix` to Finding - a discriminated union of deterministic edits (e.g. resync-client, jsonc-set, jsonc-remove, extract-secret, pin-version, rewrite-root-key) - and populates it on the checks whose repair is unambiguous. Ambiguous findings stay advisory (no autofix). No change to doctor rendered output yet.",
+      "acceptance_criteria": [
+        "Finding gains an optional `autofix?: FixAction` field; the human `fix` string is retained and unchanged.",
+        "FixAction is a typed discriminated union; each variant carries exactly the data needed to apply it deterministically (target file, jsonc path, new value / provider scheme, etc.).",
+        "Checks with a deterministic repair attach an autofix: the VS Code root-key trap, inert curation, an unpinned/vulnerable mcp-remote bridge, and a malformed client file map to `resync-client` (auto-applicable); a hardcoded secret maps to `extract-secret` and the deprecated `sse` transport to `rewrite-transport` (both guided - a human decision, never applied under --yes). Unpinned @latest stays advisory (pinning needs a non-deterministic, online version resolve), as do schema errors and info nudges.",
+        "The fix model lives CLI-side (packages/cli/src/checks) and does not touch @mcpfold/core purity; transforms reuse core serialize/loadConfig and jsonc-parser."
+      ],
+      "files_hint": [
+        "packages/cli/src/checks/types.ts",
+        "packages/cli/src/checks/servers.ts",
+        "packages/cli/src/checks/clients.ts",
+        "packages/cli/src/checks/config.ts",
+        "packages/cli/src/checks/curation.ts"
+      ],
+      "tests": [
+        "Unit: each populated check emits a well-formed autofix descriptor; advisory-only checks emit none; descriptors serialize losslessly."
+      ],
+      "definition_of_done": [
+        "Every doctor finding either carries a deterministic, apply-ready fix descriptor or is explicitly advisory-only."
+      ]
+    },
+    {
+      "id": "S25.2",
+      "epic": "E25",
+      "order": 2,
+      "priority": "p1",
+      "status": "done",
+      "dependencies": [
+        "S25.1"
+      ],
+      "title": "`mcpfold doctor --fix`: preview, consent, backup, re-validate",
+      "user_story": "As a user, I want `mcpfold doctor --fix` to apply the safe repairs for me after showing me exactly what will change, so I fix footguns in one command without hand-editing JSON.",
+      "context": "doctor (packages/cli/src/commands/doctor.ts) is read-only and exits nonzero on error-severity findings. This story adds a repair engine that consumes the S25.1 autofix descriptors. Default is a dry-run diff (before/after) with no writes; application requires --yes or an interactive confirm. Reuses backupIfExists (io/backup.ts) and atomicWrite (io/atomic-write.ts); every write is preceded by a backup and followed by a re-load + re-validate (loadConfig) - a fix that would invalidate the config is refused. Findings that route through a client re-render apply a scoped, byte-stable single-client sync rather than a hand edit.",
+      "acceptance_criteria": [
+        "`doctor --fix` without --yes prints a per-finding diff of what would change and writes nothing (dry-run).",
+        "`doctor --fix --yes` (or interactive confirm) applies all autofixable findings; `--fix <id[,id]>` scopes to specific findings.",
+        "Every modified file is backed up (backupIfExists) before an atomic write; after writing, the config is re-loaded and re-validated, and any fix that produces an invalid config is rolled back / refused with a clear error.",
+        "Advisory-only findings are reported but never auto-applied; `--json` reports applied / skipped / failed with reasons; exit code reflects remaining unfixed errors.",
+        "Secret values never appear in diffs or output (Redactor applied to all rendered before/after)."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/doctor.ts",
+        "packages/cli/src/checks/types.ts",
+        "packages/cli/src/io/backup.ts",
+        "packages/cli/src/io/atomic-write.ts",
+        "packages/cli/src/util/redact.ts",
+        "packages/cli/src/output/exit-codes.ts"
+      ],
+      "tests": [
+        "Unit: dry-run writes nothing; --yes applies and backs up; scoped --fix applies only selected ids; invalid-result fix is refused/rolled back.",
+        "Snapshot: fixed fixtures are byte-stable and re-validate clean."
+      ],
+      "definition_of_done": [
+        "A user can go from a doctor report to a repaired, re-validated, backed-up config in one consented command, with no secret ever printed."
+      ]
+    },
+    {
+      "id": "S25.3",
+      "epic": "E25",
+      "order": 3,
+      "priority": "p1",
+      "status": "done",
+      "dependencies": [
+        "S25.2"
+      ],
+      "title": "Guided secret extraction: hardcoded token to provider ref + shim",
+      "user_story": "As a user with a token pasted into plaintext JSON, I want mcpfold to move it into a secret provider, rewrite the config to a ${scheme:path} reference, and route the launch through the shim, so the raw value leaves disk in one guided step.",
+      "context": "This is the differentiator from the spec (secrets section) expressed as help. checkHardcodedSecrets (checks/servers.ts) already detects plaintext tokens; the shim launch path (packages/proxy, run command) already keeps values off disk when a server is routed through `mcpfold run`. This story wires them together: on a hardcoded-secret finding, offer (interactively or via a dedicated `mcpfold secret extract <server>`) to pick a provider (env/dotenv/keychain/infisical/op), write the value where the provider supports it (e.g. dotenv/keychain) or print the exact command to store it, replace the config value with the matching ${scheme:path} ref, and ensure the server routes through the shim on next sync. The raw token is never echoed back.",
+      "acceptance_criteria": [
+        "A hardcoded-secret finding offers extraction with a provider chooser (env / dotenv / infisical / keychain / op); non-interactive callers pass --scheme.",
+        "The config value is rewritten to a valid ${scheme:path} reference via structural jsonc edit (comments preserved), and re-validation passes.",
+        "For providers that can persist locally (dotenv, keychain), the value is written to the store; for others, the exact store-it command is printed - the raw value is never left in the config and never printed to stdout/logs.",
+        "The affected server is routed through the run shim so the resolved value is injected at launch and never written to any client file on sync.",
+        "A dry-run preview shows the ref that will be written and where the value will live, with the token redacted throughout."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/secret.ts",
+        "packages/cli/src/commands/doctor.ts",
+        "packages/cli/src/checks/servers.ts",
+        "packages/cli/src/util/redact.ts",
+        "packages/secrets/src"
+      ],
+      "tests": [
+        "Unit: extraction rewrites to a valid ref, persists/where-to-persist correctly per provider, and never emits the raw value (redaction leak test with a sentinel token).",
+        "Integration: extracted server folds out through the shim with no value on disk."
+      ],
+      "definition_of_done": [
+        "A plaintext token can be moved to a provider ref and off disk in one guided flow, provably without leaking the value."
+      ]
+    },
+    {
+      "id": "S25.4",
+      "epic": "E25",
+      "order": 4,
+      "priority": "p2",
+      "status": "done",
+      "dependencies": [],
+      "title": "`add --probe`: opt-in transport & auth autodetection",
+      "user_story": "As a user adding a remote server by URL, I want an opt-in probe to detect its transport and whether it needs auth, so the scaffolded entry is correct without me guessing streamable-http vs sse.",
+      "context": "runAdd (commands/add.ts) currently defaults a URL to streamable-http and asks for an optional token ref, with no detection. This adds an opt-in `--probe` flag that performs a single, fast, timeout-bounded network check to detect the transport (streamable-http vs sse) and whether auth is required (401 + WWW-Authenticate), then scaffolds auth.type and a ${env:...} placeholder ref accordingly. Probing is authoring-time convenience only and MUST stay opt-in and off by default - it never influences sync output, preserving determinism/offline-by-default. Any probe failure degrades silently to current behavior.",
+      "acceptance_criteria": [
+        "`mcpfold add <name> --url <url> --probe` detects transport and sets it; without --probe behavior is unchanged and fully offline.",
+        "When the probe sees an auth challenge, the scaffolded server gets auth.type plus a placeholder ${env:...} ref (never a value); the user is told to fill it in.",
+        "The probe is timeout-bounded and best-effort: any network error, timeout, or ambiguous response falls back to the current default with a note, never blocking the add.",
+        "Probing changes only what is written at add time; sync output for an identical config remains byte-identical whether or not --probe was used."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/add.ts"
+      ],
+      "tests": [
+        "Unit (injected fetch): sse vs streamable-http detection; 401 -> auth scaffold with placeholder ref; timeout/error -> graceful fallback."
+      ],
+      "definition_of_done": [
+        "Adding a URL server with --probe scaffolds the correct transport/auth without manual guessing, while offline-by-default and determinism are preserved."
+      ]
+    },
+    {
+      "id": "S25.5",
+      "epic": "E25",
+      "order": 5,
+      "priority": "p2",
+      "status": "done",
+      "dependencies": [],
+      "title": "`mcpfold explain <topic|finding-id>`: teach the footgun",
+      "user_story": "As a user, I want `mcpfold explain` to tell me why a footgun matters and why the fix is right, so I learn the config model instead of blindly applying fixes.",
+      "context": "doctor findings are terse by design. This adds an offline `explain` command with long-form entries for each finding class and core concept (why VS Code uses `servers`, why pin @latest, how the shim keeps secrets off disk, what tags/profiles do). doctor finding output gains a `see: mcpfold explain <id>` pointer. Pure static content plus a tiny command - zero infra, high retention, fully offline. No LLM generation; entries are authored and versioned in-repo.",
+      "acceptance_criteria": [
+        "`mcpfold explain <finding-id>` and `mcpfold explain <topic>` print an authored, offline explanation; unknown keys list the available topics.",
+        "Each doctor finding class has a matching explain entry, and doctor output references it via a `see:` pointer.",
+        "Content is static and in-repo (no network, no generation); `--json` returns the structured entry."
+      ],
+      "files_hint": [
+        "packages/cli/src/commands/explain.ts",
+        "packages/cli/src/commands/doctor.ts",
+        "docs"
+      ],
+      "tests": [
+        "Unit: every finding class resolves to an explain entry (no orphans); unknown key lists topics; output is stable."
+      ],
+      "definition_of_done": [
+        "Every doctor finding is one command away from an offline explanation of why it matters and why the fix is correct."
+      ]
+    },
+    {
+      "id": "S25.6",
+      "epic": "E25",
+      "order": 6,
+      "priority": "p1",
+      "status": "done",
+      "dependencies": [
+        "S25.2",
+        "S25.3"
+      ],
+      "title": "Docs + cross-OS e2e gate for the diagnose-to-repair loop",
+      "user_story": "As a maintainer, I want a cross-OS e2e that drives a deliberately-broken config through `doctor --fix` and asserts a valid, byte-stable, secret-safe result, so the assistance loop cannot silently regress.",
+      "context": "S24.4 proved the curation chain end-to-end; the repair loop needs the same guard. This adds a fixture with the classic footguns (VS Code file using the mcpServers root key, an unpinned @latest stdio server, and a hardcoded token), runs `doctor --fix --yes` and the secret-extraction flow, and asserts the outcome is valid, byte-stable across Windows/macOS/Linux, and leaks no secret value. Also adds a docs page documenting the assistance surface (doctor --fix, secret extract, add --probe, explain).",
+      "acceptance_criteria": [
+        "An e2e fixture reproduces the VS Code root-key trap, an unpinned @latest server, and a hardcoded token.",
+        "`secret extract` + `doctor --fix` repair the hardcoded token and the VS Code root-key trap; the unpinned @latest is surfaced as an advisory warning (per S25.1 it carries no deterministic autofix - pinning needs a version, which the fixture then supplies to reach a clean doctor). After repair the canonical config re-validates, is byte-stable (idempotent re-run + no OS-specific content, so identical across the CI OS matrix), and no raw secret value appears in the canonical config or any rendered client file.",
+        "The e2e runs in the existing cross-OS CI matrix and fails the build on regression.",
+        "A docs page documents the full diagnose-to-repair surface and links from docs/index.md."
+      ],
+      "files_hint": [
+        "e2e",
+        "docs/index.md",
+        "docs"
+      ],
+      "tests": [
+        "e2e: broken fixture -> doctor --fix + extract -> valid, byte-stable, secret-free config on Windows/macOS/Linux."
+      ],
+      "definition_of_done": [
+        "The diagnose-to-repair loop is proven end-to-end on every supported OS and documented for users."
+      ]
     }
   ],
   "milestones": [
@@ -6168,6 +6357,19 @@
         "S24.11"
       ],
       "goal": "Make the token-savings promise real end-to-end: any curated server routes through the proxy, the shim launches from any cwd, curate is on main and works from day zero via live discovery, auditing feeds it by default, and every savings number shown is measured from the user's own config. Gated by a cross-OS e2e that walks the whole chain."
+    },
+    {
+      "name": "guided configuration assistance",
+      "spec_ref": "mission-aligned scope decision 2026-07-13; spec secrets + doctor/add sections",
+      "stories": [
+        "S25.1",
+        "S25.2",
+        "S25.3",
+        "S25.4",
+        "S25.5",
+        "S25.6"
+      ],
+      "goal": "Close the diagnose-to-repair loop: turn every doctor finding into a deterministic, previewable, consent-gated fix; ship `doctor --fix` with backup + re-validate; make hardcoded-token to provider-ref + shim a one-command guided flow; and prove the whole loop with a cross-OS e2e. Deterministic and offline throughout - no AI/LLM recommendation engine."
     }
   ]
 }
