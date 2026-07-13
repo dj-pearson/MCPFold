@@ -5487,7 +5487,7 @@
       "epic": "E23",
       "order": 1,
       "priority": "p1",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "core: audit-log usage analysis + curation recommendation (I/O-free)",
       "user_story": "As an mcpfold user, I want a pure engine that turns recorded tool-call events into a per-server usage summary and a recommended `allow` directive, so the CLI can suggest exactly the tools I actually use without any guesswork.",

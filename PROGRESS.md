@@ -1753,3 +1753,29 @@ sink rotates to a unique per-process file (holding the earlier event) and two wr
 lose no records across rotation. `verify_all` green — lint, typecheck, full suite, and build.
 
 **All E22 stories (S22.1–S22.24) complete.**
+
+## S23.1 — core: audit-log usage analysis + curation recommendation (I/O-free)
+
+Started/done: 2026-07-13. E23 (curation intelligence) story 1. New pure module
+`packages/core/src/curate.ts` closes the loop on the token-tax metric: the proxy already records
+every `tools/call` in the redacted S18.4 audit log, but nothing consumed it, so the headline
+`tools: {mode: allow, list}` directive still had to be hand-authored.
+
+**What.** `parseAuditEvents(lines)` tolerantly parses the redacted JSONL (skips blank/malformed/
+non-object lines and events missing `server`/`type`). `analyzeUsage(events, {sinceMs?, minCalls?})`
+groups by server → tool with `{calls, outcomes:{ok,error,denied}, lastTs}`, ignoring non-`tools/call`
+events, filtering by an epoch-ms `sinceMs` (core stays clock-free — the CLI resolves `--since <days>`),
+and dropping sub-`minCalls` tools after aggregation. `usedTools(usage)` returns the sorted ok/error
+tools (denied-only excluded — those were blocked, not used). `recommendDirective({used, current?,
+knownTools?})` produces `{mode:'allow', list}` (sorted, deduped), a diff `{added, removed, unchanged}`
+against the current directive's effective visible surface (allow-list, or used∪known minus deny-list),
+an `unchanged` flag, and `unusedKnown` when `knownTools` is supplied.
+
+Pure — no `node:fs`/`node:os`/net imports (core-purity gate green). Exported from
+`packages/core/src/index.ts`. Tests (`packages/core/test/curate.test.ts`, 12): malformed-line
+tolerance, since/min-calls filtering, per-outcome tally + last-seen, denied-only exclusion, sorted/
+deduped recommendation, add/remove/unchanged diff, and unusedKnown. Typecheck, lint, prettier, and
+`@mcpfold/core` build all green.
+
+Follow-ups: S23.2 wires this into `mcpfold curate` (read the log at the CLI edge, render a report);
+S23.3 adds `--write` to persist the recommended directive.
