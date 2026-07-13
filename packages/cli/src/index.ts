@@ -120,9 +120,12 @@ export {
 export {
   runAdd,
   deriveLocalName,
+  defaultProbe,
   type AddData,
   type AddOptions,
   type Prompt,
+  type ProbeResult,
+  type UrlProber,
 } from './commands/add.js';
 export { runSearch, type SearchData, type SearchOptions } from './commands/search.js';
 export {

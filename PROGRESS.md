@@ -2348,3 +2348,14 @@ suite on the existing cross-OS CI matrix. Reconciled AC[1] with the S25.1 realit
 advisory (no deterministic autofix), so the fixture supplies a pin to reach a clean doctor. No changeset
 (docs + test only; the commands were already announced by the S25.2/S25.3 changesets). verify_all green
 across the whole workspace (core/adapters/proxy/cli/e2e).
+
+DONE S25.4 — `mcpfold add --url <url> --probe` (packages/cli/src/commands/add.ts). Opt-in, offline-by-
+default probe: POSTs a minimal MCP initialize, reads content-type (text/event-stream → sse, else
+streamable-http) and auth status (401/403 or WWW-Authenticate). On an auth challenge it scaffolds a
+placeholder `${env:<NAME>_TOKEN}` ref (never a value). Timeout-bounded (AbortController, 5s default) and
+best-effort — any error/timeout/ambiguity falls back to the S17.5 default with a note, never blocking
+the add; an explicit --transport wins. The prober is injectable (tests) and defaults to a fetch probe.
+Probing only affects add-time writes, never sync output (test proves a probed add is byte-identical to a
+plain add). Wired --probe into cli.ts; exported ProbeResult/UrlProber/defaultProbe. 6 unit tests +
+completion snapshots refreshed. Verified on the built binary (closed port → fast fallback, no hang).
+verify_all green (lint + typecheck + build + 456 cli tests).

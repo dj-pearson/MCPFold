@@ -6096,7 +6096,7 @@
       "epic": "E25",
       "order": 4,
       "priority": "p2",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "`add --probe`: opt-in transport & auth autodetection",
       "user_story": "As a user adding a remote server by URL, I want an opt-in probe to detect its transport and whether it needs auth, so the scaffolded entry is correct without me guessing streamable-http vs sse.",

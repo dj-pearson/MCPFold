@@ -724,7 +724,12 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       .option('--pin <version>', 'pin a stdio package to a fixed version')
       .option('--tag <tag...>', 'tag(s) to attach')
       .option('--token-ref <ref>', 'auth token as a ${scheme:path} reference (never a raw token)')
-      .option('--auth-type <t>', 'bearer | header | none', 'bearer'),
+      .option('--auth-type <t>', 'bearer | header | none', 'bearer')
+      .option(
+        '--probe',
+        'opt-in: probe a --url server to auto-detect transport + whether auth is required (network; off by default)',
+        false,
+      ),
   ).action(
     async (
       name: string,
@@ -741,6 +746,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
         tag?: string[];
         tokenRef?: string;
         authType?: 'bearer' | 'header' | 'none';
+        probe?: boolean;
       },
     ) => {
       const ctx = resolve(opts);
@@ -764,6 +770,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
               tags: opts.tag,
               tokenRef: opts.tokenRef,
               authType: opts.authType,
+              probe: opts.probe,
               dryRun: ctx.dryRun,
             }),
           writer,
