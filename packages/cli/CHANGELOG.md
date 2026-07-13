@@ -1,5 +1,34 @@
 # mcpfold
 
+## 1.2.0
+
+### Minor Changes
+
+- 569376b: Add `mcpfold curate`: recommend a per-server `allow` tool-list from recorded proxy usage.
+
+  The proxy audit log already records every `tools/call`; `curate` reads it, reports which tools each
+  server actually uses, and (`--write`) applies the minimal `allow` directive back to your
+  `mcp.config.jsonc` — preserving comments — so you capture the context-window savings without
+  hand-authoring tool lists. Supports `[server]`, `--since <days>`, `--min-calls <n>`, `--json`,
+  `--dry-run`, and `--yes`. `mcpfold doctor` now hints at `curate` for a server that has recorded
+  usage but no `tools` directive. New pure `@mcpfold/core` helpers (`parseAuditEvents`,
+  `analyzeUsage`, `recommendDirective`) power it.
+
+### Patch Changes
+
+- d36961c: Fix shimmed servers failing to start from GUI clients: user-scope folds now embed the canonical config's location into the shim (`mcpfold run <name> --cwd <configDir>`). Clients like Claude Desktop launch MCP servers from an arbitrary working directory (often `/` or the app dir), where the bare shim died with "No mcp.config.jsonc found" even though sync succeeded. The embedded `--cwd` also pins `.env`-adjacent secret resolution to the config's directory. Project-scope folds are unchanged — those client files are committed to the repo (and gated by `sync --check` in CI), so they stay machine-portable. Run `mcpfold sync` once after upgrading to rewrite existing user-scope shims.
+- e7f8518: `mcpfold sync` now routes any server carrying a `tools` curation directive through the
+  `mcpfold run <name>` shim, even when it has no secret reference. Previously a secret-less
+  server was rendered pointing directly at its real command, so the curating proxy never ran
+  and the directive was silently dropped. `doctor` gained a check that warns when a `tools`
+  directive can't be enforced (remote servers bridge via mcp-remote with no proxy in between),
+  and an explicit `secretStrategy: "shim"` is now honored even with zero secret refs.
+- Updated dependencies [569376b]
+  - @mcpfold/core@1.2.0
+  - @mcpfold/adapters@1.2.0
+  - @mcpfold/proxy@1.2.0
+  - @mcpfold/secrets@1.2.0
+
 ## 1.1.0
 
 ### Minor Changes
