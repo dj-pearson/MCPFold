@@ -5709,7 +5709,7 @@
       "epic": "E24",
       "order": 3,
       "priority": "p0",
-      "status": "todo",
+      "status": "done",
       "dependencies": [],
       "title": "Land the E23 curate epic on main and reconcile the VS Code curation surface",
       "user_story": "As a user who sees \"Curate to usage\" advertised in the VS Code extension, I want the underlying `mcpfold curate` command to actually exist in the released CLI, so the feature does something instead of silently rendering nothing.",

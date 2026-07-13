@@ -1913,3 +1913,63 @@ green across all packages (core/schema/secrets/adapters/proxy/cli/e2e), typechec
 and build.
 
 **E23 extended set (S23.4–S23.5) complete; full epic S23.1–S23.5 done.**
+
+---
+
+## S24.1 — sync: route every tools-directive server through the run shim
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p0, deps: none.
+
+The blocker fix (a secretless server with a `tools` directive folding to its direct command,
+silently dropping curation) had already landed via #81 — `renderWithStrategy` now shims any
+tools-bearing server under EVERY strategy before strategy selection, and `transformSecret` honors an
+explicit `secretStrategy: "shim"` even with zero secret refs. This entry closes the remaining
+acceptance gap: **criterion 5** — sync now reports which servers were shimmed for curation. `runSync`
+collects every kept server carrying a `tools` directive into `data.curated` (JSON) and a
+`Tool curation active (filtered via \`mcpfold run\` proxy): …` footer line (human), distinct from
+shimmed-for-secrets, so a user can confirm curation is live rather than silently inert. Added a
+strategy test proving a tools-bearing server with env-only refs still shims even under a `native-env`
+override (curation requires the proxy), plus two sync tests for the report. Full CLI suite green
+(pre-existing `version.test.ts` stale-dist failure unrelated).
+
+---
+
+## S24.2 — Self-locating shim: embed config location at fold time; robust config resolution in run
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p0, deps: none.
+
+The `--cwd`-embedding half (sync writes `mcpfold run <name> --cwd <configDir>` for user-scope folds,
+project-scope stays bare/portable) had landed via #80. This entry adds the **run-side fallback**
+(criteria 2 & 4): `mcpfold run` now walks up from cwd via `findConfigPathUpward` to the nearest
+canonical config, so a pre-existing bare shim launched by a GUI client from an arbitrary cwd still
+resolves. Secrets (`.env`) and org policy now resolve from the config's OWN directory (derived from
+the found path), not the launch cwd. The not-found error names every searched directory
+(`upwardSearchDirs`). Exact-directory resolution is unchanged for every other command
+(`loadConfigFromDisk` walks up only with `{ upward: true }`). New `config.test.ts` covers the upward
+walk (nearest wins, stops at fs root, error lists searched dirs); existing shim-cwd e2e/unit still
+green.
+
+---
+
+## S24.3 — Land the E23 curate epic on main and reconcile the VS Code curation surface
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p0, deps: none.
+
+The audit finding that spawned this story was **stale**: the E23 curate epic (S23.1–S23.5) had since
+merged to main via #78. `packages/cli/src/commands/curate.ts`, `packages/core/src/curate.ts`, and the
+`curate` / `curate --write` CLI registration all exist; S23.1–S23.5 are `done` and the E23 epic is in
+prd.json.
+
+Reconciliation decision: **KEEP** the VS Code curation CodeLens (it is not dead — its parser shape
+matches the real CLI output). Verified end-to-end with a new drift-guard test
+(`packages/cli/test/curate-extension-contract.test.ts`): it builds the REAL envelope via
+`buildCurateData` + `successEnvelope('curate', …)` and feeds it through the extension's REAL
+`parseCurateReport` / `buildCurationLenses` / `curatableCount`, asserting an actionable lens for a
+curatable server and a dim no-command lens for an already-curated one. Because the extension package
+is CJS and the CLI is NodeNext ESM, the parser is loaded via a variable-path dynamic import so
+`verbatimModuleSyntax` typecheck stays clean while the real module runs at runtime. Rename a field in
+`CurateServerReport` and this test fails instead of the shipped CodeLens silently degrading.
+
+`mcpfold curate` is documented in `docs/config-format.md` (what it reads — the redacted audit log; the
+audit-log prerequisite; `--json`, `--write`, `--dry-run`; and the doctor nudge). Extension settings
+(`mcpfold.showCurateLens`, `mcpfold.auditLog`) and commands remain live with no dead references.
