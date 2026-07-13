@@ -125,6 +125,29 @@ describe('runDoctor (S3.7)', () => {
     });
   });
 
+  it('flags an allow-list that predates new upstream tools (S24.11)', () => {
+    write(`{
+      "version": 1,
+      "servers": {
+        "gh": { "transport": "stdio", "command": "s", "tags": ["c"], "tools": { "mode": "allow", "list": ["a"] } }
+      },
+      "profiles": { "cursor": { "client": "cursor", "scope": "user", "include": ["c"] } }
+    }`);
+    // A discovery snapshot in the ctx-scoped cache showing a tool "b" the allow-list omits.
+    const dir = join(home, '.config', 'mcpfold', 'discovery');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'gh.json'),
+      JSON.stringify({ server: 'gh', tools: [{ name: 'a', tokens: 10 }, { name: 'b', tokens: 10 }] }),
+    );
+    const result = runDoctor({ cwd, osContext: ctx });
+    const info = result.data.findings.find((f) => f.message.includes('new tool'));
+    expect(info?.severity).toBe('info');
+    expect(info?.message).toContain('b');
+    expect(info?.fix).toContain('curate gh --refresh');
+    expect(result.exit).toBe(EXIT.SUCCESS); // info only
+  });
+
   it('explains the native-env → shim fallback for a non-env scheme (S19.4)', () => {
     write(`{
       "version": 2,

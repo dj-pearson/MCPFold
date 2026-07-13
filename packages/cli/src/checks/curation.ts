@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { analyzeUsage, parseAuditEvents, type Config } from '@mcpfold/core';
 import { requireAdapter, type OsContext } from '@mcpfold/adapters';
 import { shouldUseProxy } from '../commands/run.js';
+import { staleAllowlists } from '../discover/staleness.js';
+import type { CacheLocation } from '../discover/cache.js';
 import { readAuditLogLines } from '../util/audit-log.js';
 import type { Finding } from './types.js';
 
@@ -115,6 +117,27 @@ export function checkNoCurationConfigured(config: Config, configPath: string): F
       fix: 'Add a `tools` allow-list to trim each server, or run `mcpfold curate` (with a recorded audit log) to get a usage-based recommendation.',
     },
   ];
+}
+
+/**
+ * Allow-list staleness nudge (S24.11). When a curated server's cached discovery surface (S24.6)
+ * contains tools its `allow` list predates, those new upstream capabilities are invisible with no
+ * signal. Emits one `info` per affected server naming the count + tools, pointing at `curate --refresh`.
+ * Info-only (never fails a gate); deny/no-directive servers are unaffected (new tools pass through).
+ */
+export function checkAllowlistStaleness(
+  config: Config,
+  configPath: string,
+  ctx: OsContext,
+): Finding[] {
+  const cache: CacheLocation = { home: ctx.home, platform: ctx.platform, env: ctx.env };
+  return staleAllowlists(config, cache).map((s) => ({
+    severity: 'info' as const,
+    file: configPath,
+    where: `servers.${s.server}.tools`,
+    message: `"${s.server}" exposes ${s.newTools.length} new tool${s.newTools.length === 1 ? '' : 's'} its allow-list was written before: ${s.newTools.join(', ')}.`,
+    fix: `Run \`mcpfold curate ${s.server} --refresh\` to review and (with consent) add them.`,
+  }));
 }
 
 /** S24.5: a scannable summary of how many servers are curated, shared by doctor and status. */

@@ -2182,3 +2182,34 @@ proxy + a real child yields a filtered `tools/list` (the proxy is transport-agno
 Tests: run-filter remote routing (curated remote → proxy over `npx`; directive-less remote → plain
 bridge); doctor test flipped (remote tools directive no longer warns); shouldUseProxy updated. Full cli
 suite green (409 excl. flaky DPAPI); root lint + core purity clean; typecheck clean.
+
+---
+
+## S24.11 — Allow-list staleness: surface new upstream tools instead of hiding them forever
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p2, deps: S24.6.
+**Completes the E24 epic.**
+
+A curated server's new upstream tools now always produce a visible, actionable signal instead of being
+silently invisible.
+
+- **`discover/staleness.ts`**: `newUpstreamTools(directive, snapshot)` = surface tools an `allow` list
+  omits (deny/none → empty, criterion 4 — new tools already pass through). `staleAllowlists(config,
+  cache)` maps it over every allow-mode server with a cached snapshot.
+- **doctor** (`checkAllowlistStaleness`, cache scoped to the OsContext for determinism) emits one
+  `info` per affected server: "N new tools its allow-list was written before: …" → `curate --refresh`.
+  **status** adds a `New tools:` line + a `staleAllowlists` data field.
+- **`mcpfold curate <server> --refresh`** (`runCurateRefresh`): re-discovers the live surface, shows
+  the diff of new tools, and widens the allow-list to their union ONLY with explicit consent
+  (`--yes`/TTY confirm) — never silently. Deny/uncurated servers are a no-op; an already-covered
+  allow-list reports "up to date". Wired in cli.ts (`--refresh` flag).
+
+Verified end-to-end: with `allow:[alpha]` and a 3-tool server, status/doctor report "2 new tools",
+`--refresh` shows `+ beta, gamma` without writing, and `--refresh --yes` widens to
+`[alpha, beta, gamma]`. Criterion 1 (recording the delta): the discovery snapshot IS the recorded
+surface; `inspect` / `--refresh` refresh it and the delta is derived — a proxy-time cache write was
+judged unnecessary given the snapshot already captures the full surface.
+
+Tests: `curate-refresh.test.ts` (newUpstreamTools/staleAllowlists incl. deny; refresh consent gate,
+widen-on-yes, no-op-when-covered, deny no-op); doctor staleness info; status shape. Completions
+snapshots regenerated for `--refresh`. Full cli suite green (416); root lint + core purity clean.

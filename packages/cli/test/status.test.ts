@@ -100,6 +100,7 @@ describe('runStatus (S10.1)', () => {
       'installedUnconfigured',
       'ok',
       'savings',
+      'staleAllowlists',
     ]);
     const client = result.data.clients[0]!;
     expect(Object.keys(client).sort()).toEqual(

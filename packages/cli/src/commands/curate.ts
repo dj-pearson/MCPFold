@@ -21,6 +21,7 @@ import {
   type ToolTokenEstimate,
 } from '../discover/cache.js';
 import { formatTokens, serverSavings } from '../discover/savings.js';
+import { newUpstreamTools } from '../discover/staleness.js';
 import { AUDIT_OPT_OUT_ENV, readAuditLogLines, resolveActiveAuditLog } from '../util/audit-log.js';
 import { atomicWrite } from '../io/atomic-write.js';
 import { EXIT } from '../output/exit-codes.js';
@@ -585,6 +586,123 @@ export async function runCuratePick(
   return {
     data: dataOf(true),
     human: `${style.bold(opts.server)}: ${preview}\n${style.green(symbols.ok)} Wrote an allow-list of ${directive.list.length} tool${directive.list.length === 1 ? '' : 's'} to ${configPath}.\nRun \`mcpfold sync\` to fold it out to your clients.`,
+    exit: EXIT.SUCCESS,
+  };
+}
+
+export interface CurateRefreshOptions {
+  cwd: string;
+  server: string;
+  yes?: boolean;
+  dryRun?: boolean;
+  isTTY?: boolean;
+  env?: NodeJS.ProcessEnv;
+  cache?: CacheLocation;
+  /** Live re-discovery; injectable for tests. Falls back to the cached snapshot when omitted. */
+  discover?: (server: string) => Promise<SurfaceSnapshot | null>;
+  confirm?: () => Promise<boolean>;
+}
+
+/**
+ * `mcpfold curate <server> --refresh` (S24.11) — surface tools a server ships that its `allow` list
+ * predates, and (with explicit consent) add them. Re-discovers the live surface, shows the diff, and
+ * NEVER widens the allow-list without `--yes` or an interactive confirm. Deny/no-directive servers are
+ * a no-op: new tools already pass through by construction.
+ */
+export async function runCurateRefresh(
+  opts: CurateRefreshOptions,
+): Promise<CommandOutput<CuratePickData>> {
+  const { config } = loadConfigFromDisk(opts.cwd);
+  const server = config.servers[opts.server];
+  if (!server) throw new UsageError(`No server "${opts.server}" in the canonical config.`);
+
+  const noop = (message: string): CommandOutput<CuratePickData> => ({
+    data: {
+      server: opts.server,
+      source: 'discovery',
+      selected: server.tools?.mode === 'allow' ? server.tools.list : [],
+      fullCount: 0,
+      keptTokens: 0,
+      fullTokens: 0,
+      applied: false,
+    },
+    human: message,
+    exit: EXIT.SUCCESS,
+  });
+
+  if (server.tools?.mode !== 'allow') {
+    return noop(
+      `${style.dim(`"${opts.server}" has no allow-list — deny/uncurated servers already pass new tools through. Nothing to refresh.`)}`,
+    );
+  }
+
+  const snapshot =
+    (opts.discover ? await opts.discover(opts.server) : null) ??
+    readSnapshot(opts.server, opts.cache);
+  if (!snapshot) {
+    throw new UsageError(`No tool surface known for "${opts.server}" to refresh against.`, {
+      hint: `Run \`mcpfold inspect ${opts.server}\` first.`,
+    });
+  }
+
+  const newTools = newUpstreamTools(server.tools, snapshot);
+  if (newTools.length === 0) {
+    return noop(
+      `${style.green(symbols.ok)} "${opts.server}" is up to date — no new tools since its allow-list was written.`,
+    );
+  }
+
+  const widened: ToolsDirective = {
+    mode: 'allow',
+    list: [...new Set([...server.tools.list, ...newTools])].sort(),
+  };
+  const diff = `${style.bold(opts.server)}: ${newTools.length} new tool${newTools.length === 1 ? '' : 's'} since your allow-list was written\n${style.green(`  + ${newTools.join(', ')}`)}`;
+  const dataOf = (applied: boolean): CuratePickData => ({
+    server: opts.server,
+    source: 'discovery',
+    selected: widened.list,
+    fullCount: snapshot.toolCount,
+    keptTokens: 0,
+    fullTokens: snapshot.totalTokens,
+    applied,
+  });
+
+  const configPath = findConfigPath(opts.cwd);
+  if (!configPath) throw new UsageError(`No mcp.config.jsonc found in ${opts.cwd}.`);
+  const text = readFileSync(configPath, 'utf8');
+
+  if (opts.dryRun) {
+    const newText = applyOneDirective(text, opts.server, widened);
+    return {
+      data: dataOf(false),
+      human: `${diff}\n${style.dim(`(dry run — ${configPath} unchanged)`)}\n\n${newText}`,
+      exit: EXIT.SUCCESS,
+    };
+  }
+
+  // Consent gate: never widen an allow-list without explicit --yes or an interactive confirm.
+  const isTTY = opts.isTTY ?? Boolean(process.stdin.isTTY);
+  const confirm = opts.confirm ?? defaultConfirm;
+  const confirmed = opts.yes === true || (isTTY && (await confirm()));
+  if (!confirmed) {
+    return {
+      data: dataOf(false),
+      human: `${diff}\n${style.yellow('Not added.')} Re-run with ${style.bold('--yes')} to widen the allow-list to include them.`,
+      exit: EXIT.SUCCESS,
+    };
+  }
+
+  const newText = applyOneDirective(text, opts.server, widened);
+  const revalidated = loadConfig(newText);
+  if (!revalidated.ok) {
+    throw new UsageError(
+      `Refreshing would make the config invalid: ${revalidated.errors[0]?.message ?? 'unknown error'}.`,
+    );
+  }
+  atomicWrite(configPath, newText);
+  return {
+    data: dataOf(true),
+    human: `${diff}\n${style.green(symbols.ok)} Added ${newTools.length} tool${newTools.length === 1 ? '' : 's'} to "${opts.server}"'s allow-list in ${configPath}.\nRun \`mcpfold sync\` to fold it out.`,
     exit: EXIT.SUCCESS,
   };
 }

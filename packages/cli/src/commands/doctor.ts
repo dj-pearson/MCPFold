@@ -6,6 +6,7 @@ import { checkConfigValid } from '../checks/config.js';
 import { Redactor } from '../util/redact.js';
 import { checkClientFiles } from '../checks/clients.js';
 import {
+  checkAllowlistStaleness,
   checkCurationInactive,
   checkCurationOpportunity,
   checkNoCurationConfigured,
@@ -74,6 +75,7 @@ export function runDoctor(options: DoctorOptions): CommandOutput<DoctorData> {
       findings.push(...checkCurationOpportunity(config, configPath, ctx.env));
       findings.push(...checkNoCurationConfigured(config, configPath));
       findings.push(...checkCurationInactive(config, ctx));
+      findings.push(...checkAllowlistStaleness(config, configPath, ctx));
       findings.push(...checkAuditTrail(config, ctx));
       findings.push(...checkClientFiles(config, ctx));
     }

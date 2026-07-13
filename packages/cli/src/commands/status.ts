@@ -13,6 +13,7 @@ import { runDiff } from './diff.js';
 import { runDoctor } from './doctor.js';
 import { summarizeCuration } from '../checks/curation.js';
 import { curatedServerSavings, renderServerSavingsLine } from '../discover/savings.js';
+import { staleAllowlists as computeStaleAllowlists } from '../discover/staleness.js';
 import { detectClients } from '../util/detect-clients.js';
 import { loadConfigFromDisk } from '../util/config.js';
 import {
@@ -84,6 +85,8 @@ export interface StatusData {
   savings: string[];
   /** S24.8: where the local tool-call audit trail lives, its size, and whether it is enabled. */
   audit: StatusAudit | null;
+  /** S24.11: per-server count of new upstream tools an allow-list predates (empty when none/unknown). */
+  staleAllowlists: { server: string; newTools: number }[];
   ok: boolean;
 }
 
@@ -216,6 +219,14 @@ function renderHuman(data: StatusData): string {
       : `disabled (${data.audit.path})`;
     lines.push(`${style.bold('Audit:')} ${style.dim(where)}`);
   }
+  if (data.staleAllowlists.length > 0) {
+    // S24.11: curated servers now exposing tools their allow-list predates.
+    for (const s of data.staleAllowlists) {
+      lines.push(
+        `${style.bold('New tools:')} ${style.yellow(`${s.server} has ${s.newTools} new tool${s.newTools === 1 ? '' : 's'}`)} its allow-list predates ${symbols.arrow} \`mcpfold curate ${s.server} --refresh\``,
+      );
+    }
+  }
   lines.push('');
   lines.push(
     data.ok
@@ -272,10 +283,17 @@ export async function runStatus(options: StatusOptions): Promise<CommandOutput<S
   let curationSummary: StatusData['curationSummary'] = null;
   let savings: string[] = [];
   let audit: StatusAudit | null = null;
+  let staleAllowlists: StatusData['staleAllowlists'] = [];
   try {
     const cfg = loadConfigFromDisk(options.cwd).config;
     curationSummary = summarizeCuration(cfg);
     savings = curatedServerSavings(cfg.servers).map(renderServerSavingsLine);
+    // S24.11: allow-lists that predate new upstream tools.
+    staleAllowlists = computeStaleAllowlists(cfg, {
+      home: ctx.home,
+      platform: ctx.platform,
+      env: ctx.env,
+    }).map((s) => ({ server: s.server, newTools: s.newTools.length }));
     // S24.8: disclose where the default-on audit trail lives and how big it is.
     const path =
       resolveActiveAuditLog({ config: cfg, env: ctx.env }) ??
@@ -295,6 +313,7 @@ export async function runStatus(options: StatusOptions): Promise<CommandOutput<S
     curationSummary,
     savings,
     audit,
+    staleAllowlists,
     ok,
   };
   return { data, human: renderHuman(data), exit: ok ? EXIT.SUCCESS : EXIT.DIFF };

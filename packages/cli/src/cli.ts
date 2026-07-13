@@ -12,6 +12,7 @@ import {
   runCurate,
   runCurateApply,
   runCuratePick,
+  runCurateRefresh,
   type CurateData,
   type CuratePickData,
 } from './commands/curate.js';
@@ -331,6 +332,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
       .option('--write', 'apply the recommended allow-lists to the canonical config')
       .option('--apply', 'alias for --write')
       .option('--tools <list>', 'day-zero: allow exactly these tools (comma-separated) for <server>')
+      .option('--refresh', 'surface tools <server> ships that its allow-list predates, and add them with consent')
       .option('-y, --yes', 'skip the confirmation prompt when writing'),
   ).action(
     async (
@@ -342,6 +344,7 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
         write?: boolean;
         apply?: boolean;
         tools?: string;
+        refresh?: boolean;
         yes?: boolean;
       },
     ) => {
@@ -362,6 +365,16 @@ export function buildProgram(writer?: Writer): { program: Command; getExitCode: 
           'curate',
           ctx.json,
           () => {
+            // Allow-list staleness refresh (S24.11): surface + (with consent) add new upstream tools.
+            if (server && opts.refresh) {
+              return runCurateRefresh({
+                cwd: ctx.cwd,
+                server,
+                yes: opts.yes,
+                dryRun: ctx.dryRun,
+                discover: (name) => discoverAndCacheServer({ cwd: ctx.cwd, server: name }),
+              });
+            }
             // Day-zero picker (S24.7): a specific server with --tools, or bare (no --write) so a fresh
             // user without audit history still reaches an allow-list. Usage precedence lives inside.
             if (server && (toolsList || !write)) {
