@@ -1973,3 +1973,25 @@ is CJS and the CLI is NodeNext ESM, the parser is loaded via a variable-path dyn
 `mcpfold curate` is documented in `docs/config-format.md` (what it reads — the redacted audit log; the
 audit-log prerequisite; `--json`, `--write`, `--dry-run`; and the doctor nudge). Extension settings
 (`mcpfold.showCurateLens`, `mcpfold.auditLog`) and commands remain live with no dead references.
+
+---
+
+## S24.4 — End-to-end activation gate: a fresh user demonstrably reaches a filtered tools/list
+
+**Done** 2026-07-13 · branch `story/S24.1-S24.2-curation-routing` · priority p0, deps: S24.1, S24.2.
+
+New `e2e/activation-gate.test.ts` walks the WHOLE savings chain in one flow — the gap the audit
+flagged (every link had a test; nothing tested the chain). It scaffolds a fresh project (`runInit`),
+configures a secretless stdio server (`e2e/fixtures/curated-server.mjs`, exposing 3 tools) curated to a
+2-tool allow-list, folds it (`runSync`), then launches the rendered entry's semantics verbatim (name +
+embedded `--cwd`) from a cwd that is NOT the config directory — spawning a REAL child MCP server through
+the REAL proxy and completing a REAL MCP handshake (`initialize` + `tools/list`). It asserts the
+client-visible `tools/list` is exactly `['alpha','beta']` (gamma dropped). Each link fails with a
+distinct message — FOLD (did the curated server fold to the proxy shim?), LAUNCH (did the folded entry
+route through the proxy and initialize?), FILTER (is the client-visible list exactly the allow-list?).
+
+Runs in the CI test phase with no built dist (e2e's vitest aliases `mcpfold` → CLI source, the
+established e2e idiom); the only injected seam is the client transport, so the proxy, the spawned server
+child, config resolution from the embedded cwd, and the tool filter are all the real production code
+paths. Verified the FILTER assertion actually fires by widening the allow-list. Full e2e suite (7 files,
+13 tests) green; e2e typecheck + lint clean. **E24 p0 blockers (S24.1–S24.4) all complete.**
