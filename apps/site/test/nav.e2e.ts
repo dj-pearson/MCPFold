@@ -60,7 +60,7 @@ test('footer link map resolves against the route table (no 404)', async ({ page 
 
   // Every live internal footer href must map to a mounted route in the E13 surface.
   const validInternal =
-    /^\/($|install$|directory$|compare$|use-cases$|pricing$|features$|changelog$|security$|about$|privacy$|terms$|analytics$|brand$|glossary$|roadmap$|guides$|community$|blog$|docs(\/|$))/;
+    /^\/($|install$|directory$|compare$|use-cases$|pricing$|features$|changelog$|security$|about$|privacy$|terms$|analytics$|brand$|glossary$|roadmap$|guides$|community$|blog$|mcp-token-calculator$|docs(\/|$))/;
   for (const href of hrefs) {
     if (href.startsWith('http')) continue; // external
     expect(href, `footer link ${href} must resolve`).toMatch(validInternal);
