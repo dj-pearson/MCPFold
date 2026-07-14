@@ -6,21 +6,22 @@ gaps. Nothing here is a dated commitment.
 
 ## Shipped
 
-- **Local core:** canonical `mcp.config.jsonc`, 8 client adapters, secret references,
-  `sync`/`diff`/`doctor`/`status`/`test`/`restore`, watch mode, guided onboarding, completions.
+- **Local core:** canonical `mcp.config.jsonc`, 18 client adapters, secret references,
+  `sync`/`diff`/`doctor`/`status`/`test`/`restore`, guided repair (`doctor --fix`, `secret extract`,
+  `explain`), watch mode, guided onboarding, completions.
 - **Distribution:** npm, Homebrew, `curl | sh`, Scoop/winget, standalone binaries, update notifier.
 - **Team-without-a-backend:** repo config-as-code drift gate + the packaged GitHub Action.
 - **Cloud:** self-hosted Supabase + edge sync, device-code login, refresh-token rotation, the web
   console (visual editor, sync dashboard, team console + audit trail).
+- **Pricing + billing:** Stripe Checkout/Portal with WebCrypto webhook-signature verification wired
+  to the [entitlement checker](./pricing-model.md#billing), plus the public pricing page (S20.2).
 - **Site:** marketing site, interactive benchmark, install page, unified docs + search, server
   directory.
 
 ## Next
 
-- **Pricing + billing:** wire Stripe to the [entitlement checker](./pricing-model.md#billing) and
-  ship the pricing page (S13.6).
-- **Adapter breadth:** the next tranche from the [coverage roadmap](./coverage.md#roadmap-prioritization)
-  (Continue, Goose, Warp, JetBrains AI, Cody, Roo Code).
+- **Adapter breadth:** the next candidates from the [coverage roadmap](./coverage.md#roadmap-prioritization)
+  — the 18 shipped adapters already cover the mainstream clients; new requests use the `adapter-request` label.
 - **Compat automation:** act on the weekly compat-harness drift reports
   ([`packages/adapters/compat`](https://github.com/dj-pearson/MCPFold/blob/main/packages/adapters/compat/README.md)).
 - **Launch collateral:** the scripted demo GIF render, blog/changelog.

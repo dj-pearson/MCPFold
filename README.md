@@ -135,9 +135,12 @@ config anytime with `mcpfold status`.
 
 ### Supported clients
 
-Claude Code · Claude Desktop · Cursor · VS Code · Windsurf · Zed — `mcpfold` reads and writes each
-one's native format from a single source of truth. (New adapters are a
-[one-PR on-ramp](./CONTRIBUTING.md).)
+**18 clients**, each read and written in its own native format from a single source of truth:
+
+Claude Code · Claude Desktop · Cursor · VS Code · Visual Studio · Windsurf · Zed · Cline · Continue ·
+Roo Code · Gemini CLI · Codex CLI · Copilot CLI · JetBrains · Goose · LM Studio · Warp · opencode
+
+New adapters are a [one-PR on-ramp](./CONTRIBUTING.md).
 
 ### Editor autocomplete (JSON Schema)
 
