@@ -497,17 +497,29 @@ export async function runCuratePick(
       cache: opts.cache,
     });
     const rep = report.data.servers.find((s) => s.server === opts.server);
+    const recommended = rep?.recommended.list ?? [];
+    // Quantify the token savings of the recommended allow-list when a discovery snapshot is cached
+    // (S24.6). The audit log carries only tool names, but the snapshot carries each tool's schema
+    // token cost — so `serverSavings` gives an honest before/after here, exactly as the day-zero
+    // path does. No snapshot → no claim (0/0), preserving the "never fabricate a token number" rule.
+    const snapshot = readSnapshot(opts.server, opts.cache);
+    const savings = snapshot
+      ? serverSavings(snapshot, { mode: 'allow', list: recommended })
+      : undefined;
+    const savingsLine = savings
+      ? `\n${style.dim(`Applying it curates ${savings.keptCount} of ${savings.fullCount} tools, ${formatTokens(savings.fullTokens)} → ${formatTokens(savings.keptTokens)} tokens (approx).`)}`
+      : '';
     return {
       data: {
         server: opts.server,
         source: 'usage',
-        selected: rep?.recommended.list ?? [],
-        fullCount: rep?.recommended.list.length ?? 0,
-        keptTokens: 0,
-        fullTokens: 0,
+        selected: recommended,
+        fullCount: savings?.fullCount ?? recommended.length,
+        keptTokens: savings?.keptTokens ?? 0,
+        fullTokens: savings?.fullTokens ?? 0,
         applied: false,
       },
-      human: `${style.dim('Recorded usage is available and takes precedence over the day-zero picker.')}\n${report.human}\n${style.cyan(symbols.arrow)} Run \`mcpfold curate ${opts.server} --write\` to apply it, or \`--tools <list>\` to choose manually.`,
+      human: `${style.dim('Recorded usage is available and takes precedence over the day-zero picker.')}\n${report.human}${savingsLine}\n${style.cyan(symbols.arrow)} Run \`mcpfold curate ${opts.server} --write\` to apply it, or \`--tools <list>\` to choose manually.`,
       exit: report.exit,
     };
   }

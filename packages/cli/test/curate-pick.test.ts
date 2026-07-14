@@ -140,7 +140,32 @@ describe('runCuratePick — usage precedence (S24.7 criterion 5)', () => {
     const out = await runCuratePick({ ...base(), server: 'github', auditLogPath: logPath });
     expect(out.data.source).toBe('usage');
     expect(out.data.applied).toBe(false); // read-only; the bare picker never auto-writes usage-based
+    expect(out.data.selected).toEqual(['search_code']); // only the used tool
     expect(out.human).toContain('takes precedence');
     expect(readFileSync(configPath(), 'utf8')).toBe(CONFIG); // untouched
+  });
+
+  it('quantifies token savings from the cached snapshot for the usage recommendation', async () => {
+    const logPath = join(cwd, 'audit.jsonl');
+    writeFileSync(
+      logPath,
+      JSON.stringify({
+        ts: '2026-07-11T00:00:00.000Z',
+        server: 'github',
+        type: 'tools/call',
+        tool: 'search_code',
+        outcome: 'ok',
+      }),
+    );
+    const out = await runCuratePick({ ...base(), server: 'github', auditLogPath: logPath });
+    // The snapshot has all 3 tools; usage recommends only search_code — so full=3, kept token cost
+    // is search_code's schema and is strictly less than the full surface (measured, not fabricated).
+    expect(out.data.fullCount).toBe(3);
+    const searchTokens = estimateToolTokens(TOOLS.find((t) => t.name === 'search_code'));
+    const fullTokens = TOOLS.reduce((s, t) => s + estimateToolTokens(t), 0);
+    expect(out.data.keptTokens).toBe(searchTokens);
+    expect(out.data.fullTokens).toBe(fullTokens);
+    expect(out.data.keptTokens).toBeLessThan(out.data.fullTokens);
+    expect(out.human).toContain('curates 1 of 3 tools');
   });
 });
