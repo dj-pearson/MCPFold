@@ -50,7 +50,13 @@ function plantHardcoded(): void {
 describe('runSecretExtract (S25.3)', () => {
   it('dotenv: rewrites the config to a ref, persists the value to .env, preserves comments', async () => {
     plantHardcoded();
-    const res = await runSecretExtract({ cwd, server: 'gh', scheme: 'dotenv', now: NOW, osContext: ctx });
+    const res = await runSecretExtract({
+      cwd,
+      server: 'gh',
+      scheme: 'dotenv',
+      now: NOW,
+      osContext: ctx,
+    });
 
     expect(res.data.wrote).toBe(true);
     expect(res.data.extracted).toHaveLength(1);
@@ -76,12 +82,20 @@ describe('runSecretExtract (S25.3)', () => {
     expect(listBackups(configPath())).toHaveLength(1);
 
     // doctor no longer flags a hardcoded secret.
-    expect(runDoctor({ cwd, osContext: ctx }).data.findings.some((f) => f.where?.includes('API_TOKEN'))).toBe(false);
+    expect(
+      runDoctor({ cwd, osContext: ctx }).data.findings.some((f) => f.where?.includes('API_TOKEN')),
+    ).toBe(false);
   });
 
   it('never prints the raw value; non-dotenv schemes emit a placeholder command + warning', async () => {
     plantHardcoded();
-    const res = await runSecretExtract({ cwd, server: 'gh', scheme: 'keychain', now: NOW, osContext: ctx });
+    const res = await runSecretExtract({
+      cwd,
+      server: 'gh',
+      scheme: 'keychain',
+      now: NOW,
+      osContext: ctx,
+    });
 
     expect(res.data.extracted[0]!.ref).toBe('${keychain:API_TOKEN}');
     expect(res.data.extracted[0]!.storedTo).toBeNull();
@@ -110,7 +124,13 @@ describe('runSecretExtract (S25.3)', () => {
   it('dry-run writes nothing (no config change, no .env, no backup)', async () => {
     plantHardcoded();
     const before = readFileSync(configPath(), 'utf8');
-    const res = await runSecretExtract({ cwd, server: 'gh', scheme: 'dotenv', dryRun: true, osContext: ctx });
+    const res = await runSecretExtract({
+      cwd,
+      server: 'gh',
+      scheme: 'dotenv',
+      dryRun: true,
+      osContext: ctx,
+    });
 
     expect(res.data.wrote).toBe(false);
     expect(res.data.extracted).toHaveLength(1); // still shows the plan
@@ -128,9 +148,20 @@ describe('runSecretExtract (S25.3)', () => {
       },
       "profiles": {}
     }`);
-    const res = await runSecretExtract({ cwd, server: 'gh', scheme: 'dotenv', key: 'X-Api-Key', now: NOW, osContext: ctx });
+    const res = await runSecretExtract({
+      cwd,
+      server: 'gh',
+      scheme: 'dotenv',
+      key: 'X-Api-Key',
+      now: NOW,
+      osContext: ctx,
+    });
     expect(res.data.extracted).toHaveLength(1);
-    expect(res.data.extracted[0]).toMatchObject({ field: 'auth.headers', key: 'X-Api-Key', ref: '${dotenv:X_API_KEY}' });
+    expect(res.data.extracted[0]).toMatchObject({
+      field: 'auth.headers',
+      key: 'X-Api-Key',
+      ref: '${dotenv:X_API_KEY}',
+    });
     // dotenv key is the sanitized name.
     expect(readFileSync(join(cwd, '.env'), 'utf8')).toContain(`X_API_KEY=${SECRET}`);
   });
@@ -149,8 +180,8 @@ describe('runSecretExtract (S25.3)', () => {
 
   it('errors on an unknown server', async () => {
     plantHardcoded();
-    await expect(runSecretExtract({ cwd, server: 'nope', scheme: 'dotenv', osContext: ctx })).rejects.toThrow(
-      /No server named "nope"/,
-    );
+    await expect(
+      runSecretExtract({ cwd, server: 'nope', scheme: 'dotenv', osContext: ctx }),
+    ).rejects.toThrow(/No server named "nope"/);
   });
 });

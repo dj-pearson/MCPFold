@@ -46,6 +46,15 @@ export interface CompatSample {
    * samples. Unreachable or ambiguous ⇒ the live check degrades to `skipped`, never a false pass.
    */
   liveUrl?: string;
+  /**
+   * A stable token that proves the fetched page is really the client's config doc (S19.5) — the
+   * config filename is the natural choice (`mcp.json`, `settings.json`). When a client moves or
+   * renames its docs, the old `liveUrl` often serves a 200 redirect/landing/anti-bot page whose
+   * body omits our root key — which the token check would otherwise misread as format drift. If
+   * `liveAnchor` is set and absent from the fetched text, the live check degrades to `skipped`
+   * ("doc moved/unrecognized") instead of a false `divergent`. Undefined ⇒ no anchor gate.
+   */
+  liveAnchor?: string;
 }
 
 /** Parse rendered client config text by its on-disk format (JSON / YAML / TOML). */
@@ -193,6 +202,16 @@ export async function checkLive(
       status: 'skipped',
       divergence: [],
       reason: 'upstream doc unreachable',
+    };
+  }
+  // Anchor gate: if the fetched page doesn't carry the client's stable config-doc token, it's most
+  // likely a moved/redirected/anti-bot page — not evidence of format drift. Skip, never false-fail.
+  if (sample.liveAnchor && !text.includes(sample.liveAnchor)) {
+    return {
+      client: sample.client,
+      status: 'skipped',
+      divergence: [],
+      reason: `upstream doc moved or unrecognized (anchor "${sample.liveAnchor}" absent)`,
     };
   }
   const shape = shapeOf(rendered, sample.serverContainer, sample.format);

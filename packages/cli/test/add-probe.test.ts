@@ -16,10 +16,7 @@ let cwd: string;
 beforeEach(() => {
   cwd = mkdtempSync(join(tmpdir(), 'mcpfold-probe-'));
   // A minimal valid canonical config to add into.
-  writeFileSync(
-    join(cwd, 'mcp.config.jsonc'),
-    `{ "version": 1, "servers": {}, "profiles": {} }`,
-  );
+  writeFileSync(join(cwd, 'mcp.config.jsonc'), `{ "version": 1, "servers": {}, "profiles": {} }`);
 });
 afterEach(() => rmSync(cwd, { recursive: true, force: true }));
 
@@ -29,7 +26,10 @@ const readServer = (name: string) => {
   return loaded.config.servers[name]!;
 };
 
-const prober = (result: Awaited<ReturnType<UrlProber>>): UrlProber => async () => result;
+const prober =
+  (result: Awaited<ReturnType<UrlProber>>): UrlProber =>
+  async () =>
+    result;
 
 describe('add --probe (S25.4)', () => {
   it('detects streamable-http and scaffolds a placeholder auth ref on a 401', async () => {

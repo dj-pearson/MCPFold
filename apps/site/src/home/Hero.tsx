@@ -1,6 +1,10 @@
 import { Badge, Button, Container } from '../design/components';
 import { compute, FIXTURE_SERVERS } from '../benchmark/model';
+import { GUIDE_CLIENTS } from '../guides/guides.data';
 import { TheFold } from './TheFold';
+
+/** Live client count — never a hardcoded number that can drift below what mcpfold actually supports. */
+const CLIENT_COUNT = GUIDE_CLIENTS.length;
 
 /** Homepage hero (S13.2, on-page SEO S15.3) — H1 leads with the focus keyword "MCP config" + the
  * brand; the first ~100 words name MCP config/servers, the supported clients, and the token savings,
@@ -28,8 +32,8 @@ export function Hero() {
         style={{ fontSize: '1.25rem', maxWidth: 720, margin: '0 auto var(--space-6)' }}
       >
         mcpfold is a free, open-source CLI that manages your MCP servers from one canonical config
-        and folds it out to every MCP client — Claude Code, Claude Desktop, Cursor, VS Code,
-        Windsurf, and Zed — each in its own format.
+        and folds it out to all {CLIENT_COUNT} supported MCP clients — Claude Code, Cursor, VS Code,
+        Windsurf, Zed, and more — each in its own format.
       </p>
 
       <p

@@ -329,7 +329,9 @@ function renderHuman(
   } else {
     for (const a of meta.applied) {
       const bak = a.backup ? style.dim(` (backup: ${a.backup})`) : '';
-      parts.push(`${style.green(symbols.ok)} fixed [${a.ids.join(', ')}] — re-folded "${a.target}"${bak}`);
+      parts.push(
+        `${style.green(symbols.ok)} fixed [${a.ids.join(', ')}] — re-folded "${a.target}"${bak}`,
+      );
     }
     for (const f of meta.failed) {
       parts.push(`${style.red(symbols.err)} failed [${f.ids.join(', ')}] — ${f.error}`);

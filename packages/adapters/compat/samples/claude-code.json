@@ -23,5 +23,6 @@
     "user": "/home/dev/.claude.json",
     "project": "/home/dev/repo/.mcp.json"
   },
-  "liveUrl": "https://docs.claude.com/en/docs/claude-code/mcp"
+  "liveUrl": "https://docs.claude.com/en/docs/claude-code/mcp",
+  "liveAnchor": ".mcp.json"
 }

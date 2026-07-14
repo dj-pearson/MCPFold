@@ -30,21 +30,24 @@ export const EXPLAIN: Record<string, ExplainEntry> = {
   'vscode-root-key': {
     id: 'vscode-root-key',
     title: 'VS Code uses the root key "servers", not "mcpServers"',
-    summary: 'Copying a Claude/Cursor config into VS Code fails silently because the root key differs.',
+    summary:
+      'Copying a Claude/Cursor config into VS Code fails silently because the root key differs.',
     body: `Almost every client puts its MCP servers under the JSON key "mcpServers" — Claude Desktop, Claude Code, Cursor, Windsurf. VS Code is the exception: it reads the root key "servers" (and Zed reads "context_servers"). The shapes are otherwise similar enough that a wrong-key file parses as valid JSON and loads with zero servers — no error, no warning, just nothing. mcpfold folds each client its own native shape from one canonical config, so you never hand-copy between them; the fix for a drifted file is to re-fold it (\`mcpfold sync\`, or \`doctor --fix\`).`,
     related: ['config-format', 'inert-curation'],
   },
   'inert-curation': {
     id: 'inert-curation',
     title: 'A tools allow-list only filters behind the proxy shim',
-    summary: 'A curated server wired straight at its command loads every tool — the allow-list is inert.',
+    summary:
+      'A curated server wired straight at its command loads every tool — the allow-list is inert.',
     body: `Native client config can enable or disable a whole server, but it cannot express "load this server, but only 3 of its 20 tools". That per-tool trimming is what saves the context-window tokens, and it needs a thin local proxy: mcpfold folds a curated server to \`mcpfold run <name>\`, which starts the real server and filters its tools/list. If a client file points a curated server directly at its real command (an old file, or a hand edit), the proxy is bypassed and every tool loads again — the \`tools\` directive silently does nothing. Re-folding through the shim (\`doctor --fix\`) restores the filtering.`,
     related: ['curation', 'no-curation'],
   },
   'mcp-remote-cve': {
     id: 'mcp-remote-cve',
     title: 'Pin the mcp-remote bridge (CVE-2025-6514)',
-    summary: 'An unpinned mcp-remote bridge can pull a version with a known remote-code-execution flaw.',
+    summary:
+      'An unpinned mcp-remote bridge can pull a version with a known remote-code-execution flaw.',
     body: `Clients that cannot reach an authenticated remote server natively bridge through the \`mcp-remote\` npx package. Versions 0.0.5–0.1.15 carry CVE-2025-6514, a remote-code-execution vulnerability, and an unpinned \`npx -y mcp-remote\` resolves to whatever is newest — or whatever an attacker has published. mcpfold pins the bridge to a known-safe version at fold time; re-folding (\`doctor --fix\`) rewrites an unpinned or vulnerable bridge to the pinned one.`,
     related: ['unpinned-latest'],
   },
@@ -72,7 +75,8 @@ export const EXPLAIN: Record<string, ExplainEntry> = {
   'unpinned-latest': {
     id: 'unpinned-latest',
     title: 'An unpinned @latest package is a supply-chain risk',
-    summary: 'Pin stdio servers to a fixed version so a launch cannot silently pull new (or malicious) code.',
+    summary:
+      'Pin stdio servers to a fixed version so a launch cannot silently pull new (or malicious) code.',
     body: `\`npx -y some-server@latest\` resolves to whatever is newest at launch — so a compromised or simply broken new release runs on your machine with no review. This is the lesson of the April-2026 stdio-transport incidents. Add a \`pin\` (e.g. "pin": "1.4.2") and mcpfold rewrites @latest to that fixed version at fold time. mcpfold will not choose a version for you — pinning requires deciding which release you trust, which is a human call, so \`doctor --fix\` leaves this one to you.`,
     related: ['mcp-remote-cve'],
   },
@@ -93,14 +97,16 @@ export const EXPLAIN: Record<string, ExplainEntry> = {
   'native-env-fallback': {
     id: 'native-env-fallback',
     title: 'A native-env server with a non-env secret folds via the shim',
-    summary: 'The native-env strategy only works for ${env:…}; other schemes fold through the run shim.',
+    summary:
+      'The native-env strategy only works for ${env:…}; other schemes fold through the run shim.',
     body: `The \`native-env\` secret strategy emits the client's own environment indirection, which only works for \`\${env:...}\` references. A server that opts into native-env but uses a different scheme (infisical/keychain/op/dotenv) cannot be resolved by the client, so mcpfold safely folds it through the \`mcpfold run\` shim instead — the behavior is correct, just worth knowing. Use only \`\${env:...}\` refs on native-env servers to fold shim-free, or set the server's secretStrategy to "shim" to make the choice explicit.`,
     related: ['shim', 'secret-refs'],
   },
   'curation-opportunity': {
     id: 'curation-opportunity',
     title: 'A server has recorded usage but no tools directive',
-    summary: 'mcpfold has usage data suggesting which tools you actually use — curate to trim the rest.',
+    summary:
+      'mcpfold has usage data suggesting which tools you actually use — curate to trim the rest.',
     body: `The local audit trail recorded which tools of this server you have actually called, but the server has no \`tools\` allow-list, so every tool still loads into every client's context. \`mcpfold curate <server>\` shows the usage and \`mcpfold curate <server> --write\` applies the recommended allow-list — turning recorded usage into measured token savings.`,
     related: ['curation', 'no-curation'],
   },
@@ -114,7 +120,8 @@ export const EXPLAIN: Record<string, ExplainEntry> = {
   'allowlist-staleness': {
     id: 'allowlist-staleness',
     title: 'An allow-list predates new upstream tools',
-    summary: 'A curated server shipped tools your allow-list was written before — they are invisible.',
+    summary:
+      'A curated server shipped tools your allow-list was written before — they are invisible.',
     body: `A curated (allow-mode) server now exposes tools its allow-list was written before. Because allow-lists keep only the listed names, those new capabilities are invisible with no signal. \`mcpfold curate <server> --refresh\` re-runs the recommendation including the new tools and shows the diff before writing — it never widens an allow-list without your consent.`,
     related: ['curation'],
   },
@@ -150,7 +157,8 @@ export const EXPLAIN: Record<string, ExplainEntry> = {
   shim: {
     id: 'shim',
     title: 'The run shim',
-    summary: 'mcpfold run resolves secrets and filters tools at launch, keeping both off the client file.',
+    summary:
+      'mcpfold run resolves secrets and filters tools at launch, keeping both off the client file.',
     body: `The \`mcpfold run <name>\` shim is a thin launcher folded into a client file in place of the real command. At launch it resolves the server's secret references (so no value is written to the client file) and, when the server is curated, filters its tools/list (so only the allow-listed tools reach the client's context). It is the mechanism behind both secret safety and tool curation.`,
     related: ['secret-refs', 'curation', 'inert-curation'],
   },
@@ -190,13 +198,9 @@ export function runExplain(options: ExplainOptions): CommandOutput<ExplainData> 
       : '';
     return {
       data: { entry, topics },
-      human: [
-        style.bold(entry.title),
-        style.dim(entry.summary),
-        '',
-        entry.body,
-        `${related}`,
-      ].join('\n'),
+      human: [style.bold(entry.title), style.dim(entry.summary), '', entry.body, `${related}`].join(
+        '\n',
+      ),
     };
   }
 
