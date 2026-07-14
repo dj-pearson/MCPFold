@@ -1,6 +1,6 @@
 {
   "name": "@mcpfold/schema",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Published JSON Schema for mcp.config.jsonc, generated from the zod source.",
   "license": "MIT",
   "type": "module",
