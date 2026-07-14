@@ -21,5 +21,6 @@
     "user": "/home/dev/.cursor/mcp.json",
     "project": "/home/dev/repo/.cursor/mcp.json"
   },
-  "liveUrl": "https://docs.cursor.com/context/model-context-protocol"
+  "liveUrl": "https://cursor.com/docs/mcp",
+  "liveAnchor": "mcp.json"
 }

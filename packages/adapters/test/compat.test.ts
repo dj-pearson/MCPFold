@@ -145,6 +145,40 @@ describe('compat harness (S14.2)', () => {
     expect(result.reason).toMatch(/unreachable/);
   });
 
+  it('live check: skipped when a moved/anti-bot page lacks the anchor — not a false divergent (#77)', async () => {
+    const rendered = JSON.stringify({ mcpServers: { srv: { command: 'npx' } } });
+    const live: CompatSample = {
+      ...sample,
+      liveUrl: 'https://docs.example/mcp',
+      liveAnchor: 'mcp.json',
+    };
+    // The old URL now 200s a redirect/marketing shell: no `mcpServers`, and no `mcp.json` anchor.
+    const result = await checkLive(
+      rendered,
+      live,
+      async () => 'Cursor — the AI code editor. Get started free.',
+    );
+    expect(result.status).toBe('skipped');
+    expect(result.reason).toMatch(/moved or unrecognized/);
+  });
+
+  it('live check: still divergent when the real doc keeps the anchor but renames the root key (#77)', async () => {
+    const rendered = JSON.stringify({ mcpServers: { srv: { command: 'npx' } } });
+    const live: CompatSample = {
+      ...sample,
+      liveUrl: 'https://docs.example/mcp',
+      liveAnchor: 'mcp.json',
+    };
+    // Genuine drift: page is clearly the config doc (has `mcp.json`) but renamed the root key.
+    const result = await checkLive(
+      rendered,
+      live,
+      async () => 'Edit mcp.json and add servers under "servers": { … }',
+    );
+    expect(result.status).toBe('divergent');
+    expect(result.divergence.join(' ')).toContain('mcpServers');
+  });
+
   it('flags a resolved path move (S19.5)', () => {
     const rendered = JSON.stringify({ mcpServers: { srv: { command: 'npx' } } });
     const withPath: CompatSample = {

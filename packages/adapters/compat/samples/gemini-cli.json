@@ -21,5 +21,6 @@
     "user": "/home/dev/.gemini/settings.json",
     "project": "/home/dev/repo/.gemini/settings.json"
   },
-  "liveUrl": "https://google-gemini.github.io/gemini-cli/docs/tools/mcp-server.html"
+  "liveUrl": "https://google-gemini.github.io/gemini-cli/docs/tools/mcp-server.html",
+  "liveAnchor": "settings.json"
 }

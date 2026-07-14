@@ -34,9 +34,21 @@ const formatOf = (client: string): ConfigFormat => FORMAT_BY_CLIENT[client] ?? '
  */
 const LIVE_URL_BY_CLIENT: Record<string, string> = {
   vscode: 'https://code.visualstudio.com/docs/copilot/chat/mcp-servers',
-  cursor: 'https://docs.cursor.com/context/model-context-protocol',
+  cursor: 'https://cursor.com/docs/mcp',
   'claude-code': 'https://docs.claude.com/en/docs/claude-code/mcp',
   'gemini-cli': 'https://google-gemini.github.io/gemini-cli/docs/tools/mcp-server.html',
+};
+
+/**
+ * A stable config-doc token per live client (S19.5) — the config filename. When a client's docs
+ * move or add anti-bot pages, the old URL can 200 with a body missing our root key; the anchor lets
+ * the live check tell "doc moved" (→ skipped) from real format drift (→ divergent). See checkLive.
+ */
+const LIVE_ANCHOR_BY_CLIENT: Record<string, string> = {
+  vscode: 'mcp.json',
+  cursor: 'mcp.json',
+  'claude-code': '.mcp.json',
+  'gemini-cli': 'settings.json',
 };
 
 /** Real doc fetcher for `--live`: best-effort GET, returns null on any failure (→ skipped, never fail). */
@@ -112,6 +124,9 @@ if (process.argv.includes('--capture')) {
       remoteEntryKeys: shape.remoteEntryKeys,
       paths: currentPaths[adapter.id],
       ...(LIVE_URL_BY_CLIENT[adapter.id] ? { liveUrl: LIVE_URL_BY_CLIENT[adapter.id] } : {}),
+      ...(LIVE_ANCHOR_BY_CLIENT[adapter.id]
+        ? { liveAnchor: LIVE_ANCHOR_BY_CLIENT[adapter.id] }
+        : {}),
     };
     writeFileSync(join(samplesDir, `${adapter.id}.json`), `${JSON.stringify(sample, null, 2)}\n`);
   }

@@ -26,5 +26,6 @@
     "user": "/home/dev/.config/Code/User/mcp.json",
     "project": "/home/dev/repo/.vscode/mcp.json"
   },
-  "liveUrl": "https://code.visualstudio.com/docs/copilot/chat/mcp-servers"
+  "liveUrl": "https://code.visualstudio.com/docs/copilot/chat/mcp-servers",
+  "liveAnchor": "mcp.json"
 }
