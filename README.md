@@ -116,6 +116,23 @@ mcpfold doctor    # health-check config, clients, and secret references
 Other commands: `secret` (manage secret references), `run` (launch the curating proxy), `status`,
 `add`. See the full [Quickstart](./docs/quickstart.md) and [command reference](./docs/index.md).
 
+### Cut the token tax with curation
+
+The savings above come from **curation** — exposing only the tools an agent actually uses. `curate`
+writes an allow-list; `sync` folds each curated server out as a `mcpfold run` proxy shim, so clients
+only ever load the trimmed toolset:
+
+```bash
+mcpfold add fs --package @modelcontextprotocol/server-filesystem  # add a server
+mcpfold curate fs --tools read_text_file,write_file,list_directory # keep only what you use
+# → fs: keeping 3 of 14 tools, ~3.2k → ~684 tokens (approx)
+mcpfold sync                                                       # fold it out (writes a proxy shim)
+```
+
+Already been running your servers? Plain `mcpfold curate` reads the local audit trail and
+recommends the allow-list from your **actual** tool usage. Check the measured savings on your own
+config anytime with `mcpfold status`.
+
 ### Supported clients
 
 Claude Code · Claude Desktop · Cursor · VS Code · Windsurf · Zed — `mcpfold` reads and writes each
