@@ -224,7 +224,9 @@ export async function runSecretExtract(
   // Reuse the doctor detector so "what counts as a hardcoded secret" has a single source of truth.
   const hits = checkHardcodedSecrets(loaded.config, configPath)
     .map((f) => f.autofix)
-    .filter((a): a is ExtractSecretFix => a?.kind === 'extract-secret' && a.server === options.server)
+    .filter(
+      (a): a is ExtractSecretFix => a?.kind === 'extract-secret' && a.server === options.server,
+    )
     .filter((a) => !options.key || a.key === options.key);
 
   if (hits.length === 0) {
@@ -245,7 +247,9 @@ export async function runSecretExtract(
         `Provider to move ${hits.length} secret(s) into (${EXTRACT_SCHEMES.join('/')})`,
         'dotenv',
       );
-      scheme = EXTRACT_SCHEMES.includes(answer as SecretScheme) ? (answer as SecretScheme) : 'dotenv';
+      scheme = EXTRACT_SCHEMES.includes(answer as SecretScheme)
+        ? (answer as SecretScheme)
+        : 'dotenv';
     }
   }
   scheme ??= 'dotenv';
@@ -283,7 +287,9 @@ export async function runSecretExtract(
     // Comment-preserving structural replacement of the literal with the reference.
     newText = applyEdits(
       newText,
-      modify(newText, jsonPathFor(a), ref, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
+      modify(newText, jsonPathFor(a), ref, {
+        formattingOptions: { insertSpaces: true, tabSize: 2 },
+      }),
     );
     extracted.push({ field: a.field, key: a.key, ref, scheme, storedTo, storeCommand });
   }
@@ -321,9 +327,7 @@ function renderExtract(
 ): string {
   const verb = meta.wrote ? 'Extracted' : 'Would extract';
   const lines = extracted.map((e) => {
-    const where = e.storedTo
-      ? `stored in ${e.storedTo}`
-      : `run: ${e.storeCommand}`;
+    const where = e.storedTo ? `stored in ${e.storedTo}` : `run: ${e.storeCommand}`;
     return `  ${e.field}.${e.key} → ${e.ref}   (${where})`;
   });
   const footer: string[] = [];

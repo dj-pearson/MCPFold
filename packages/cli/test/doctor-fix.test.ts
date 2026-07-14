@@ -58,7 +58,9 @@ describe('runDoctorFix (S25.2)', () => {
 
     expect(res.data.previewed).toBe(true);
     expect(res.data.applied).toEqual([]);
-    expect(res.data.fixable.some((f) => f.kind === 'resync-client' && f.mode === 'auto')).toBe(true);
+    expect(res.data.fixable.some((f) => f.kind === 'resync-client' && f.mode === 'auto')).toBe(
+      true,
+    );
     // Nothing on disk changed, and no backup was taken.
     expect(readFileSync(clientPath, 'utf8')).toBe(original);
     expect(listBackups(clientPath)).toEqual([]);
@@ -128,7 +130,9 @@ describe('runDoctorFix (S25.2)', () => {
     mkdirSync(wsDir, { recursive: true });
     writeFileSync(
       join(wsDir, 'mcp_config.json'),
-      JSON.stringify({ mcpServers: { gh: { command: 'npx', args: ['-y', 'mcp-remote', 'https://y/mcp'] } } }),
+      JSON.stringify({
+        mcpServers: { gh: { command: 'npx', args: ['-y', 'mcp-remote', 'https://y/mcp'] } },
+      }),
     );
 
     const all = await runDoctorFix({ cwd, osContext: ctx, confirm: never });
@@ -136,7 +140,13 @@ describe('runDoctorFix (S25.2)', () => {
     expect(autoIds.length).toBe(2);
 
     // Apply only the first auto id — exactly one profile is re-folded.
-    const scoped = await runDoctorFix({ cwd, osContext: ctx, ids: [autoIds[0]!], yes: true, now: NOW });
+    const scoped = await runDoctorFix({
+      cwd,
+      osContext: ctx,
+      ids: [autoIds[0]!],
+      yes: true,
+      now: NOW,
+    });
     expect(scoped.data.applied).toHaveLength(1);
     expect(scoped.data.applied[0]!.ids).toEqual([autoIds[0]]);
 

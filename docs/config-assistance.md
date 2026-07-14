@@ -27,7 +27,7 @@ mcpfold doctor --fix --json       # report what was applied / skipped / failed
 ```
 
 - **Preview by default.** Without `--yes` (and without an interactive "yes"), `--fix` writes nothing —
-  it prints what it *would* do.
+  it prints what it _would_ do.
 - **Backed up + re-validated.** Every file is backed up before an atomic write, and `doctor` is re-run
   afterward to confirm. A fix that would raise the error count is **rolled back from its backup**; a
   fix whose finding survives is reported **failed**, never a silent partial write.
@@ -36,12 +36,12 @@ mcpfold doctor --fix --json       # report what was applied / skipped / failed
 
 ### What `--fix` applies automatically
 
-| Finding | Fix |
-| --- | --- |
-| VS Code file uses the `mcpServers` root key (should be `servers`) | re-fold that client from canonical |
-| A curated server bypasses the proxy (its `tools` list is inert) | re-fold it through the `mcpfold run` shim |
-| An unpinned / vulnerable `mcp-remote` bridge (CVE-2025-6514) | re-fold it to the pinned bridge |
-| A malformed client JSON file | regenerate it from canonical |
+| Finding                                                           | Fix                                       |
+| ----------------------------------------------------------------- | ----------------------------------------- |
+| VS Code file uses the `mcpServers` root key (should be `servers`) | re-fold that client from canonical        |
+| A curated server bypasses the proxy (its `tools` list is inert)   | re-fold it through the `mcpfold run` shim |
+| An unpinned / vulnerable `mcp-remote` bridge (CVE-2025-6514)      | re-fold it to the pinned bridge           |
+| A malformed client JSON file                                      | regenerate it from canonical              |
 
 ### What it reports but does **not** auto-apply
 
@@ -76,7 +76,7 @@ mcpfold secret extract <server> --dry-run          # preview the plan, write not
 ## `mcpfold explain` — learn why a footgun matters
 
 Every `doctor` finding ends with a `see: mcpfold explain <id>` pointer. Run it for an offline, authored
-explanation of *why* the footgun matters and *why* the fix is right — so you learn the model instead of
+explanation of _why_ the footgun matters and _why_ the fix is right — so you learn the model instead of
 applying fixes blindly:
 
 ```bash

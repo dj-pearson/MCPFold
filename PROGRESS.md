@@ -2289,6 +2289,7 @@ verification (criterion 3, needs an Azure DevOps PAT). Story stays in_progress u
 ## E25 — Guided configuration assistance (diagnose → repair)
 
 ### S25.1 — Machine-applicable fix model on the doctor Finding contract [in_progress]
+
 START: extend the CLI `Finding` contract with an optional deterministic `autofix` descriptor
 (discriminated union: `resync-client` for the VS Code root-key trap / inert curation / unpinned
 mcp-remote bridge, and `extract-secret` for hardcoded tokens — the latter applied later by the
@@ -2315,11 +2316,13 @@ back from backup (restoreBackup), and a fix whose finding persists is reported f
 partial. Guided fixes (extract-secret, rewrite-transport) are reported/skipped, never auto-applied. `--json`
 reports applied/skipped/failed; exit reflects remaining errors. No secret value ever printed (consumes
 runDoctor's already-redacted findings; preview describes actions, not file contents). Wired `--fix [ids]`
-+ `--yes` into cli.ts (+ `parseFixIds`). 9 engine tests + 3 parser tests; completion snapshots updated for
-the new `--fix` flag. Verified end-to-end on the built binary (inert-curation → re-folded through the
-`mcpfold run` shim). verify_all green (lint + typecheck + build + full 440-test suite).
+
+- `--yes` into cli.ts (+ `parseFixIds`). 9 engine tests + 3 parser tests; completion snapshots updated for
+  the new `--fix` flag. Verified end-to-end on the built binary (inert-curation → re-folded through the
+  `mcpfold run` shim). verify_all green (lint + typecheck + build + full 440-test suite).
 
 ### S25.3 — Guided secret extraction (hardcoded token → provider ref + shim) [in_progress]
+
 START: add `mcpfold secret extract <server>` — reuse checkHardcodedSecrets to locate hardcoded
 env/header values, pick a provider (default dotenv; --scheme or interactive), rewrite each value to a
 `${scheme:path}` ref via jsonc modify (comments preserved, re-validated), back up the config first.
@@ -2361,6 +2364,7 @@ completion snapshots refreshed. Verified on the built binary (closed port → fa
 verify_all green (lint + typecheck + build + 456 cli tests).
 
 ### S25.5 — `mcpfold explain <topic|finding-id>` [in_progress]
+
 START: add an offline `explain` command with an authored entry per doctor finding class + core concept;
 add an optional `explain?` topic id to the Finding contract, populate it in each check, and have doctor
 print a `see: mcpfold explain <id>` pointer. `--json` returns the structured entry; unknown key lists
