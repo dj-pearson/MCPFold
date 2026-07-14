@@ -46,6 +46,12 @@ jobs:
       - name: Typecheck
         run: pnpm --filter mcpfold-vscode typecheck
 
+      - name: Test
+        # Unit tests for the extension's pure modules (token-budget estimator, curation, discovery
+        # cache). The monorepo's `pnpm -r test` also covers these; this runs them on the ext-only
+        # fast path so an ext-only PR gets the signal without the full matrix.
+        run: pnpm --filter mcpfold-vscode test
+
       - name: Build
         run: pnpm --filter mcpfold-vscode build
 
