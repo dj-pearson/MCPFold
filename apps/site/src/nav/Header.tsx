@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Container } from '../design/components';
 import { currentTheme, toggleTheme, type Theme } from '../design/theme';
@@ -51,13 +51,26 @@ export function Header() {
   useEffect(() => setTheme(currentTheme()), []);
   const isActive = useActive();
   const nav = liveNav();
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLElement>(null);
 
-  // Close the mobile menu on Escape.
+  // Close the mobile menu on Escape, returning focus to the toggle that opened it (WCAG 2.4.3).
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  // When the menu opens, move keyboard focus into it so screen-reader / keyboard users land on the
+  // menu rather than being left on the toggle behind it.
+  useEffect(() => {
+    if (open) mobileMenuRef.current?.querySelector<HTMLElement>('a, button')?.focus();
   }, [open]);
 
   const themeButton = (
@@ -152,6 +165,7 @@ export function Header() {
 
         {/* Hamburger — visible only below the breakpoint (see tokens.css). */}
         <button
+          ref={menuButtonRef}
           type="button"
           className="nav-toggle"
           data-testid="menu-button"
@@ -175,6 +189,7 @@ export function Header() {
 
       {open && (
         <nav
+          ref={mobileMenuRef}
           id="mobile-menu"
           aria-label="Mobile"
           data-testid="mobile-menu"

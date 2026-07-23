@@ -71,14 +71,14 @@ Statement is new (see §2).
 | --- | --- | --- | --- |
 | A1 | No accessibility statement page | Medium | ✅ Fixed — `/accessibility` added |
 | A2 | No brand `:focus-visible` ring; keyboard focus relied on UA defaults only | Medium | ✅ Fixed — `tokens.css` adds a 2px accent focus ring on all interactive controls (WCAG 2.4.7 / 2.4.11) |
-| A3 | Dark-mode primary CTA: white text on `--accent #748ffc` ≈ **3.0:1** — fails AA (4.5:1) | High | ⚠️ Owner decision (brand color) — see §4 |
-| A4 | Light-mode accent link/button text ≈ **4.3:1** — marginally under AA | Medium | ⚠️ Owner decision (brand color) — see §4 |
-| A5 | `--danger` token undefined; error text falls back to `#e5484d` ≈ 3.9:1 | Low | ⚠️ Owner decision — define an AA-passing `--danger` |
-| A6 | Mobile menu closes on Escape but has no focus trap / focus-return | Low | ⛔ Follow-up (2.4.3) |
-| A7 | No axe/jest-axe rule engine (Lighthouse only) | Low | ⛔ Follow-up — add `@axe-core/playwright` |
+| A3 | Dark-mode primary CTA: white text on `--accent #748ffc` ≈ **3.0:1** — fails AA (4.5:1) | High | ✅ Fixed — dark-mode `--accent-fg` flips to dark ink → **6.55:1** |
+| A4 | Light-mode accent link/button text ≈ **4.3:1** — marginally under AA | Medium | ✅ Fixed — `--accent` → `#3b5bdb` → **5.67:1** |
+| A5 | `--danger` token undefined; error text falls back to `#e5484d` ≈ 3.9:1 | Low | ✅ Fixed — per-theme `--danger` (`#c92a2a` / `#ff8787`) clears AA |
+| A6 | Mobile menu closes on Escape but has no focus trap / focus-return | Low | ✅ Fixed — focus moves into the menu on open and returns to the toggle on close |
+| A7 | No axe/jest-axe rule engine (Lighthouse only) | Low | ✅ Fixed — `@axe-core/playwright` scan added to the e2e suite |
 
-Both contrast items (A3–A5) are documented as *known limitations* in the new Accessibility Statement
-so the posted claim stays honest until the palette is tuned.
+All contrast pairs were verified against the WCAG 1.4.3 formula in both light and dark themes; the
+lowest ratio after the change is 5.29:1 (accent link on the elevated surface).
 
 ---
 

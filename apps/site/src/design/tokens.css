@@ -19,9 +19,14 @@
   --radius: 10px;
   --maxw: 1080px;
 
-  /* Brand */
-  --accent: #4c6ef5;
+  /* Brand — accent tuned for WCAG 1.4.3 AA. Light: #3b5bdb gives white-on-accent buttons AND
+     accent-as-link-text ≈ 5.7:1 on white (both clear 4.5:1). Dark: the accent stays a lighter
+     periwinkle so link text keeps ~6.5:1 on the dark bg; button text flips to dark ink via a
+     per-theme --accent-fg so the button label also clears 4.5:1 (white-on-#748ffc was only ~3:1).
+     --danger is defined per-theme so error text clears AA on each background. */
+  --accent: #3b5bdb;
   --accent-fg: #ffffff;
+  --danger: #c92a2a;
 
   /* Light theme (default) */
   --bg: #ffffff;
@@ -41,6 +46,8 @@
     --border: #262b36;
     --code-bg: #161a22;
     --accent: #748ffc;
+    --accent-fg: #0b0d12;
+    --danger: #ff8787;
   }
 }
 
@@ -52,7 +59,9 @@
   --fg-muted: #5c6470;
   --border: #e4e7ec;
   --code-bg: #f2f4f7;
-  --accent: #4c6ef5;
+  --accent: #3b5bdb;
+  --accent-fg: #ffffff;
+  --danger: #c92a2a;
 }
 :root[data-theme='dark'] {
   --bg: #0b0d12;
@@ -62,6 +71,8 @@
   --border: #262b36;
   --code-bg: #161a22;
   --accent: #748ffc;
+  --accent-fg: #0b0d12;
+  --danger: #ff8787;
 }
 
 * {
