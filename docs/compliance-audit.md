@@ -112,18 +112,23 @@ require, which were previously missing:
 
 ### Data-subject request (DSAR) fulfillment — backend
 
-- The policy now describes access/erasure/portability rights, **but the hosted cloud has no
-  self-service endpoint** to fulfill them. There is no account-deletion route, no data-export route, and
-  the `configs`/audit tables are append-only. A DSAR currently requires manual Supabase-admin action.
-  **⛔ Follow-up required** — build deletion + export endpoints in `services/edge`, or document the
-  manual SLA-backed process. The schema already cascades on `auth.users` delete, so a deletion endpoint
-  is mostly wiring.
-- The subscribe form promises "unsubscribe anytime" and the `newsletter_subscribers` table has an
-  `unsubscribed` state, but **nothing sets it** — there is no unsubscribe endpoint. **⛔ Follow-up
-  required.**
+- **✅ Fixed here.** Added two authenticated edge endpoints and self-service UI:
+  - `GET /account-export` — a JSON copy of the caller's data (profile, machines, teams, personal
+    config versions), RLS-scoped via `asUser`. Surfaced as a "Download my data" button on the app
+    dashboard.
+  - `POST /account-delete` — deletes the caller's `auth.users` row on the privileged connection; the
+    schema's `on delete cascade` erases the public profile, machines, configs, owned teams, and
+    memberships. Surfaced as a confirming "Delete my account" button.
+  - `functions/account/index.ts` + `test/account.test.ts` (DB-free unit tests: auth-required, correct
+    scoping, idempotent delete). Wired in `services/edge/src/server.ts`; client methods in
+    `apps/web/src/api/cloud.ts`; UI in `apps/web/src/account/AccountPrivacy.tsx`.
+- **✅ Fixed here.** Newsletter unsubscribe: `POST /unsubscribe` (public) sets a subscriber's status
+  to `unsubscribed` by row-id token or email, honoring the form's "unsubscribe anytime" promise
+  (`functions/subscribe/index.ts` `createUnsubscribeHandler` + tests). The one remaining step is to
+  include the unsubscribe link in outbound emails once the double-opt-in email flow is wired.
 - DSAR contact is the shared `security@mcpfold.com` mailbox. **⚠️ Owner decision** — consider a
   dedicated `privacy@mcpfold.com` alias and, if you have EU/EEA users at scale, whether a GDPR Art. 27
-  EU representative is required.
+  EU representative is required (see §4).
 
 ---
 
