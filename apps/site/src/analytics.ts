@@ -25,10 +25,33 @@ declare global {
   }
 }
 
+/**
+ * Honor browser privacy signals — Do-Not-Track (DNT) and Global Privacy Control (GPC) — so the
+ * opt-out the /privacy and /analytics pages promise is actually enforced in code, not just claimed.
+ * When either signal is set we never load the analytics script, so nothing is measured or sent.
+ */
+export function privacySignalOptOut(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const nav = navigator as Navigator & {
+    doNotTrack?: string | null;
+    globalPrivacyControl?: boolean;
+    msDoNotTrack?: string | null;
+  };
+  const dnt =
+    nav.doNotTrack ??
+    (typeof window !== 'undefined'
+      ? (window as Window & { doNotTrack?: string | null }).doNotTrack
+      : undefined) ??
+    nav.msDoNotTrack;
+  return dnt === '1' || dnt === 'yes' || nav.globalPrivacyControl === true;
+}
+
 export function initAnalytics(): void {
   const src = import.meta.env.VITE_ANALYTICS_SRC;
   const domain = import.meta.env.VITE_ANALYTICS_DOMAIN;
   if (!src || !domain || typeof document === 'undefined') return;
+  // Respect Do-Not-Track / Global Privacy Control: never load analytics for users who opted out.
+  if (privacySignalOptOut()) return;
 
   const s = document.createElement('script');
   s.defer = true;

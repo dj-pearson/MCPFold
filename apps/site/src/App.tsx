@@ -50,6 +50,7 @@ export function App() {
         <Route path="/privacy" element={<LegalPage id="privacy" />} />
         <Route path="/terms" element={<LegalPage id="terms" />} />
         <Route path="/analytics" element={<LegalPage id="analytics" />} />
+        <Route path="/accessibility" element={<LegalPage id="accessibility" />} />
         <Route path="/community" element={<Community />} />
         <Route path="/blog" element={<BlogIndex />} />
         <Route path="/blog/:slug" element={<BlogPost />} />

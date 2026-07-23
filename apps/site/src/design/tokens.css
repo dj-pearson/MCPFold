@@ -142,3 +142,19 @@ code {
 main:focus {
   outline: none;
 }
+
+/* WCAG 2.4.7 (Focus Visible) / 2.4.11 (Focus Appearance): a brand-consistent, guaranteed-contrast
+   keyboard focus ring on every interactive control, rather than relying on inconsistent UA defaults.
+   Scoped to :focus-visible so mouse/touch users don't see the ring, and enumerated per element so the
+   programmatically-focused <main> (skip-link target) is excluded. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:not(main):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}

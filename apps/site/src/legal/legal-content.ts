@@ -16,8 +16,8 @@
  * index-bloat risk, and having them crawlable aids transparency.
  */
 
-const EFFECTIVE_DATE = '2026-07-10';
-const VERSION = '1.0';
+const EFFECTIVE_DATE = '2026-07-23';
+const VERSION = '1.1';
 const CONTACT = 'security@mcpfold.com';
 const GITHUB = 'https://github.com/dj-pearson/MCPFold';
 
@@ -73,15 +73,48 @@ export const LEGAL_DOCS: readonly LegalDoc[] = [
         ],
       },
       {
-        heading: 'Data sharing and processors',
+        heading: 'Legal bases for processing (GDPR)',
         paragraphs: [
-          'We do not sell personal data or share it with advertisers. Where the hosted service relies on infrastructure providers (for example, hosting and the database), they process data solely to run the service on our behalf.',
+          'For visitors in the EU/EEA and UK, we process the limited data described here on the following legal bases under the GDPR: performance of a contract (Art. 6(1)(b)) to operate the hosted cloud you signed up for — authentication, config sync, and the audit trail; our legitimate interests (Art. 6(1)(f)) in understanding aggregate, cookieless site traffic to improve the project, which is why analytics carries no personal data and honors Do-Not-Track / Global Privacy Control; and your consent (Art. 6(1)(a)) where you actively opt in, such as CLI telemetry or subscribing to updates. The local CLI processes no personal data at all.',
         ],
       },
       {
-        heading: 'Your choices and rights',
+        heading: 'Data sharing, processors and subprocessors',
         paragraphs: [
-          'The CLI and everything local require no account and collect nothing by default. For the hosted cloud, you can request access to or deletion of your account data by contacting us. You can opt out of CLI telemetry at any time as described above, and out of website analytics by blocking the analytics script or sending a Do-Not-Track signal.',
+          'We do not sell personal data, share it for cross-context behavioral advertising, or share it with advertisers. Where the hosted service relies on infrastructure providers, they act as processors that handle data solely to run the service on our behalf under data-processing terms.',
+          'The subprocessors we currently use are: Supabase (managed Postgres, authentication, and hosting for the hosted cloud and edge service), Stripe (payment and subscription processing for paid plans — Stripe handles card data directly; we never see full card numbers), and Cloudflare (Pages hosting and CDN for the website). This list is kept current; material changes are reflected in the version and effective date above.',
+        ],
+      },
+      {
+        heading: 'International data transfers',
+        paragraphs: [
+          'Our infrastructure providers may process data in the United States and other countries. Where personal data of EU/EEA or UK residents is transferred internationally, it is protected by appropriate safeguards such as the Standard Contractual Clauses offered by those providers. Because the CLI and all local software run entirely on your own machine, they involve no cross-border transfer.',
+        ],
+      },
+      {
+        heading: 'Data retention',
+        paragraphs: [
+          'The website analytics is aggregate and non-identifying, so there is nothing personal to retain. For the hosted cloud, we retain your account data and synced configuration for as long as your account is active; when you close your account or ask us to delete it, we remove your account data (which cascades to the teams, machines, configs, and audit records tied to it), subject to any short retention required to meet legal, security, or billing obligations. Opt-in CLI telemetry events are non-identifying and retained only in aggregate.',
+        ],
+      },
+      {
+        heading: 'Your rights and choices',
+        paragraphs: [
+          'The CLI and everything local require no account and collect nothing by default. For the hosted cloud, and to the extent the GDPR, UK GDPR, or US state privacy laws apply to you, you have the right to access a copy of your data, to correct inaccurate data, to delete your data, to receive it in a portable format, to object to or restrict certain processing, and to withdraw consent at any time. You will not be discriminated against for exercising these rights.',
+          `To exercise any of these rights, email ${CONTACT} from the address associated with your account and tell us what you would like to do; we respond within the timeframes the applicable law requires (generally within 30 days for GDPR and 45 days for California requests). You can also opt out of CLI telemetry at any time as described above, unsubscribe from any update emails, and opt out of website analytics by sending a Do-Not-Track or Global Privacy Control signal, which we honor automatically.`,
+          'If you are in the EU/EEA or UK and believe we have not handled your data properly, you have the right to lodge a complaint with your local data-protection authority.',
+        ],
+      },
+      {
+        heading: 'California and US state privacy rights',
+        paragraphs: [
+          'We do not sell your personal information and we do not share it for cross-context behavioral advertising, so there is no "sale" or "share" to opt out of under the CCPA/CPRA and comparable US state laws. California and other US-state residents still have the rights to know, access, correct, delete, and be free from discrimination for exercising them; use the same contact above to make a request. Because we honor Global Privacy Control, a GPC signal is treated as a valid opt-out preference.',
+        ],
+      },
+      {
+        heading: "Children's privacy",
+        paragraphs: [
+          'mcpfold is a developer tool intended for adults and is not directed to children. We do not knowingly collect personal information from anyone under 16. If you believe a child has provided us personal data, contact us and we will delete it.',
         ],
       },
       {
@@ -164,7 +197,8 @@ export const LEGAL_DOCS: readonly LegalDoc[] = [
       {
         heading: 'What we do not do',
         paragraphs: [
-          'We set no cookies and use no local storage for tracking. We collect no personally identifying information, do not build user profiles, and do not track you across other websites. There are no advertising or third-party marketing trackers.',
+          'We set no cookies and load no third-party advertising or marketing trackers. We collect no personally identifying information, do not build user profiles, and do not track you across other websites. There are deliberately no Google Analytics, gtag, or similar tags on this site.',
+          'The only client-side storage we use is first-party and functional: your theme preference, and — if you arrive from a campaign link — a single sessionStorage entry recording which channel referred you (e.g. `utm_source`), so a visit can be attributed to a channel in aggregate. It holds no identifier, is never shared, is not a cookie, and is cleared when you close the tab.',
         ],
       },
       {
@@ -176,7 +210,52 @@ export const LEGAL_DOCS: readonly LegalDoc[] = [
       {
         heading: 'How to opt out',
         paragraphs: [
-          'You can opt out at any time by blocking the analytics script in your browser or an extension, or by sending a Do-Not-Track signal. Analytics is also disabled entirely on any build without the analytics configuration. See the privacy policy for the full picture.',
+          'You can opt out at any time by sending a Do-Not-Track or Global Privacy Control signal from your browser — we detect it and never load analytics at all — or by blocking the analytics script with an extension. Analytics is also disabled entirely on any build without the analytics configuration. See the privacy policy for the full picture.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'accessibility',
+    path: '/accessibility',
+    title: 'Accessibility statement',
+    metaTitle: 'Accessibility statement — mcpfold',
+    metaDescription:
+      'mcpfold aims to conform to WCAG 2.2 Level AA. How the site supports keyboard, screen-reader, contrast, and reduced-motion needs, the known limitations we are tracking, and how to report an accessibility barrier.',
+    effectiveDate: EFFECTIVE_DATE,
+    version: VERSION,
+    intro:
+      'We want mcpfold to be usable by everyone, including people who rely on assistive technology. This statement describes how the website supports accessibility, the standard we target, known limitations, and how to reach us if something is not working for you.',
+    sections: [
+      {
+        heading: 'Our target standard',
+        paragraphs: [
+          'We aim to conform to the Web Content Accessibility Guidelines (WCAG) 2.2 Level AA, and we use that standard as the yardstick for the US Americans with Disabilities Act (ADA) and the EU/EN 301 549 expectations. Accessibility is treated as an ongoing commitment, not a one-time checkbox.',
+        ],
+      },
+      {
+        heading: 'What the site supports',
+        paragraphs: [
+          'The site is built to be operated by keyboard alone: a "Skip to content" link is the first thing you reach, every interactive control shows a visible focus ring, and the navigation exposes its state to assistive tech (current page, expanded/collapsed menus). Pages use proper landmarks (header, navigation, main, footer) and a single, ordered heading structure.',
+          'Content is written to work with screen readers: images carry descriptive alternative text (or are marked decorative), forms have associated labels, and status messages are announced politely. The site works in both light and dark themes, respects your operating-system color-scheme preference, and honors "reduce motion" so animations are turned off when you ask for less movement.',
+        ],
+      },
+      {
+        heading: 'How we test',
+        paragraphs: [
+          'Every change is checked in continuous integration against an automated accessibility budget (a Lighthouse accessibility score gate), alongside end-to-end tests that exercise keyboard navigation, skip links, and ARIA state. Automated testing cannot catch everything, so we also rely on manual review and your feedback.',
+        ],
+      },
+      {
+        heading: 'Known limitations',
+        paragraphs: [
+          'We are actively tracking a few items: some accent-colored text and buttons sit close to the minimum contrast ratio and are being tuned to comfortably clear WCAG AA, and the mobile navigation menu closes on Escape but does not yet trap focus while open. Documentation pages rendered from Markdown are held to the same standard but receive less frequent manual review. If you hit a barrier not listed here, please tell us.',
+        ],
+      },
+      {
+        heading: 'Report a problem',
+        paragraphs: [
+          `If any part of this site is difficult to use with assistive technology, we want to fix it. Email ${CONTACT} or open an issue on ${GITHUB} describing the page, what you were trying to do, and the assistive technology or browser you were using. We aim to acknowledge accessibility reports within a few business days.`,
         ],
       },
     ],
