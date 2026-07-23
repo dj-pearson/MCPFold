@@ -16,6 +16,7 @@ export default defineConfig({
     '**/use-cases.e2e.ts',
     '**/about.e2e.ts',
     '**/legal.e2e.ts',
+    '**/a11y.e2e.ts',
     '**/community.e2e.ts',
     '**/roadmap.e2e.ts',
     '**/notfound.e2e.ts',

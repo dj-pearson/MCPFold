@@ -9,7 +9,7 @@ const ONE_LINER =
   'One source of truth for your MCP servers — write it once, fold it out to every client.';
 
 const COLORS: Array<{ name: string; hex: string; note: string }> = [
-  { name: 'Accent', hex: '#4c6ef5', note: 'Primary brand blue (light theme)' },
+  { name: 'Accent', hex: '#3b5bdb', note: 'Primary brand blue (light theme, WCAG AA)' },
   { name: 'Accent (dark)', hex: '#748ffc', note: 'Brand blue on dark backgrounds' },
   { name: 'Foreground', hex: '#14161a', note: 'Near-black text' },
   { name: 'Background', hex: '#ffffff', note: 'Light surface' },

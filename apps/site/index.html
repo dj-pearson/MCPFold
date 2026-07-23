@@ -43,20 +43,11 @@
     />
     <meta name="twitter:image" content="https://mcpfold.com/og.png" />
 
-    <!-- Privacy-friendly analytics (S13.1): cookieless, no PII. Enabled only when the site is
-         built with VITE_ANALYTICS_SRC + VITE_ANALYTICS_DOMAIN (see src/analytics.ts + docs). -->
-
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-2LCNNCXPG7"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag('js', new Date());
-
-      gtag('config', 'G-2LCNNCXPG7');
-    </script>
+    <!-- Privacy-friendly analytics (S13.1): cookieless, no PII, no third-party trackers. Loaded ONLY
+         at runtime by src/analytics.ts, and only when the site is built with VITE_ANALYTICS_SRC +
+         VITE_ANALYTICS_DOMAIN, so previews/local dev never phone home. Deliberately NO Google
+         Analytics / gtag here — that would set cookies and transfer data to a third party, which
+         directly contradicts the /privacy and /analytics disclosures and would require consent. -->
   </head>
   <body>
     <div id="root"></div>

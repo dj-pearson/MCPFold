@@ -24,7 +24,11 @@ import {
   createTeamsHandler,
 } from "../functions/teams/index.ts";
 import { type BillingConfig, createBillingHandler } from "../functions/billing/index.ts";
-import { createSubscribeHandler } from "../functions/subscribe/index.ts";
+import { createSubscribeHandler, createUnsubscribeHandler } from "../functions/subscribe/index.ts";
+import {
+  createAccountDeleteHandler,
+  createAccountExportHandler,
+} from "../functions/account/index.ts";
 import { dbEntitlementChecker } from "../lib/entitlements.ts";
 import { DEFAULT_CONFIG, type DeviceAuthConfig, type Sql } from "../lib/device.ts";
 import { json } from "../lib/http.ts";
@@ -65,6 +69,9 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
   const teamEvents = createTeamEventsHandler({ sql, cfg });
   const billing = createBillingHandler({ sql, cfg, billing: loadBillingConfig() });
   const subscribe = createSubscribeHandler({ sql });
+  const unsubscribe = createUnsubscribeHandler({ sql });
+  const accountExport = createAccountExportHandler({ sql, cfg });
+  const accountDelete = createAccountDeleteHandler({ sql, cfg });
   return (req) => {
     const path = new URL(req.url).pathname.replace(/\/+$/, "");
     if (path.endsWith("/health") || path === "") {
@@ -87,6 +94,9 @@ export function createRouter(sql: Sql, cfg: DeviceAuthConfig): (req: Request) =>
     if (path.endsWith("/team-audit")) return teamAudit(req);
     if (path.endsWith("/teams")) return teams(req);
     if (path.endsWith("/subscribe")) return subscribe(req); // public, unauthenticated (S13.18)
+    if (path.endsWith("/unsubscribe")) return unsubscribe(req); // public: honor "unsubscribe anytime"
+    if (path.endsWith("/account-export")) return accountExport(req); // DSAR: data access/portability
+    if (path.endsWith("/account-delete")) return accountDelete(req); // DSAR: right to erasure
     return auth(req);
   };
 }

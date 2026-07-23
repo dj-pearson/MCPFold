@@ -88,6 +88,7 @@ export const FOOTER_GROUPS: NavGroup[] = [
       { label: 'Privacy', href: '/privacy' },
       { label: 'Terms', href: '/terms' },
       { label: 'Analytics & cookies', href: '/analytics' },
+      { label: 'Accessibility', href: '/accessibility' },
       { label: 'Brand & press kit', href: '/brand' },
       { label: 'MIT license', href: `${GITHUB}/blob/main/LICENSE`, external: true },
     ],

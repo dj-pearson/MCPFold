@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { CLIENT_IDS, type Config } from '@mcpfold/core';
 import { useAuth } from '../auth/AuthProvider';
+import { AccountPrivacy } from '../account/AccountPrivacy';
 
 // Reuses the canonical types straight from @mcpfold/core — the web app never redefines the
 // config shape. The visual editor (S7.2) builds on exactly this `Config`.
@@ -30,6 +31,7 @@ export function Dashboard() {
           ))}
         </ul>
       </section>
+      <AccountPrivacy />
     </div>
   );
 }

@@ -64,3 +64,49 @@ export function createSubscribeHandler(deps: SubscribeDeps): (req: Request) => P
     return cors(json({ ok: true }, 202));
   };
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type UnsubscribeInput =
+  | { kind: "invalid" }
+  | { kind: "token"; token: string }
+  | { kind: "email"; email: string };
+
+/**
+ * Parse an unsubscribe request. A `token` (the subscriber's row id, the value an unsubscribe link
+ * carries) is preferred; a bare `email` is accepted too, since unsubscribing is a fail-safe,
+ * reduce-contact action on a low-sensitivity, email-only table. Pure (no I/O) for unit testing.
+ */
+export function parseUnsubscribe(body: Record<string, unknown>): UnsubscribeInput {
+  const token = typeof body.token === "string" ? body.token.trim() : "";
+  if (UUID_RE.test(token)) return { kind: "token", token };
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  if (email && email.length <= 254 && EMAIL_RE.test(email)) return { kind: "email", email };
+  return { kind: "invalid" };
+}
+
+/**
+ * Public unsubscribe sink — honors the "unsubscribe anytime" promise on the subscribe form. Sets the
+ * subscriber's status to `unsubscribed` (a state the schema already allows). Always returns 200 for a
+ * well-formed request, whether or not a matching row existed, so it never reveals who is subscribed.
+ */
+export function createUnsubscribeHandler(deps: SubscribeDeps): (req: Request) => Promise<Response> {
+  return async (req) => {
+    if (req.method === "OPTIONS") return cors(new Response(null, { status: 204 }));
+    if (req.method !== "POST") return cors(json({ error: "method_not_allowed" }, 405));
+
+    const parsed = parseUnsubscribe(await readJson(req));
+    if (parsed.kind === "invalid") return cors(json({ error: "invalid_request" }, 400));
+
+    if (parsed.kind === "token") {
+      await deps.sql`
+        update public.newsletter_subscribers set status = 'unsubscribed' where id = ${parsed.token}
+      `;
+    } else {
+      await deps.sql`
+        update public.newsletter_subscribers set status = 'unsubscribed' where email = ${parsed.email}
+      `;
+    }
+    return cors(json({ ok: true }, 200));
+  };
+}

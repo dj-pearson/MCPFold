@@ -137,7 +137,7 @@ export function Subscribe({
 
           <p aria-live="polite" style={{ minHeight: '1.2em', margin: 'var(--space-2) 0 0' }}>
             {status === 'error' && (
-              <span data-testid="subscribe-error" style={{ color: 'var(--danger, #e5484d)' }}>
+              <span data-testid="subscribe-error" style={{ color: 'var(--danger, #c92a2a)' }}>
                 Please enter a valid email — and if it still fails, try again in a moment.
               </span>
             )}

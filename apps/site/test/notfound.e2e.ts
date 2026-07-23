@@ -42,7 +42,7 @@ test('/brand: downloadable assets + colors + one-liner + no-endorsement (no-JS)'
   expect(html).toContain('<title>Brand &amp; press kit — mcpfold</title>');
   expect(html).toContain('data-testid="brand-oneliner"');
   expect(html).toContain('data-testid="brand-colors"');
-  expect(html).toContain('#4c6ef5'); // the accent token
+  expect(html).toContain('#3b5bdb'); // the accent token (WCAG AA tuned)
   // Download links to the real asset files.
   expect(html).toContain('/brand/mcpfold-wordmark.svg');
   expect(html).toContain('/brand/mcpfold-logomark.svg');

@@ -3,7 +3,7 @@ import { Container } from '../design/components';
 import { legalDocById } from './legal-content';
 
 /**
- * Legal & policy pages (S13.14): /privacy, /terms, /analytics. Each renders one doc from the single
+ * Legal & policy pages (S13.14): /privacy, /terms, /analytics, /accessibility. Each renders one doc from the single
  * typed content source (legal-content.ts), dated and versioned, so the pages stay consistent with the
  * real data practices and are easy to update together. Prerendered and left indexable (documented
  * choice — see legal-content.ts). Cross-linked to each other in the footer.
@@ -44,7 +44,8 @@ export function LegalPage({ id }: { id: string }) {
 
       <p style={{ color: 'var(--fg-muted)', fontSize: '0.9rem', marginTop: 'var(--space-10)' }}>
         See also: <Link to="/privacy">Privacy</Link> · <Link to="/terms">Terms</Link> ·{' '}
-        <Link to="/analytics">Analytics &amp; cookies</Link> · <Link to="/security">Security</Link>
+        <Link to="/analytics">Analytics &amp; cookies</Link> ·{' '}
+        <Link to="/accessibility">Accessibility</Link> · <Link to="/security">Security</Link>
       </p>
     </Container>
   );

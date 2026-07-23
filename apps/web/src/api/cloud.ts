@@ -24,6 +24,10 @@ export interface CloudApi {
   getMachines(): Promise<{ machines: MachineStatus[]; latestVersion: number }>;
   getVersionHistory(): Promise<VersionRecord[]>;
   revokeMachine(name: string): Promise<void>;
+  /** DSAR: download a JSON copy of the account's personal data (GDPR/CCPA access + portability). */
+  exportAccount(): Promise<Blob>;
+  /** DSAR: permanently delete the account and all synced data (GDPR/CCPA erasure). */
+  deleteAccount(): Promise<void>;
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'https://functions.mcpfold.com';
@@ -72,6 +76,18 @@ function httpCloudApi(base: string, getToken: () => string | null): CloudApi {
       });
       if (!res.ok) throw new Error(`Could not revoke ${name} (${res.status}).`);
     },
+    async exportAccount() {
+      const res = await fetch(`${base}/account-export`, { headers: authHeader() });
+      if (!res.ok) throw new Error(`Could not export your data (${res.status}).`);
+      return await res.blob();
+    },
+    async deleteAccount() {
+      const res = await fetch(`${base}/account-delete`, {
+        method: 'POST',
+        headers: authHeader(),
+      });
+      if (!res.ok) throw new Error(`Could not delete your account (${res.status}).`);
+    },
   };
 }
 
@@ -102,6 +118,27 @@ function mockCloudApi(): CloudApi {
         { version: 2, author: 'dev@mcpfold.com', at: '2026-07-07T09:00:00Z' },
         { version: 1, author: 'dev@mcpfold.com', at: '2026-07-06T08:00:00Z' },
       ]),
+    exportAccount: () =>
+      Promise.resolve(
+        new Blob(
+          [
+            JSON.stringify(
+              {
+                exported_at: '2026-07-23T00:00:00Z',
+                user_id: 'mock-user',
+                profile: { email: 'dev@mcpfold.com' },
+                machines,
+                teams: [],
+                configs: [{ version, config }],
+              },
+              null,
+              2,
+            ),
+          ],
+          { type: 'application/json' },
+        ),
+      ),
+    deleteAccount: () => Promise.resolve(),
   };
 }
 
