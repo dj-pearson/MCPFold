@@ -126,38 +126,73 @@ require, which were previously missing:
   to `unsubscribed` by row-id token or email, honoring the form's "unsubscribe anytime" promise
   (`functions/subscribe/index.ts` `createUnsubscribeHandler` + tests). The one remaining step is to
   include the unsubscribe link in outbound emails once the double-opt-in email flow is wired.
-- DSAR contact is the shared `security@mcpfold.com` mailbox. **⚠️ Owner decision** — consider a
-  dedicated `privacy@mcpfold.com` alias and, if you have EU/EEA users at scale, whether a GDPR Art. 27
-  EU representative is required (see §4).
+- **✅ Fixed here (needs one ops step).** The policy now names a dedicated privacy contact,
+  `privacy@mcpfold.com`, for all data-subject requests (security reports still go to
+  `security@mcpfold.com`). **Action for the owner:** create the `privacy@mcpfold.com` alias and
+  forward it to a monitored inbox — the address is now published, so it must resolve.
+
+### EU representative (GDPR Art. 27) — assessment
+
+A controller with no establishment in the EU/EEA must designate an EU representative if it offers
+goods/services to, or monitors the behavior of, people in the EU (Art. 27(1)). There is an exemption
+(Art. 27(2)) for processing that is **occasional**, does **not** include large-scale special-category
+or criminal data, and is **unlikely to result in a risk** to individuals.
+
+- **Where mcpfold sits today:** the site's analytics is cookieless and non-identifying; the hosted
+  cloud stores only an email + refs-only config (never secret values, never special-category data).
+  This is low-risk and, at current scale, plausibly "occasional" — so the Art. 27(2) exemption
+  **likely applies** and no representative is required yet.
+- **Reassess and appoint a representative if** the hosted cloud starts serving EU users at
+  non-trivial, ongoing scale, or you begin systematic monitoring. This is a **⚠️ owner decision** to
+  confirm with counsel; it is a documented judgement, not a code change.
 
 ---
 
-## 4. Items requiring an owner decision
+## 4. Remaining items (owner action, not code)
 
-1. **Brand accent contrast (A3–A5).** Fixing the dark-mode CTA and borderline link contrast means
-   darkening `--accent` (or the button background), which changes the visual identity site-wide. A
-   value near `#3b5bdb`/`#4263eb` gets white-on-accent comfortably past 4.5:1 in both themes. Left for
-   design sign-off; flagged as a known limitation in the Accessibility Statement in the meantime.
-2. **DSAR backend** (deletion + export endpoints) and **newsletter unsubscribe** endpoint.
-3. **Dedicated privacy contact** (`privacy@`) and EU Art. 27 representative assessment.
-4. **A subprocessor page/DPA** if you begin signing enterprise data-processing agreements (the named
-   list in the policy is sufficient for now).
+The audit findings above are now remediated in code. What's left needs a person, not a commit:
+
+1. **Create the `privacy@mcpfold.com` alias** and forward it to a monitored inbox. The address is
+   published in the policy, so it must resolve. (One-time ops step.)
+2. **Confirm the EU Art. 27 representative assessment** (§3) with counsel. Current read: the
+   exemption likely applies; revisit if EU hosted-cloud usage grows.
+3. **Wire the unsubscribe link into outbound emails** once the double-opt-in email flow is built —
+   the `/unsubscribe` endpoint and token are ready to receive it.
+4. **Legal review of the expanded policy copy.** The disclosures are accurate to the architecture,
+   but a lawyer should sign off before it's treated as final.
+5. **Optional:** a standalone subprocessor page / DPA if you begin signing enterprise data-processing
+   agreements (the named list in the policy is sufficient for now).
 
 ---
 
-## 5. What changed in this commit
+## 5. What changed (across the audit commits)
 
+**Analytics / privacy contradiction**
 - `apps/site/index.html` — removed hardcoded Google Analytics/gtag.
 - `apps/site/src/analytics.ts` — honor Do-Not-Track / Global Privacy Control before loading analytics.
-- `apps/site/src/design/tokens.css` — brand `:focus-visible` keyboard focus ring.
-- `apps/site/src/legal/legal-content.ts` — expanded Privacy Policy (GDPR/CCPA) + corrected Analytics
-  disclosure + new **Accessibility Statement**; version bumped to 1.1.
-- `apps/site/src/App.tsx`, `src/site-structure.ts`, `src/legal/LegalPage.tsx` — wire the `/accessibility`
-  route, footer link, and cross-links (auto-prerendered, in sitemap).
-- `apps/site/test/legal.e2e.ts` — assert the new disclosures render, the accessibility page renders,
-  and **no third-party tracker ships in the built HTML** (regression guard).
+- `apps/site/test/legal.e2e.ts` — regression guard: no third-party tracker in the built HTML.
 
-Verification: `tsc --noEmit` clean, `vite build` + SSG prerender (143 routes) succeeds, and the legal
-e2e suite passes (6/6). Two unrelated suite failures (`about.e2e`, hydrate test on `/`) are caused by
-`api.github.com` returning 403 in the sandboxed audit environment — both exercise live-GitHub fetches
-on pages this change does not touch.
+**Accessibility (WCAG 2.2 AA / ADA)**
+- `apps/site/src/design/tokens.css` — AA-tuned `--accent` (per-theme `--accent-fg`), per-theme
+  `--danger`, and a brand `:focus-visible` ring. `Brand.tsx` / `notfound.e2e.ts` follow the new hex.
+- `apps/site/src/nav/Header.tsx` — mobile-menu focus-move-in + focus-return.
+- `apps/site/test/a11y.e2e.ts` — `@axe-core/playwright` scan (WCAG 2.0/2.1/2.2 A+AA), all pass.
+- New **Accessibility Statement** at `/accessibility` (route + footer link + sitemap).
+
+**Privacy legal content (GDPR / CCPA)**
+- `apps/site/src/legal/legal-content.ts` — lawful basis, full data-subject rights, retention,
+  international transfers, named subprocessors, US-state "do not sell/share", children's data, a
+  dedicated `privacy@` contact; version bumped to 1.1.
+
+**DSAR + unsubscribe backend + UI**
+- `services/edge/functions/account/index.ts` — `/account-export` + `/account-delete`.
+- `services/edge/functions/subscribe/index.ts` — `/unsubscribe`.
+- `services/edge/src/server.ts` routing; `services/edge/test/{account,subscribe}.test.ts`.
+- `apps/web` — `cloud.ts` client methods + `account/AccountPrivacy.tsx` dashboard panel.
+
+Verification: site `tsc --noEmit` clean; `vite build` + SSG prerender (143 routes) succeeds; the
+legal (6/6), a11y axe (6/6), nav, and notfound suites pass. The web app typechecks clean. The edge
+DSAR/unsubscribe unit tests follow the existing DB-free pattern and run under `deno task test` in CI
+(Deno's binary couldn't be fetched in this sandbox to run them locally). Pre-existing browser-based
+suite failures (`about.e2e`, the hydrate test) come from `api.github.com` returning 403 and a
+provisioned-chromium/Playwright version skew in this sandbox — not from these changes.
