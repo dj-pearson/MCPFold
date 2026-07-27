@@ -23,7 +23,7 @@ jobs:
       - uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: pnpm
@@ -69,7 +69,7 @@ jobs:
       - uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: pnpm
@@ -142,7 +142,7 @@ jobs:
       - uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           # pkg fetches a base binary matching the runner's exact Node version from its pkg-fetch
           # release (v3.6). Pin to 22.23.1 — a version v3.6 ships prebuilts for on every OS/arch —
@@ -186,7 +186,7 @@ jobs:
       TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       # On a manual Release the tag is the event's tag; on the automatic push path there is no
@@ -274,7 +274,7 @@ jobs:
       WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Resolve release tag
