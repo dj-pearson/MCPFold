@@ -1,0 +1,164 @@
+{
+  "$schema": "https://mcpfold.com/schemas/seo-prd.json",
+  "name": "mcpfold SEO iterative loop",
+  "description": "One SEO element improved per iteration. Items too large for a single iteration are recorded here with enough detail to be picked up cold on the next iteration. Update `status` and `iteration` as items land.",
+  "site": "apps/site",
+  "createdAt": "2026-09-10",
+  "loop": { "total": 15, "completed": 1 },
+  "items": [
+    {
+      "id": "SEO-1",
+      "title": "Per-URL sitemap lastmod from content, not the build clock",
+      "status": "done",
+      "iteration": 1,
+      "impact": "high",
+      "effort": "s",
+      "problem": "Every URL in every child sitemap carried the same BUILD_DATE. Google discards lastmod entirely when a site stamps all URLs identically on each deploy, so the crawl-scheduling signal was worthless across ~hundreds of pSEO pages.",
+      "solution": "scripts/lastmod.mjs maps each route to the source file(s) that produce it and dates it from the last commit touching them (git log -1 --format=%cs), cached per file, falling back to the build date when git is unavailable. Child sitemaps now carry the newest lastmod they contain.",
+      "files": ["scripts/lastmod.mjs", "scripts/gen-seo.mjs", "test/seo.e2e.ts", "package.json"],
+      "verify": "node scripts/lastmod.mjs --self-test; e2e 'sitemap lastmod is per-URL content dating'"
+    },
+    {
+      "id": "SEO-2",
+      "title": "Rasterize per-page OG cards to PNG",
+      "status": "todo",
+      "impact": "high",
+      "effort": "m",
+      "problem": "gen-og.mjs emits dist/og/<route>.svg and gen-seo.mjs wires it into og:image and twitter:image for every route. Facebook, LinkedIn, X/Twitter, Slack and Discord all REJECT image/svg+xml for og:image, so every page except the home fallback (/og.png) currently renders a blank social card. The code comment in gen-og.mjs already flags this as a deferred follow-up.",
+      "solution": "Add @resvg/resvg-js (or sharp) as an apps/site devDependency; rasterize renderOgSvg() output to 1200x630 PNG in the gen-seo route loop, write dist/og/<route>.png, and point og:image/twitter:image at the PNG. Keep the SVG alongside for debugging. Embed the Inter font bytes or fall back to a system sans that resvg can resolve inside CI containers (resvg does not inherit browser font fallback). Add og:image:width/height/alt per route, and an e2e assertion that og:image ends in .png and returns content-type image/png.",
+      "risks": ["resvg native binary must resolve on the Cloudflare Pages / CI build image", "font availability in the build container"],
+      "files": ["scripts/gen-og.mjs", "scripts/gen-seo.mjs", "package.json", "test/seo.e2e.ts"]
+    },
+    {
+      "id": "SEO-3",
+      "title": "RSS feed is invalid and undiscoverable",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "s",
+      "problem": "feed.xml emits <pubDate>2026-01-05</pubDate> — RSS 2.0 requires RFC-822 dates, so readers and Google's blog discovery reject or mis-sort the items. The channel also lacks <language>, <lastBuildDate>, <atom:link rel=\"self\">, and nothing in <head> advertises the feed (no <link rel=\"alternate\" type=\"application/rss+xml\">), so it is effectively unlinked.",
+      "solution": "Convert frontmatter dates to RFC-822 in gen-seo.mjs, add the atom self link + language + lastBuildDate, and add the alternate link to index.html (and to the prerendered shell). Add a feed e2e that parses the dates.",
+      "files": ["scripts/gen-seo.mjs", "index.html", "test/blog.e2e.ts"]
+    },
+    {
+      "id": "SEO-4",
+      "title": "JSON-LD points at /docs, which is not a route",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "s",
+      "problem": "softwareApplication() in src/seo/jsonld.ts sets softwareHelp to `${SITE_URL}/docs`. There is no /docs route in App.tsx and it is not in allRoutes(), so the structured data advertises a 404 on every page that emits the SoftwareApplication node.",
+      "solution": "Audit every absolute URL emitted in jsonld.ts against allRoutes() and fail the build on any that is not a prerendered route (extend scripts/seo-audit.mjs with a validateJsonLdUrls guard, mirroring validateKeywordPages). Then fix softwareHelp to /install or /guides.",
+      "files": ["src/seo/jsonld.ts", "scripts/seo-audit.mjs", "scripts/gen-seo.mjs"]
+    },
+    {
+      "id": "SEO-5",
+      "title": "No Organization/WebSite node with sameAs + SearchAction",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "s",
+      "problem": "Entity consolidation for a brand query ('mcpfold') depends on a site-wide Organization node with sameAs links (GitHub, npm, X) and a WebSite node carrying @id, publisher, and inLanguage. Verify what jsonld.ts already emits site-wide and fill the gaps.",
+      "solution": "Emit a single Organization + WebSite pair on every route with stable @id URIs, and cross-reference them from the page-type nodes via isPartOf/publisher so the graph is connected rather than a bag of disjoint nodes.",
+      "files": ["src/seo/jsonld.ts"]
+    },
+    {
+      "id": "SEO-6",
+      "title": "Title/description length guards in the build audit",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "s",
+      "problem": "auditMeta checks presence and uniqueness but not length. Data-derived titles (directory entry names, comparison metaTitles) can exceed the ~60-char SERP truncation point and descriptions the ~155-char point, silently, at pSEO scale.",
+      "solution": "Add length bounds to auditMeta (warn/fail thresholds), report the worst offenders, and fix the templates that overflow. Keep it a build failure so it cannot regress.",
+      "files": ["scripts/seo-audit.mjs", "src/seo/meta.ts"]
+    },
+    {
+      "id": "SEO-7",
+      "title": "Internal linking: no programmatic related-pages mesh",
+      "status": "todo",
+      "impact": "high",
+      "effort": "m",
+      "problem": "Directory entries, guides, glossary terms, comparisons, features and use-cases are separate silos. Deep pSEO pages get little internal PageRank and no topical cross-linking, which is the single biggest lever on a large generated site.",
+      "solution": "Build a related-links resolver (category siblings, glossary terms mentioned on a page, the guide for a client referenced by a directory entry, the feature a use-case leans on) rendered as a 'Related' block on every deep page. Add a build guard for orphan routes: every route in allRoutes() must be reachable by at least one in-body internal link from another prerendered page.",
+      "files": ["src/seo/related.ts (new)", "src/design/components.tsx", "scripts/seo-audit.mjs"]
+    },
+    {
+      "id": "SEO-8",
+      "title": "Orphan-page + internal-link-graph build guard",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "m",
+      "problem": "Nothing verifies that prerendered routes are actually linked from the site. A route can be in the sitemap and reachable only by direct URL.",
+      "solution": "Parse the prerendered dist/**/index.html for internal <a href> targets, build the link graph, and fail the build on orphans, on links to non-existent routes, and on any page with zero outbound internal links. Depends on SEO-7 landing first so the guard passes.",
+      "dependsOn": ["SEO-7"],
+      "files": ["scripts/seo-audit.mjs", "scripts/gen-seo.mjs"]
+    },
+    {
+      "id": "SEO-9",
+      "title": "Breadcrumb JSON-LD coverage across every deep page type",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "s",
+      "problem": "BreadcrumbList is mentioned in the jsonld.ts header comment; confirm it is emitted for every deep route (directory entry, category, guide, glossary term, comparison, feature, use-case, blog post) and that positions/URLs are correct. Breadcrumbs drive the SERP path display for deep pSEO URLs.",
+      "solution": "Derive breadcrumbs from the route segments via one shared function and assert coverage in the build audit: every route with 2+ segments must emit a BreadcrumbList whose last item URL equals its canonical.",
+      "files": ["src/seo/jsonld.ts", "scripts/seo-audit.mjs"]
+    },
+    {
+      "id": "SEO-10",
+      "title": "Canonical/trailing-slash and host normalization at the edge",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "s",
+      "problem": "The prerender writes /x/index.html, so both /x and /x/ serve 200 with the same canonical. Duplicate URLs still burn crawl budget even when the canonical is right. www vs apex and http vs https need a single 301 target too.",
+      "solution": "Add Cloudflare Pages _redirects (or a Worker) normalizing trailing slashes, www→apex, http→https with 301s, and an e2e that asserts the redirect chain is at most one hop.",
+      "files": ["public/_redirects (new)", "test/seo.e2e.ts"]
+    },
+    {
+      "id": "SEO-11",
+      "title": "Heading hierarchy audit on prerendered HTML",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "s",
+      "problem": "No guard that each prerendered page has exactly one <h1>, that it is non-empty, that it contains the page's focus keyword, and that heading levels do not skip.",
+      "solution": "Extend the build audit to parse dist HTML for the heading outline and fail on violations.",
+      "files": ["scripts/seo-audit.mjs"]
+    },
+    {
+      "id": "SEO-12",
+      "title": "Image SEO: alt text, dimensions, lazy loading, modern formats",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "m",
+      "problem": "No audit of <img> in the prerendered output for missing alt, missing width/height (CLS), missing loading=\"lazy\" below the fold, or legacy formats.",
+      "solution": "Add an image audit to the build guard and fix offenders; ship AVIF/WebP with fallbacks where the asset pipeline allows.",
+      "files": ["scripts/seo-audit.mjs", "assets/", "src/design/components.tsx"]
+    },
+    {
+      "id": "SEO-13",
+      "title": "Core Web Vitals budget enforced in CI",
+      "status": "todo",
+      "impact": "high",
+      "effort": "l",
+      "problem": "Rankings are gated on field CWV; there is currently no LCP/CLS/INP budget in CI and no render-blocking-resource check on the prerendered pages.",
+      "solution": "Add Lighthouse CI (or a Playwright + web-vitals harness) against `vite preview` of dist/ with per-route budgets, run on PRs, failing on regression. Preload the LCP image/font, inline critical CSS, and defer GSAP where it is not above the fold.",
+      "files": [".github/workflows/", "apps/site/lighthouserc.json (new)", "index.html"]
+    },
+    {
+      "id": "SEO-14",
+      "title": "GEO: llms.txt completeness and per-page AI answerability",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "m",
+      "problem": "scripts/gen-llms.mjs exists but its coverage against allRoutes() is unverified, and answer engines favour pages that state a direct answer in the first 200 words with a scannable definition block. FAQ coverage (src/seo/faq.ts) is partial.",
+      "solution": "Audit llms.txt for full route coverage in the build, extend FAQ coverage to every deep page type with real questions from the keyword map, and add a lead-answer paragraph pattern to the page templates.",
+      "files": ["scripts/gen-llms.mjs", "src/seo/faq.ts", "scripts/seo-audit.mjs"]
+    },
+    {
+      "id": "SEO-15",
+      "title": "Keyword map → page coverage gaps and cannibalization",
+      "status": "todo",
+      "impact": "medium",
+      "effort": "m",
+      "problem": "validateKeywordPages only proves each mapped page exists. It does not prove the reverse — that every meaningful keyword cluster in src/seo/keyword-map.ts has a page — nor does it detect two pages targeting the same primary keyword (cannibalization).",
+      "solution": "Invert the check: report clusters with no page, and fail on two routes sharing a primary keyword. Produce a build-time coverage report to drive the next content batch.",
+      "files": ["src/seo/keyword-map.ts", "scripts/seo-audit.mjs"]
+    }
+  ]
+}

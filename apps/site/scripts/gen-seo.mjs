@@ -10,7 +10,8 @@
  *   3. writes dist/<route>/index.html (the client hydrates it in place),
  *   4. AUDITS every route (S15.8): fails the build on a route missing/duplicating meta or a
  *      keyword→page target that isn't a real route (index-bloat + dead-tracking guard),
- *   5. regenerates feed.xml (blog RSS) and a scaled sitemap index + typed child sitemaps w/ lastmod.
+ *   5. regenerates feed.xml (blog RSS) and a scaled sitemap index + typed child sitemaps, each URL
+ *      dated by the content behind it (scripts/lastmod.mjs), not by the build clock.
  * robots.txt ships from public/.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -20,10 +21,11 @@ import { pathToFileURL } from 'node:url';
 import { DIRECTORY } from '../../../packages/core/dist/index.js';
 import { renderOgSvg, ogPathForRoute } from './gen-og.mjs';
 import { auditMeta, validateKeywordPages } from './seo-audit.mjs';
+import { createLastmodResolver } from './lastmod.mjs';
 
 const SITE_URL = 'https://mcpfold.com';
-// Deterministic-per-build lastmod. sitemap.xml lives in dist/ (gitignored), so this never drifts a
-// committed file; it reflects when the site was last built/deployed.
+// Build date — used as the lastmod fallback only (see createLastmodResolver below). sitemap.xml
+// lives in dist/ (gitignored), so nothing here drifts a committed file.
 const BUILD_DATE = new Date().toISOString().slice(0, 10);
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = join(here, '..', 'dist');
@@ -165,27 +167,36 @@ for (const route of routes) {
   buckets.get(b).push(route);
 }
 
+// Per-URL lastmod from the content behind each route (SEO-1). Stamping every URL with the build
+// date makes Google discard the signal outright; dating each page from the last commit that touched
+// its source means a page's lastmod only moves when that page actually changed.
+const lastmodFor = createLastmodResolver({ fallback: BUILD_DATE });
+
 const childSitemaps = [];
 for (const [name, group] of [...buckets].sort((a, b) => a[0].localeCompare(b[0]))) {
+  const dates = [];
   const urls = group
-    .map(
-      (r) =>
-        `  <url>\n    <loc>${SITE_URL}${r}</loc>\n    <lastmod>${BUILD_DATE}</lastmod>\n  </url>`,
-    )
+    .map((r) => {
+      const lastmod = lastmodFor(r);
+      dates.push(lastmod);
+      return `  <url>\n    <loc>${SITE_URL}${r}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`;
+    })
     .join('\n');
   const file = `sitemap-${name}.xml`;
   writeFileSync(
     join(dist, file),
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
   );
-  childSitemaps.push(file);
+  // A child sitemap's own lastmod is the newest lastmod it contains, so the index tells a crawler
+  // which buckets are worth re-fetching.
+  childSitemaps.push({ file, lastmod: dates.sort()[dates.length - 1] ?? BUILD_DATE });
 }
 
 // The sitemap index that robots.txt points at.
 const indexEntries = childSitemaps
   .map(
-    (f) =>
-      `  <sitemap>\n    <loc>${SITE_URL}/${f}</loc>\n    <lastmod>${BUILD_DATE}</lastmod>\n  </sitemap>`,
+    ({ file, lastmod }) =>
+      `  <sitemap>\n    <loc>${SITE_URL}/${file}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </sitemap>`,
   )
   .join('\n');
 writeFileSync(

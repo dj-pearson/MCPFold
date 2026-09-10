@@ -36,6 +36,24 @@ test('sitemap.xml is a sitemap index that references typed child sitemaps with l
   }
 });
 
+test('sitemap lastmod is per-URL content dating, not one uniform build date', async ({
+  request,
+}) => {
+  // SEO-1: Google discards lastmod when every URL carries the same stamp on every deploy. The dates
+  // come from the last commit touching each route's source, so distinct page types must differ.
+  const index = await rawText(request, '/sitemap.xml');
+  const children: string[] = locsFromXml(index);
+  const dates = new Set<string>();
+  for (const child of children) {
+    const body = await rawText(request, child.replace(SITE, ''));
+    for (const m of body.matchAll(/<lastmod>([^<]+)<\/lastmod>/g)) {
+      expect(m[1], `${child} lastmod is an ISO date`).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      dates.add(m[1]!);
+    }
+  }
+  expect(dates.size, 'sitemap lastmod values must vary by content, not be one build date').toBeGreaterThan(1);
+});
+
 test('every prerendered page appears exactly once across the typed sitemaps', async ({
   request,
 }) => {
