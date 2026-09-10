@@ -31,6 +31,8 @@ export function Footer() {
                 alt="mcpfold logo"
                 width={24}
                 height={24}
+                loading="lazy"
+                decoding="async"
                 style={{ borderRadius: 6 }}
               />
               mcpfold

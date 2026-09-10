@@ -1,5 +1,5 @@
 /**
- * Heading-outline audit over the prerendered HTML (SEO-11).
+ * Heading-outline and image audits over the prerendered HTML (SEO-11, SEO-12).
  *
  * A page's heading outline is how both a crawler and a screen reader understand its structure, and
  * nothing in the build checked it. At pSEO scale the failure mode is silent: a template change adds
@@ -8,6 +8,10 @@
  * The audit is scoped to the page's own <main> content. The shared header, the Related block and
  * the footer (which renders an <h2> per group) are shell chrome present on every page — including
  * them would drown the signal and make a real skip undetectable.
+ *
+ * The image audit (SEO-12) rides along on the same pass: every <img> needs alt text a screen reader
+ * and an image crawler can use, and intrinsic width/height so the browser reserves the box before
+ * the bytes arrive — a missing pair on an above-the-fold image is a CLS hit on Core Web Vitals.
  *
  * Run `node scripts/headings.mjs --self-test`.
  */
@@ -78,6 +82,51 @@ export function auditHeadings(pages) {
   return problems;
 }
 
+/** Every <img> tag in an HTML fragment, with its parsed attributes. */
+export function imagesFromHtml(html) {
+  return [...html.matchAll(/<img\b([^>]*)>/gi)].map((m) => {
+    const attrs = {};
+    for (const a of (m[1] ?? '').matchAll(/([a-zA-Z-]+)(?:="([^"]*)")?/g)) {
+      attrs[a[1].toLowerCase()] = a[2] ?? '';
+    }
+    return attrs;
+  });
+}
+
+/**
+ * @param {Array<{route: string, html: string}>} pages
+ * @returns {{problems: string[], warnings: string[]}}
+ */
+export function auditImages(pages) {
+  const problems = [];
+  const warnings = [];
+  for (const { route, html } of pages) {
+    // Scoped to <main> like the heading audit — the shell's logo is audited once via the home page.
+    for (const [i, img] of imagesFromHtml(mainRegion(html)).entries()) {
+      const where = `${route}: <img src="${img.src ?? '?'}">`;
+
+      // alt="" is a valid, deliberate signal for a decorative image; a missing attribute is not.
+      if (img.alt === undefined) {
+        problems.push(`${where} has no alt attribute`);
+      } else if (!img.alt.trim() && img['aria-hidden'] !== 'true' && img.role !== 'presentation') {
+        warnings.push(`${where} has empty alt — mark it aria-hidden if that is deliberate`);
+      }
+
+      if (!img.width || !img.height) {
+        problems.push(`${where} has no intrinsic width/height — it will shift layout as it loads`);
+      }
+
+      if (img.loading === 'lazy' && img.fetchpriority === 'high') {
+        problems.push(`${where} is both lazy and high priority — pick one`);
+      }
+      if (!img.loading && i > 0) {
+        warnings.push(`${where} has no loading hint; below-the-fold images should be lazy`);
+      }
+    }
+  }
+  return { problems, warnings };
+}
+
 // --- Self-test -------------------------------------------------------------------------------
 if (process.argv.includes('--self-test')) {
   const failures = [];
@@ -123,9 +172,45 @@ if (process.argv.includes('--self-test')) {
   expect('flags an empty h2', has('/empty: empty <h2>'));
   expect('does not flag the footer h2 as a skip', !dirty.some((p) => p.includes('/two: heading level')));
 
+  // --- Images (SEO-12) ---
+  const imgPage = (route, main) => ({ route, html: `<main>${main}</main>` });
+  const imgClean = auditImages([
+    imgPage(
+      '/ok',
+      '<img src="/a.svg" alt="A diagram" width="900" height="557" loading="eager" fetchpriority="high">' +
+        '<img src="/b.png" alt="" aria-hidden="true" width="24" height="24" loading="lazy">',
+    ),
+  ]);
+  expect(
+    `clean images pass (got ${JSON.stringify(imgClean)})`,
+    imgClean.problems.length === 0 && imgClean.warnings.length === 0,
+  );
+
+  const imgDirty = auditImages([
+    imgPage('/bad', '<img src="/no-alt.png" width="10" height="10" loading="lazy">'),
+    imgPage('/bad2', '<img src="/no-dims.png" alt="x" loading="lazy">'),
+    imgPage(
+      '/bad3',
+      '<img src="/conflict.png" alt="x" width="1" height="1" loading="lazy" fetchpriority="high">',
+    ),
+    imgPage('/bad4', '<img src="/silent.png" alt="  " width="1" height="1" loading="lazy">'),
+  ]);
+  const imgHas = (needle) =>
+    [...imgDirty.problems, ...imgDirty.warnings].some((p) => p.includes(needle));
+  expect('flags a missing alt attribute', imgHas('no alt attribute'));
+  expect('flags missing dimensions', imgHas('no intrinsic width/height'));
+  expect('flags lazy + high priority', imgHas('both lazy and high priority'));
+  expect('warns on an undeclared empty alt', imgHas('has empty alt'));
+  expect(
+    'accepts aria-hidden empty alt without warning',
+    !imgClean.warnings.some((w) => w.includes('empty alt')),
+  );
+
   if (failures.length) {
-    console.error('✗ headings self-test FAILED:\n  ' + failures.join('\n  '));
+    console.error('✗ headings/images self-test FAILED:\n  ' + failures.join('\n  '));
     process.exit(1);
   }
-  console.log('✓ headings self-test passed (single h1, empty headings, level skips, main scoping)');
+  console.log(
+    '✓ headings/images self-test passed (single h1, level skips, main scoping; alt text, dimensions, loading hints)',
+  );
 }

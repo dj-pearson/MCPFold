@@ -64,9 +64,14 @@ export function Brand() {
       >
         {ASSETS.map((a) => (
           <div key={a.href} style={card}>
+            {/* SEO-12: below the fold, so lazy — but the box is still reserved up front. */}
             <img
               src={a.href}
-              alt={a.label}
+              alt={`${a.label} — mcpfold brand asset`}
+              width={160}
+              height={64}
+              loading="lazy"
+              decoding="async"
               style={{ maxWidth: '100%', height: 64, objectFit: 'contain' }}
             />
             <p style={{ margin: 'var(--space-2) 0 0', fontWeight: 600 }}>{a.label}</p>

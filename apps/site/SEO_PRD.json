@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 12
+    "completed": 13
   },
   "items": [
     {
@@ -208,16 +208,21 @@
     {
       "id": "SEO-12",
       "title": "Image SEO: alt text, dimensions, lazy loading, modern formats",
-      "status": "todo",
+      "status": "done",
       "impact": "medium",
       "effort": "m",
-      "problem": "No audit of <img> in the prerendered output for missing alt, missing width/height (CLS), missing loading=\"lazy\" below the fold, or legacy formats.",
-      "solution": "Add an image audit to the build guard and fix offenders; ship AVIF/WebP with fallbacks where the asset pipeline allows.",
+      "problem": "Alt text turned out to be fine on all four images — the real defect was dimensions. The hero demo.svg is the page's LCP element and declared no width/height, so the browser reserved no box and the layout shifted as it loaded. The brand-asset images had the same gap, and nothing was lazy-loaded or priority-hinted.",
+      "solution": "Hero: width/height matching demo.svg's intrinsic 900x557, height:auto to keep it fluid, plus loading=eager and fetchpriority=high so the LCP image stays off the lazy path. Brand and footer images: intrinsic dimensions, loading=lazy, decoding=async, and a more descriptive alt. auditImages (riding the same dist read as the heading audit, scoped to <main>) fails the build on a missing alt attribute, missing width/height, or an image that is both lazy and fetchpriority=high; it warns on an undeclared empty alt (alt='' plus aria-hidden is accepted as deliberate) and on a below-the-fold image with no loading hint.",
       "files": [
-        "scripts/seo-audit.mjs",
-        "assets/",
-        "src/design/components.tsx"
-      ]
+        "src/home/Hero.tsx",
+        "src/brand/Brand.tsx",
+        "src/nav/Footer.tsx",
+        "scripts/headings.mjs",
+        "scripts/gen-seo.mjs"
+      ],
+      "iteration": 13,
+      "deferred": "AVIF/WebP conversion was not done: the only raster image in page content is logo-mark.png at 24-28px, where format conversion saves nothing measurable. The hero is already an SVG. Revisit if photographic content is ever added.",
+      "verify": "node scripts/headings.mjs --self-test"
     },
     {
       "id": "SEO-13",

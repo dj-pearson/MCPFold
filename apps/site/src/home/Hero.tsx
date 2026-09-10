@@ -77,12 +77,21 @@ export function Hero() {
       <TheFold result={headline} />
 
       <div style={{ marginTop: 'var(--space-12)' }} data-reveal>
+        {/* SEO-12: this is the LCP element. width/height match demo.svg's intrinsic 900x557 so the
+            browser reserves the right aspect ratio before it loads (no layout shift), and
+            fetchpriority="high" with eager loading keeps it off the lazy path. */}
         <img
           src="/demo.svg"
           alt="mcpfold in the terminal: init, import, sync, and diff show one config folding out to every client"
           data-testid="demo-image"
+          width={900}
+          height={557}
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
           style={{
             width: '100%',
+            height: 'auto',
             maxWidth: 760,
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius)',

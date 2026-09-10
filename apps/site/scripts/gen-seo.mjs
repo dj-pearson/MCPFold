@@ -12,7 +12,8 @@
  *      keyword→page target that isn't a real route, JSON-LD that links to a non-route, or a
  *      title/description outside the SERP length budget, and then re-reads the written HTML to
  *      audit the internal link graph (dead links, orphans, pages with no links) and each page's
- *      heading outline (one h1, no empty headings, no skipped levels), and the shipped _redirects
+ *      heading outline (one h1, no empty headings, no skipped levels), every <img> (alt text and
+ *      intrinsic dimensions), and the shipped _redirects
  *      map (targets resolve, no rule shadows a live route),
  *   5. regenerates feed.xml (blog RSS) and a scaled sitemap index + typed child sitemaps, each URL
  *      dated by the content behind it (scripts/lastmod.mjs), not by the build clock.
@@ -38,7 +39,7 @@ import {
 import { createLastmodResolver } from './lastmod.mjs';
 import { renderFeed } from './feed.mjs';
 import { auditLinkGraph, readPrerenderedPages } from './link-graph.mjs';
-import { auditHeadings } from './headings.mjs';
+import { auditHeadings, auditImages } from './headings.mjs';
 
 const SITE_URL = 'https://mcpfold.com';
 // Build date — used as the lastmod fallback only (see createLastmodResolver below). sitemap.xml
@@ -148,7 +149,9 @@ const { problems: keywordProblems, warnings: keywordWarnings } = auditKeywordMap
     ],
   },
 );
-const warnings = [...lengthWarnings, ...keywordWarnings];
+// SEO-12: a missing alt or missing dimensions fails; a debatable loading hint only warns.
+const { problems: imageProblems, warnings: imageWarnings } = auditImages(prerendered);
+const warnings = [...lengthWarnings, ...keywordWarnings, ...imageWarnings];
 if (warnings.length > 0) {
   console.warn(`⚠ SEO warnings (${warnings.length}):\n  ${warnings.join('\n  ')}`);
 }
@@ -181,6 +184,7 @@ const problems = [
   // page nothing links to, a link the shell emits to a dead path, or a broken heading outline.
   ...auditLinkGraph(prerendered, routes),
   ...auditHeadings(prerendered),
+  ...imageProblems,
   // SEO-10: a redirect whose target was renamed 301s into a 404 and spends the link equity on the way.
   ...(existsSync(redirectsFile)
     ? auditRedirects(readFileSync(redirectsFile, 'utf8'), routes)
