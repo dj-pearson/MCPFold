@@ -10,8 +10,8 @@
  *   3. writes dist/<route>/index.html (the client hydrates it in place),
  *   4. AUDITS every route (S15.8): fails the build on a route missing/duplicating meta, a
  *      keyword→page target that isn't a real route, JSON-LD that links to a non-route, or a
- *      title/description outside the SERP length budget (index-bloat + dead-tracking +
- *      dead-structured-data + truncated-snippet guards),
+ *      title/description outside the SERP length budget, and then re-reads the written HTML to
+ *      audit the internal link graph — dead links, orphan pages, pages with no links at all,
  *   5. regenerates feed.xml (blog RSS) and a scaled sitemap index + typed child sitemaps, each URL
  *      dated by the content behind it (scripts/lastmod.mjs), not by the build clock.
  * robots.txt ships from public/.
@@ -31,6 +31,7 @@ import {
 } from './seo-audit.mjs';
 import { createLastmodResolver } from './lastmod.mjs';
 import { renderFeed } from './feed.mjs';
+import { auditLinkGraph, readPrerenderedPages } from './link-graph.mjs';
 
 const SITE_URL = 'https://mcpfold.com';
 // Build date — used as the lastmod fallback only (see createLastmodResolver below). sitemap.xml
@@ -143,6 +144,9 @@ const problems = [
       '/blog/',
     ],
   }),
+  // SEO-8: read back what actually shipped. Data-level guards can't see a page nothing links to,
+  // or a link the shell emits to a path that no longer exists.
+  ...auditLinkGraph(readPrerenderedPages(dist), routes),
 ];
 if (problems.length > 0) {
   console.error(`✗ SEO audit failed (${problems.length}):\n  ${problems.join('\n  ')}`);

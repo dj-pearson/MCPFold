@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 5
+    "completed": 6
   },
   "items": [
     {
@@ -132,19 +132,21 @@
     {
       "id": "SEO-8",
       "title": "Orphan-page + internal-link-graph build guard",
-      "status": "todo",
+      "status": "done",
       "impact": "medium",
       "effort": "m",
       "problem": "Nothing verifies that prerendered routes are actually linked from the site. A route can be in the sitemap and reachable only by direct URL.",
-      "solution": "Parse the prerendered dist/**/index.html for internal <a href> targets, build the link graph, and fail the build on orphans, on links to non-existent routes, and on any page with zero outbound internal links. Depends on SEO-7 landing first so the guard passes.",
+      "solution": "scripts/link-graph.mjs reads back every dist/**/index.html the prerender wrote, extracts the internal <a href> targets, and audits the resulting graph: a dead link (not a route, not under the sibling docs build, not a static file), an orphan (no OTHER page links to it — self-links don't count), or a page with no internal links at all all fail the build. Wired into gen-seo.mjs after the prerender loop, so it checks what actually shipped rather than the data that produced it.",
       "dependsOn": [
         "SEO-7"
       ],
       "files": [
-        "scripts/seo-audit.mjs",
-        "scripts/gen-seo.mjs"
+        "scripts/link-graph.mjs",
+        "scripts/gen-seo.mjs",
+        "package.json"
       ],
-      "note": "Partly covered by SEO-7's validateRelatedLinks (dead targets, self-links, page types losing their block). Still to do: parse the prerendered dist HTML for the full <a href> graph, catch true orphans and pages with zero outbound internal links. NOTE: site-structure.ts PRIMARY_NAV links to /docs and /docs/*.html — legal (sibling docs build), so the graph walker needs the same EXTERNALLY_SERVED allowlist."
+      "iteration": 6,
+      "verify": "node scripts/link-graph.mjs --self-test"
     },
     {
       "id": "SEO-9",
