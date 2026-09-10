@@ -24,6 +24,7 @@ import { DIRECTORY } from '../../../packages/core/dist/index.js';
 import { renderOgSvg, ogPathForRoute } from './gen-og.mjs';
 import {
   auditMeta,
+  auditBreadcrumbs,
   auditMetaLength,
   validateJsonLdUrls,
   validateRelatedLinks,
@@ -131,6 +132,8 @@ const problems = [
   ...validateKeywordPages(mappedPaths(), routes),
   // SEO-4: structured data that advertises a 404 is worse than emitting none at all.
   ...validateJsonLdUrls(jsonLdByRoute, routes, { siteUrl: SITE_URL }),
+  // SEO-9: one derived trail per route — coverage can't drift per page type unnoticed.
+  ...auditBreadcrumbs(jsonLdByRoute, { siteUrl: SITE_URL }),
   // SEO-7: the cross-silo mesh must resolve. Every deep page type carries the block, so losing one
   // wholesale is a regression the build should catch, not something to notice in Search Console.
   ...validateRelatedLinks(relatedByRoute, routes, {

@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 6
+    "completed": 7
   },
   "items": [
     {
@@ -151,15 +151,18 @@
     {
       "id": "SEO-9",
       "title": "Breadcrumb JSON-LD coverage across every deep page type",
-      "status": "todo",
+      "status": "done",
       "impact": "medium",
       "effort": "s",
-      "problem": "BreadcrumbList is mentioned in the jsonld.ts header comment; confirm it is emitted for every deep route (directory entry, category, guide, glossary term, comparison, feature, use-case, blog post) and that positions/URLs are correct. Breadcrumbs drive the SERP path display for deep pSEO URLs.",
-      "solution": "Derive breadcrumbs from the route segments via one shared function and assert coverage in the build audit: every route with 2+ segments must emit a BreadcrumbList whose last item URL equals its canonical.",
+      "problem": "Breadcrumb coverage was uneven and hand-written per page type. Deep pSEO pages started their trail at the hub with no Home crumb while shallow pages included one; the hubs themselves, /install, /pricing, /security, /changelog and the token calculator emitted no trail at all; and a directory entry jumped straight from Directory to the server, skipping the category that actually sits between them.",
+      "solution": "crumbsFor() in jsonld.ts derives the trail from the route in one place: always rooted at Home, with the category level inserted for directory entries, hub labels from one table, and legal/deep page types resolved from their own data. jsonLdForPath() now composes pageNodes() + the derived BreadcrumbList, so every hand-written trail is gone and a new page type inherits a correct one. auditBreadcrumbs() fails the build unless every non-home route emits exactly one list, rooted at Home, with contiguous positions and a last item equal to that page's own canonical (and the home page emits none).",
       "files": [
         "src/seo/jsonld.ts",
-        "scripts/seo-audit.mjs"
-      ]
+        "scripts/seo-audit.mjs",
+        "scripts/gen-seo.mjs"
+      ],
+      "iteration": 7,
+      "verify": "node scripts/seo-audit.mjs --self-test"
     },
     {
       "id": "SEO-10",

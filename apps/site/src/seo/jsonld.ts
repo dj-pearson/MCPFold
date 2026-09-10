@@ -1,4 +1,9 @@
-import { DIRECTORY, categoryMeta, entriesForCategory } from '@mcpfold/core';
+import {
+  DIRECTORY,
+  categoryMeta,
+  entriesForCategory,
+  pagedCategoriesForEntry,
+} from '@mcpfold/core';
 import { POSTS } from '../blog/posts';
 import { SITE_URL } from './meta';
 import { faqPageJsonLd, faqsForPath } from './faq';
@@ -244,7 +249,12 @@ function aboutOrganization(): JsonLd {
   };
 }
 
-function breadcrumb(trail: Array<{ name: string; path: string }>): JsonLd {
+interface Crumb {
+  name: string;
+  path: string;
+}
+
+function breadcrumb(trail: Crumb[]): JsonLd {
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -257,8 +267,90 @@ function breadcrumb(trail: Array<{ name: string; path: string }>): JsonLd {
   };
 }
 
-/** Structured-data nodes for a pathname (may be empty). */
-export function jsonLdForPath(path: string): JsonLd[] {
+/** Human label for each hub, so a derived trail reads the way the nav does. */
+const HUB_LABELS: Record<string, string> = {
+  '/directory': 'Directory',
+  '/guides': 'Guides',
+  '/glossary': 'Glossary',
+  '/compare': 'Compare',
+  '/features': 'Features',
+  '/use-cases': 'Use cases',
+  '/blog': 'Blog',
+  '/install': 'Install',
+  '/pricing': 'Pricing',
+  '/security': 'Security & trust',
+  '/about': 'About',
+  '/community': 'Community & support',
+  '/brand': 'Brand & press kit',
+  '/roadmap': 'Roadmap',
+  '/changelog': 'Changelog',
+  '/mcp-token-calculator': 'MCP token calculator',
+};
+
+const HOME: Crumb = { name: 'Home', path: '/' };
+
+/**
+ * The breadcrumb trail for a pathname, derived from the route rather than hand-written per page
+ * (SEO-9).
+ *
+ * Coverage used to be uneven: deep pSEO pages started their trail at the hub with no Home crumb,
+ * the hubs themselves emitted no trail at all, /install, /pricing, /security, /changelog and the
+ * token calculator emitted none, and a directory entry jumped straight from Directory to the
+ * server, skipping the category that actually sits between them. Deriving the trail in one place
+ * fixes all of that at once and means a new page type inherits a correct trail for free.
+ *
+ * Returns [] for the home page, which is its own root and takes no BreadcrumbList.
+ */
+export function crumbsFor(path: string): Crumb[] {
+  const p = path !== '/' && path.endsWith('/') ? path.slice(0, -1) : path;
+  if (p === '/') return [];
+
+  if (p.startsWith('/directory/category/')) {
+    const cat = p.slice('/directory/category/'.length);
+    if (entriesForCategory(cat).length === 0) return [];
+    return [HOME, { name: 'Directory', path: '/directory' }, { name: categoryMeta(cat).label, path: p }];
+  }
+  if (p.startsWith('/directory/')) {
+    const entry = DIRECTORY.find((e) => e.id === p.slice('/directory/'.length));
+    if (!entry) return [];
+    // A server sits under a category, not directly under the directory — reflect the real
+    // hierarchy so the SERP path shows where the page actually lives.
+    const category = pagedCategoriesForEntry(entry)[0];
+    return [
+      HOME,
+      { name: 'Directory', path: '/directory' },
+      ...(category
+        ? [{ name: category.label, path: `/directory/category/${category.id}` }]
+        : []),
+      { name: entry.name, path: p },
+    ];
+  }
+
+  const deep: Array<[string, (id: string) => string | undefined]> = [
+    ['/guides/', (id) => guideById(id)?.label],
+    ['/glossary/', (id) => termById(id)?.term],
+    ['/compare/', (id) => comparisonById(id)?.navLabel],
+    ['/features/', (id) => featureById(id)?.nav],
+    ['/use-cases/', (id) => useCaseById(id)?.nav],
+    ['/blog/', (id) => POSTS.find((e) => e.slug === id)?.title],
+  ];
+  for (const [prefix, label] of deep) {
+    if (!p.startsWith(prefix)) continue;
+    const name = label(p.slice(prefix.length));
+    if (!name) return [];
+    const hub = prefix.slice(0, -1);
+    return [HOME, { name: HUB_LABELS[hub] ?? hub, path: hub }, { name, path: p }];
+  }
+
+  const legal = legalDocById(p.slice(1));
+  if (legal && legal.path === p) return [HOME, { name: legal.title, path: p }];
+
+  const hubLabel = HUB_LABELS[p];
+  return hubLabel ? [HOME, { name: hubLabel, path: p }] : [];
+}
+
+/** Page-type structured data for a pathname, without the breadcrumb (added by jsonLdForPath). */
+function pageNodes(path: string): JsonLd[] {
   const p = path !== '/' && path.endsWith('/') ? path.slice(0, -1) : path;
   // GEO (S15.2): any page with FAQ units also emits a FAQPage node.
   const faqs = faqsForPath(p);
@@ -276,147 +368,60 @@ export function jsonLdForPath(path: string): JsonLd[] {
   if (p.startsWith('/guides/')) {
     const guide = guideById(p.slice('/guides/'.length));
     if (!guide) return [];
-    return [
-      guideHowTo(guide),
-      breadcrumb([
-        { name: 'Guides', path: '/guides' },
-        { name: guide.label, path: `/guides/${guide.id}` },
-      ]),
-    ];
+    return [guideHowTo(guide)];
   }
 
   if (p.startsWith('/glossary/')) {
     const entry = termById(p.slice('/glossary/'.length));
     if (!entry) return [];
-    return [
-      definedTerm(entry),
-      breadcrumb([
-        { name: 'Glossary', path: '/glossary' },
-        { name: entry.term, path: `/glossary/${entry.id}` },
-      ]),
-    ];
+    return [definedTerm(entry)];
   }
 
   if (p.startsWith('/compare/')) {
     const entry = comparisonById(p.slice('/compare/'.length));
     if (!entry) return [];
-    return [
-      compareArticle(entry),
-      breadcrumb([
-        { name: 'Compare', path: '/compare' },
-        { name: entry.navLabel, path: `/compare/${entry.id}` },
-      ]),
-    ];
+    return [compareArticle(entry)];
   }
 
   if (p.startsWith('/features/')) {
     const feature = featureById(p.slice('/features/'.length));
     if (!feature) return [];
-    return [
-      featureArticle(feature),
-      breadcrumb([
-        { name: 'Features', path: '/features' },
-        { name: feature.nav, path: `/features/${feature.id}` },
-      ]),
-    ];
+    return [featureArticle(feature)];
   }
 
-  if (p.startsWith('/use-cases/')) {
-    const uc = useCaseById(p.slice('/use-cases/'.length));
-    if (!uc) return [];
-    return [
-      breadcrumb([
-        { name: 'Use cases', path: '/use-cases' },
-        { name: uc.nav, path: `/use-cases/${uc.id}` },
-      ]),
-    ];
-  }
+  // Use-case, directory-entry and blog-post pages carry no page-type schema of their own; they get
+  // their FAQs (if any) from the fall-through below and their trail from crumbsFor().
+  if (p === '/about') return [aboutOrganization(), ...faqNode];
 
-  if (p === '/about')
-    return [
-      aboutOrganization(),
-      breadcrumb([
-        { name: 'Home', path: '/' },
-        { name: 'About', path: '/about' },
-      ]),
-      ...faqNode,
-    ];
-
-  if (p === '/community')
-    return [
-      breadcrumb([
-        { name: 'Home', path: '/' },
-        { name: 'Community & support', path: '/community' },
-      ]),
-      ...faqNode,
-    ];
-
-  if (p === '/roadmap')
-    return [
-      breadcrumb([
-        { name: 'Home', path: '/' },
-        { name: 'Roadmap', path: '/roadmap' },
-      ]),
-      ...faqNode,
-    ];
-
-  if (p === '/brand')
-    return [
-      breadcrumb([
-        { name: 'Home', path: '/' },
-        { name: 'Brand & press kit', path: '/brand' },
-      ]),
-      ...faqNode,
-    ];
+  // /community, /roadmap and /brand carry no page-type schema of their own — just their FAQs and
+  // the derived breadcrumb.
+  if (p === '/community' || p === '/roadmap' || p === '/brand') return faqNode;
 
   if (p.startsWith('/directory/category/')) {
     const cat = p.slice('/directory/category/'.length);
     if (entriesForCategory(cat).length === 0) return [];
-    return [
-      categoryItemList(cat),
-      breadcrumb([
-        { name: 'Directory', path: '/directory' },
-        { name: categoryMeta(cat).label, path: `/directory/category/${cat}` },
-      ]),
-    ];
+    return [categoryItemList(cat)];
   }
 
-  if (p.startsWith('/directory/')) {
-    const entry = DIRECTORY.find((e) => e.id === p.slice('/directory/'.length));
-    if (!entry) return [];
-    return [
-      breadcrumb([
-        { name: 'Directory', path: '/directory' },
-        { name: entry.name, path: `/directory/${entry.id}` },
-      ]),
-    ];
-  }
-
-  if (p.startsWith('/blog/')) {
-    const post = POSTS.find((e) => e.slug === p.slice('/blog/'.length));
-    if (!post) return [];
-    return [
-      breadcrumb([
-        { name: 'Blog', path: '/blog' },
-        { name: post.title, path: `/blog/${post.slug}` },
-      ]),
-    ];
-  }
-
-  // Legal & policy pages (S13.14): a breadcrumb into each policy.
+  // Legal & policy pages (S13.14) carry only their FAQs; the trail is derived.
   const legal = p.startsWith('/') ? legalDocById(p.slice(1)) : undefined;
-  if (legal && legal.path === p) {
-    return [
-      breadcrumb([
-        { name: 'Home', path: '/' },
-        { name: legal.title, path: legal.path },
-      ]),
-      ...faqNode,
-    ];
-  }
+  if (legal && legal.path === p) return faqNode;
 
   // Pages with FAQ units but no other structured data (e.g. /install, /pricing).
   return faqNode;
+}
+
+/**
+ * Structured-data nodes for a pathname (may be empty).
+ *
+ * Page-type nodes first, then the derived BreadcrumbList — one trail resolver for the whole site,
+ * so coverage can't drift per page type. scripts/seo-audit.mjs asserts every non-home route emits
+ * one whose last item is that page's own canonical.
+ */
+export function jsonLdForPath(path: string): JsonLd[] {
+  const crumbs = crumbsFor(path);
+  const nodes = pageNodes(path);
+  return crumbs.length > 0 ? [...nodes, breadcrumb(crumbs)] : nodes;
 }
 
 /** Serialize the JSON-LD nodes for a path into <script type="application/ld+json"> tags (SSG use). */

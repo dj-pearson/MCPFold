@@ -9,6 +9,8 @@
  *   - auditMetaLength: titles/descriptions must fit the SERP. Hard failures for values so long or
  *     so short they are broken; warnings for values that merely truncate. Presence and uniqueness
  *     were already guarded — length was not, so data-derived titles silently overflowed at scale.
+ *   - auditBreadcrumbs: every non-home route must emit exactly one BreadcrumbList, rooted at the
+ *     home page, with contiguous positions and a last item equal to that page's own canonical.
  *   - validateRelatedLinks: every cross-silo related link must resolve to a real route, so the
  *     internal-link mesh can never point somewhere the site doesn't serve.
  *   - validateJsonLdUrls: every internal URL a route's JSON-LD advertises (url, isPartOf,
@@ -199,6 +201,56 @@ export function validateRelatedLinks(entries, routes, { expectLinksUnder = [] } 
 }
 
 /**
+ * Breadcrumb coverage and shape (SEO-9). Breadcrumbs drive the path Google shows in place of the
+ * raw URL, which matters most on exactly the deep generated pages that had no trail at all.
+ *
+ * @param {Array<{route: string, jsonLdNodes: unknown[]}>} entries
+ * @param {{siteUrl: string}} opts
+ * @returns {string[]} problems (empty = clean)
+ */
+export function auditBreadcrumbs(entries, { siteUrl }) {
+  const problems = [];
+  for (const { route, jsonLdNodes } of entries) {
+    const lists = (jsonLdNodes ?? []).filter((n) => n && n['@type'] === 'BreadcrumbList');
+    if (route === '/') {
+      if (lists.length > 0) problems.push('/: the home page should not emit a BreadcrumbList');
+      continue;
+    }
+    if (lists.length === 0) {
+      problems.push(`${route}: no BreadcrumbList`);
+      continue;
+    }
+    if (lists.length > 1) {
+      problems.push(`${route}: ${lists.length} BreadcrumbList nodes (expected 1)`);
+      continue;
+    }
+    const items = lists[0].itemListElement ?? [];
+    if (items.length < 2) {
+      problems.push(`${route}: breadcrumb has ${items.length} item(s) — needs at least Home + self`);
+      continue;
+    }
+    items.forEach((item, i) => {
+      if (item.position !== i + 1) {
+        problems.push(`${route}: breadcrumb item ${i + 1} has position ${item.position}`);
+      }
+      if (!item.name || !String(item.name).trim()) {
+        problems.push(`${route}: breadcrumb item ${i + 1} has no name`);
+      }
+    });
+    if (items[0].item !== `${siteUrl}/`) {
+      problems.push(`${route}: breadcrumb does not start at the home page (got "${items[0].item}")`);
+    }
+    const last = items[items.length - 1];
+    if (last.item !== `${siteUrl}${route}`) {
+      problems.push(
+        `${route}: breadcrumb ends at "${last.item}", not this page's own canonical`,
+      );
+    }
+  }
+  return problems;
+}
+
+/**
  * Path prefixes this site serves that are NOT prerendered SPA routes. /docs is its own static build
  * (S8.1) deployed alongside dist/, so its URLs are live even though allRoutes() never lists them.
  */
@@ -273,6 +325,48 @@ if (process.argv.includes('--self-test')) {
   ]);
   if (lenFail.problems.length !== 2) {
     failures.push(`expected 2 length failures, got ${lenFail.problems.length}`);
+  }
+
+  // Breadcrumbs: coverage, root, ordering and self-terminating trail.
+  const crumb = (path, trail) => ({
+    route: path,
+    jsonLdNodes: [
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: trail.map((c, i) => ({
+          '@type': 'ListItem',
+          position: i + 1,
+          name: c.name,
+          item: `${siteUrl}${c.path}`,
+        })),
+      },
+    ],
+  });
+  const goodCrumbs = [
+    { route: '/', jsonLdNodes: [{ '@type': 'SoftwareApplication' }] },
+    crumb('/directory/github', [
+      { name: 'Home', path: '/' },
+      { name: 'Directory', path: '/directory' },
+      { name: 'GitHub', path: '/directory/github' },
+    ]),
+  ];
+  if (auditBreadcrumbs(goodCrumbs, { siteUrl }).length !== 0) {
+    failures.push('well-formed breadcrumbs should pass');
+  }
+  const badCrumbs = [
+    // Home must not carry a trail.
+    crumb('/', [{ name: 'Home', path: '/' }, { name: 'Home', path: '/' }]),
+    // Missing entirely.
+    { route: '/pricing', jsonLdNodes: [] },
+    // Does not start at Home, and does not end at its own canonical.
+    crumb('/guides/cursor', [
+      { name: 'Guides', path: '/guides' },
+      { name: 'Cursor', path: '/guides/zed' },
+    ]),
+  ];
+  const crumbProblems = auditBreadcrumbs(badCrumbs, { siteUrl });
+  if (crumbProblems.length !== 4) {
+    failures.push(`expected 4 breadcrumb problems, got ${crumbProblems.length}: ${crumbProblems}`);
   }
 
   // Related-links mesh: dead targets, self-links and a page type losing its block all fail.
@@ -368,6 +462,6 @@ if (process.argv.includes('--self-test')) {
     process.exit(1);
   }
   console.log(
-    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links)',
+    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links,\n     breadcrumb coverage)',
   );
 }
