@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 13
+    "completed": 14
   },
   "items": [
     {
@@ -29,11 +29,11 @@
     {
       "id": "SEO-2",
       "title": "Rasterize per-page OG cards to PNG",
-      "status": "todo",
+      "status": "done",
       "impact": "high",
       "effort": "m",
       "problem": "gen-og.mjs emits dist/og/<route>.svg and gen-seo.mjs wires it into og:image and twitter:image for every route. Facebook, LinkedIn, X/Twitter, Slack and Discord all REJECT image/svg+xml for og:image, so every page except the home fallback (/og.png) currently renders a blank social card. The code comment in gen-og.mjs already flags this as a deferred follow-up.",
-      "solution": "Add @resvg/resvg-js (or sharp) as an apps/site devDependency; rasterize renderOgSvg() output to 1200x630 PNG in the gen-seo route loop, write dist/og/<route>.png, and point og:image/twitter:image at the PNG. Keep the SVG alongside for debugging. Embed the Inter font bytes or fall back to a system sans that resvg can resolve inside CI containers (resvg does not inherit browser font fallback). Add og:image:width/height/alt per route, and an e2e assertion that og:image ends in .png and returns content-type image/png.",
+      "solution": "gen-og.mjs gained rasterizeOgSvg() via @resvg/resvg-js (new devDependency), kept as a SOFT dependency: when the rasterizer or its native binary is unavailable on the build image, the tags fall back to the shared static /og.png rather than an SVG — a generic card that renders beats a per-page card that doesn't — and the build warns loudly. gen-seo now writes the SVG as source of truth plus a PNG, and rewrites og:image:width/height per page to match whichever asset it used. auditSocialCards fails the build on an SVG og:image or twitter:image, a non-numeric declared size, or a missing og:image:alt.",
       "risks": [
         "resvg native binary must resolve on the Cloudflare Pages / CI build image",
         "font availability in the build container"
@@ -41,9 +41,14 @@
       "files": [
         "scripts/gen-og.mjs",
         "scripts/gen-seo.mjs",
-        "package.json",
-        "test/seo.e2e.ts"
-      ]
+        "scripts/headings.mjs",
+        "index.html",
+        "package.json"
+      ],
+      "iteration": 14,
+      "also_fixed": "Every non-home page declared og:image:width=1280 / height=640 (the static card's size) while pointing at a 1200x630 per-page card — gen-seo rewrote the URL but never the dimensions. Also added the og:image:alt tag, which the site had never emitted.",
+      "unverified": "NOT executable-verified: node_modules is absent in the session container, so @resvg/resvg-js was never installed or run. The soft-dependency design means a failure there degrades to the static card rather than breaking the build, and auditSocialCards catches any SVG that slips through. First real CI build should confirm the '⚠ no OG rasterizer available' warning does NOT appear and spot-check a dist/og/*.png.",
+      "verify": "node scripts/headings.mjs --self-test; then confirm dist/og/*.png exist after a real build"
     },
     {
       "id": "SEO-3",

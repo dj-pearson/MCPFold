@@ -127,6 +127,44 @@ export function auditImages(pages) {
   return { problems, warnings };
 }
 
+/**
+ * Social-card audit (SEO-2). Facebook, LinkedIn, X, Slack and Discord all reject image/svg+xml for
+ * og:image, so an SVG card is a blank box on every surface that matters — and the failure is
+ * invisible from the site itself. Also checks that the declared dimensions exist, since a scraper
+ * that trusts a wrong width/height crops the card.
+ *
+ * @param {Array<{route: string, html: string}>} pages
+ * @returns {string[]} problems (empty = clean)
+ */
+export function auditSocialCards(pages) {
+  const problems = [];
+  const meta = (html, attr, key) => {
+    const re = new RegExp(`<meta[^>]*\\b${attr}="${key}"[^>]*\\bcontent="([^"]*)"`, 'i');
+    return re.exec(html)?.[1];
+  };
+  for (const { route, html } of pages) {
+    for (const [attr, key] of [
+      ['property', 'og:image'],
+      ['name', 'twitter:image'],
+    ]) {
+      const url = meta(html, attr, key);
+      if (!url) {
+        problems.push(`${route}: no ${key}`);
+      } else if (/\.svg(\?|#|$)/i.test(url)) {
+        problems.push(`${route}: ${key} is an SVG ("${url}") — every major scraper rejects it`);
+      }
+    }
+    for (const key of ['og:image:width', 'og:image:height']) {
+      const value = meta(html, 'property', key);
+      if (!value || !/^\d+$/.test(value)) {
+        problems.push(`${route}: ${key} is "${value ?? 'missing'}"`);
+      }
+    }
+    if (!meta(html, 'property', 'og:image:alt')) problems.push(`${route}: no og:image:alt`);
+  }
+  return problems;
+}
+
 // --- Self-test -------------------------------------------------------------------------------
 if (process.argv.includes('--self-test')) {
   const failures = [];
@@ -206,11 +244,29 @@ if (process.argv.includes('--self-test')) {
     !imgClean.warnings.some((w) => w.includes('empty alt')),
   );
 
+  // --- Social cards (SEO-2) ---
+  const card = (url) =>
+    `<meta property="og:image" content="${url}" />` +
+    `<meta property="og:image:width" content="1200" />` +
+    `<meta property="og:image:height" content="630" />` +
+    `<meta property="og:image:alt" content="A page" />` +
+    `<meta name="twitter:image" content="${url}" />`;
+  expect(
+    'a PNG card passes',
+    auditSocialCards([{ route: '/a', html: card('https://x/og/a.png') }]).length === 0,
+  );
+  const svgCard = auditSocialCards([{ route: '/a', html: card('https://x/og/a.svg') }]);
+  expect('an SVG card fails for both og and twitter', svgCard.length === 2);
+  expect('the SVG failure names the format', svgCard.every((p) => p.includes('rejects it')));
+  const bare = auditSocialCards([{ route: '/a', html: '<meta charset="utf-8">' }]);
+  // og:image, twitter:image, width, height, alt
+  expect(`a page with no card tags fails (got ${bare.length})`, bare.length === 5);
+
   if (failures.length) {
-    console.error('✗ headings/images self-test FAILED:\n  ' + failures.join('\n  '));
+    console.error('✗ headings/images/cards self-test FAILED:\n  ' + failures.join('\n  '));
     process.exit(1);
   }
   console.log(
-    '✓ headings/images self-test passed (single h1, level skips, main scoping; alt text, dimensions, loading hints)',
+    '✓ headings/images/cards self-test passed (single h1, level skips, main scoping; alt text,\n     dimensions, loading hints; no SVG social cards, declared card size)',
   );
 }

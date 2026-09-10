@@ -6,7 +6,8 @@
  *   1. imports the SSR bundle (dist-ssr/entry-server.js, built by `vite build --ssr`),
  *   2. for each route, renders the app to HTML, reconciles the per-route <title>/description/OG/
  *      canonical (single source of truth: resolveMeta), injects per-page-type JSON-LD, and writes a
- *      per-page OG card (dist/og/<route>.svg) wired into og:image / twitter:image,
+ *      per-page OG card rasterized to dist/og/<route>.png and wired into og:image/twitter:image
+ *      with matching dimensions (scrapers reject SVG),
  *   3. writes dist/<route>/index.html (the client hydrates it in place),
  *   4. AUDITS every route (S15.8): fails the build on a route missing/duplicating meta, a
  *      keyword→page target that isn't a real route, JSON-LD that links to a non-route, or a
@@ -24,7 +25,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pathToFileURL } from 'node:url';
 import { DIRECTORY } from '../../../packages/core/dist/index.js';
-import { renderOgSvg, ogPathForRoute } from './gen-og.mjs';
+import {
+  OG_HEIGHT,
+  OG_WIDTH,
+  ogPathForRoute,
+  rasterizeOgSvg,
+  renderOgSvg,
+} from './gen-og.mjs';
 import {
   auditMeta,
   auditBreadcrumbs,
@@ -39,7 +46,7 @@ import {
 import { createLastmodResolver } from './lastmod.mjs';
 import { renderFeed } from './feed.mjs';
 import { auditLinkGraph, readPrerenderedPages } from './link-graph.mjs';
-import { auditHeadings, auditImages } from './headings.mjs';
+import { auditHeadings, auditImages, auditSocialCards } from './headings.mjs';
 
 const SITE_URL = 'https://mcpfold.com';
 // Build date — used as the lastmod fallback only (see createLastmodResolver below). sitemap.xml
@@ -68,7 +75,7 @@ const esc = (s) =>
 const shell = readFileSync(join(dist, 'index.html'), 'utf8');
 
 /** Reconcile <head> SEO tags + inject JSON-LD + the rendered app body into the built shell. */
-function pageHtml(route, meta, appHtml, jsonLd, ogUrl) {
+function pageHtml(route, meta, appHtml, jsonLd, og) {
   return shell
     .replace(/<title>[\s\S]*?<\/title>/, `<title>${esc(meta.title)}</title>`)
     .replace(/(<meta\s+name="description"\s+content=")[\s\S]*?(")/, `$1${esc(meta.description)}$2`)
@@ -78,16 +85,45 @@ function pageHtml(route, meta, appHtml, jsonLd, ogUrl) {
       `$1${esc(meta.description)}$2`,
     )
     .replace(/(<meta property="og:url" content=")[\s\S]*?(")/, `$1${esc(meta.canonical)}$2`)
-    .replace(/(<meta property="og:image" content=")[\s\S]*?(")/, `$1${esc(ogUrl)}$2`)
+    .replace(/(<meta property="og:image" content=")[\s\S]*?(")/, `$1${esc(og.url)}$2`)
+    .replace(/(<meta property="og:image:width" content=")[\s\S]*?(")/, `$1${og.width}$2`)
+    .replace(/(<meta property="og:image:height" content=")[\s\S]*?(")/, `$1${og.height}$2`)
+    .replace(/(<meta property="og:image:alt" content=")[\s\S]*?(")/, `$1${esc(meta.title)}$2`)
     .replace(/(<meta name="twitter:title" content=")[\s\S]*?(")/, `$1${esc(meta.title)}$2`)
     .replace(
       /(<meta\s+name="twitter:description"\s+content=")[\s\S]*?(")/,
       `$1${esc(meta.description)}$2`,
     )
-    .replace(/(<meta name="twitter:image" content=")[\s\S]*?(")/, `$1${esc(ogUrl)}$2`)
+    .replace(/(<meta name="twitter:image" content=")[\s\S]*?(")/, `$1${esc(og.url)}$2`)
     .replace(/(<link rel="canonical" href=")[\s\S]*?(")/, `$1${esc(meta.canonical)}$2`)
     .replace('</head>', `${jsonLd}</head>`)
     .replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
+}
+
+/**
+ * SEO-2: every social scraper that matters (Facebook, LinkedIn, X, Slack, Discord) rejects
+ * image/svg+xml for og:image, so the per-page SVG cards rendered as blank boxes everywhere. Write
+ * the SVG as the source of truth, rasterize it to PNG, and point the tags at the PNG.
+ *
+ * When no rasterizer is available the tags fall back to the shared static /og.png rather than an
+ * SVG — a generic card that renders beats a per-page card that doesn't. The build says so loudly.
+ */
+const STATIC_OG = { url: `${SITE_URL}/og.png`, width: 1280, height: 640 };
+let rasterized = 0;
+
+async function ogCard(route, title) {
+  const svg = renderOgSvg({ title });
+  const svgRel = ogPathForRoute(route);
+  mkdirSync(dirname(join(dist, svgRel)), { recursive: true });
+  writeFileSync(join(dist, svgRel), svg);
+
+  const png = await rasterizeOgSvg(svg);
+  if (!png) return STATIC_OG;
+
+  const pngRel = ogPathForRoute(route, 'png');
+  writeFileSync(join(dist, pngRel), png);
+  rasterized++;
+  return { url: `${SITE_URL}/${pngRel}`, width: OG_WIDTH, height: OG_HEIGHT };
 }
 
 const routes = allRoutes();
@@ -100,14 +136,7 @@ for (const route of routes) {
   jsonLdByRoute.push({ route, jsonLdNodes });
   relatedByRoute.push({ route, relatedHrefs });
 
-  // Per-page OG card, wired into this page's og:image / twitter:image.
-  const ogRel = ogPathForRoute(route);
-  const ogOut = join(dist, ogRel);
-  mkdirSync(dirname(ogOut), { recursive: true });
-  writeFileSync(ogOut, renderOgSvg({ title: meta.title }));
-  const ogUrl = `${SITE_URL}/${ogRel}`;
-
-  const html = pageHtml(route, meta, appHtml, jsonLd, ogUrl);
+  const html = pageHtml(route, meta, appHtml, jsonLd, await ogCard(route, meta.title));
   // "/" writes dist/index.html; "/x/y" writes dist/x/y/index.html.
   const outDir = route === '/' ? dist : join(dist, ...route.split('/').filter(Boolean));
   mkdirSync(outDir, { recursive: true });
@@ -118,16 +147,20 @@ for (const route of routes) {
 // serves with a real 404 status for unmatched paths. Not in allRoutes/sitemap and not audited.
 {
   const { appHtml, meta, jsonLd } = render('/404');
-  const ogRel = ogPathForRoute('/404');
-  mkdirSync(dirname(join(dist, ogRel)), { recursive: true });
-  writeFileSync(join(dist, ogRel), renderOgSvg({ title: meta.title }));
   writeFileSync(
     join(dist, '404.html'),
-    pageHtml('/404', meta, appHtml, jsonLd, `${SITE_URL}/${ogRel}`),
+    pageHtml('/404', meta, appHtml, jsonLd, await ogCard('/404', meta.title)),
   );
 }
 
 // --- Technical-SEO guards (S15.8): fail the build on meta/tracking problems ------------------
+if (rasterized === 0) {
+  console.warn(
+    '⚠ no OG rasterizer available (@resvg/resvg-js) — every page falls back to the shared /og.png.\n' +
+      '  Per-page cards need the devDependency installed on the build image.',
+  );
+}
+
 const prerendered = readPrerenderedPages(dist);
 // public/_redirects is copied into dist by Vite; audit the copy that actually ships.
 const redirectsFile = join(dist, '_redirects');
@@ -185,6 +218,8 @@ const problems = [
   ...auditLinkGraph(prerendered, routes),
   ...auditHeadings(prerendered),
   ...imageProblems,
+  // SEO-2: an SVG og:image is a blank card on every social surface, invisibly.
+  ...auditSocialCards(prerendered),
   // SEO-10: a redirect whose target was renamed 301s into a 404 and spends the link equity on the way.
   ...(existsSync(redirectsFile)
     ? auditRedirects(readFileSync(redirectsFile, 'utf8'), routes)

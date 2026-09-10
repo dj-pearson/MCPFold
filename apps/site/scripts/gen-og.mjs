@@ -8,12 +8,18 @@
  *
  * Run standalone (`node scripts/gen-og.mjs`) to (re)generate every card from the SSR bundle.
  *
- * SVG keeps the pipeline dependency-free and crisp at any size; rasterizing to PNG at the edge (for
- * the few scrapers that reject SVG) is a documented deploy-time follow-up — see docs/seo-measurement.md.
+ * SEO-2: the cards are RASTERIZED to PNG before shipping. "A few scrapers reject SVG" was too
+ * generous — Facebook, LinkedIn, X, Slack and Discord all refuse image/svg+xml for og:image, so an
+ * SVG card renders as a blank box everywhere it matters. The SVG is still the source of truth (it
+ * stays dependency-free and diffable); rasterization happens once at build time.
  */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+/** The card's intrinsic size. og:image:width/height must agree with it, or scrapers crop. */
+export const OG_WIDTH = 1200;
+export const OG_HEIGHT = 630;
 
 const xml = (s) =>
   String(s)
@@ -62,10 +68,53 @@ export function renderOgSvg({ title, eyebrow = 'mcpfold', domain = 'mcpfold.com'
 `;
 }
 
-/** Map a route pathname to its OG file path under dist/og (mirrors the route tree). */
-export function ogPathForRoute(route) {
-  if (route === '/') return 'og/index.svg';
-  return `og/${route.split('/').filter(Boolean).join('/')}.svg`;
+/**
+ * Map a route pathname to its OG file path under dist/og (mirrors the route tree).
+ *
+ * @param {string} route
+ * @param {'svg'|'png'} [ext]
+ */
+export function ogPathForRoute(route, ext = 'svg') {
+  if (route === '/') return `og/index.${ext}`;
+  return `og/${route.split('/').filter(Boolean).join('/')}.${ext}`;
+}
+
+/**
+ * Load the SVG rasterizer once, or return null when it isn't installed.
+ *
+ * Kept as a soft dependency on purpose: if the rasterizer is missing or its native binary won't
+ * load on the build image, the build must still produce a card format scrapers accept — it falls
+ * back to the shared static /og.png rather than shipping an SVG that renders blank. A broken
+ * per-page card is a nuisance; a blank card on every page is the bug this story exists to fix.
+ */
+let rasterizerPromise;
+export function loadRasterizer() {
+  rasterizerPromise ??= import('@resvg/resvg-js')
+    .then((mod) => mod.Resvg ?? mod.default?.Resvg ?? null)
+    .catch(() => null);
+  return rasterizerPromise;
+}
+
+/**
+ * Render an OG card SVG to PNG bytes, or null when no rasterizer is available.
+ *
+ * @param {string} svg
+ * @returns {Promise<Buffer|null>}
+ */
+export async function rasterizeOgSvg(svg) {
+  const Resvg = await loadRasterizer();
+  if (!Resvg) return null;
+  try {
+    // The card is pure text on flat rectangles, so system fonts are enough; the SVG's font-family
+    // already falls back to a generic sans that every build image provides.
+    const resvg = new Resvg(svg, {
+      fitTo: { mode: 'width', value: OG_WIDTH },
+      font: { loadSystemFonts: true, defaultFontFamily: 'DejaVu Sans' },
+    });
+    return resvg.render().asPng();
+  } catch {
+    return null;
+  }
 }
 
 // --- Standalone: regenerate every card from the SSR bundle ----------------------------------
@@ -79,12 +128,18 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   }
   const { allRoutes, render } = await import(pathToFileURL(ssrEntry).href);
   let n = 0;
+  let png = 0;
   for (const route of allRoutes()) {
     const svg = renderOgSvg({ title: render(route).meta.title });
     const out = join(dist, ogPathForRoute(route));
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, svg);
+    const bytes = await rasterizeOgSvg(svg);
+    if (bytes) {
+      writeFileSync(join(dist, ogPathForRoute(route, 'png')), bytes);
+      png++;
+    }
     n++;
   }
-  console.log(`✓ generated ${n} per-page OG cards under dist/og/`);
+  console.log(`✓ generated ${n} per-page OG cards under dist/og/ (${png} rasterized to PNG)`);
 }

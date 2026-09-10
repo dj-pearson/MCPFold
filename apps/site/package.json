@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
+    "@resvg/resvg-js": "^2.6.2",
     "@playwright/test": "^1.47.2",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
