@@ -11,7 +11,8 @@
  *   4. AUDITS every route (S15.8): fails the build on a route missing/duplicating meta, a
  *      keyword→page target that isn't a real route, JSON-LD that links to a non-route, or a
  *      title/description outside the SERP length budget, and then re-reads the written HTML to
- *      audit the internal link graph — dead links, orphan pages, pages with no links at all,
+ *      audit the internal link graph (dead links, orphans, pages with no links) and each page's
+ *      heading outline (one h1, no empty headings, no skipped levels),
  *   5. regenerates feed.xml (blog RSS) and a scaled sitemap index + typed child sitemaps, each URL
  *      dated by the content behind it (scripts/lastmod.mjs), not by the build clock.
  * robots.txt ships from public/.
@@ -34,6 +35,7 @@ import {
 import { createLastmodResolver } from './lastmod.mjs';
 import { renderFeed } from './feed.mjs';
 import { auditLinkGraph, readPrerenderedPages } from './link-graph.mjs';
+import { auditHeadings } from './headings.mjs';
 
 const SITE_URL = 'https://mcpfold.com';
 // Build date — used as the lastmod fallback only (see createLastmodResolver below). sitemap.xml
@@ -120,6 +122,7 @@ for (const route of routes) {
 }
 
 // --- Technical-SEO guards (S15.8): fail the build on meta/tracking problems ------------------
+const prerendered = readPrerenderedPages(dist);
 // SEO-6: length is a separate tier — a value past the SERP cut is a warning, one so long or short
 // that the snippet is unusable fails the build.
 const { problems: lengthProblems, warnings } = auditMetaLength(metaByRoute);
@@ -150,9 +153,10 @@ const problems = [
       '/blog/',
     ],
   }),
-  // SEO-8: read back what actually shipped. Data-level guards can't see a page nothing links to,
-  // or a link the shell emits to a path that no longer exists.
-  ...auditLinkGraph(readPrerenderedPages(dist), routes),
+  // SEO-8 + SEO-11: read back what actually shipped, in one pass. Data-level guards can't see a
+  // page nothing links to, a link the shell emits to a dead path, or a broken heading outline.
+  ...auditLinkGraph(prerendered, routes),
+  ...auditHeadings(prerendered),
 ];
 if (problems.length > 0) {
   console.error(`✗ SEO audit failed (${problems.length}):\n  ${problems.join('\n  ')}`);

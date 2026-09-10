@@ -88,6 +88,10 @@ export function InstallPage() {
           </span>
         </p>
 
+        {/* SEO-11: the channel cards below are <h3>; without this section heading the outline
+            jumped h1 → h3, which the build's heading audit now rejects. */}
+        <h2 id="channels-heading">Choose an install channel</h2>
+
         <div
           role="tablist"
           aria-label="Operating system"

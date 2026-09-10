@@ -73,7 +73,11 @@ export function auditLinkGraph(pages, routes) {
   return problems;
 }
 
-/** Read a built dist/ into `[{route, hrefs}]`. "/" is dist/index.html; "/x/y" is dist/x/y/index.html. */
+/**
+ * Read a built dist/ into `[{route, html, hrefs}]`. "/" is dist/index.html; "/x/y" is
+ * dist/x/y/index.html. The raw HTML rides along so other post-build audits (headings, images) can
+ * reuse one pass over the files rather than re-reading every page.
+ */
 export function readPrerenderedPages(dist) {
   const pages = [];
   const walk = (dir) => {
@@ -83,10 +87,8 @@ export function readPrerenderedPages(dist) {
         walk(full);
       } else if (name === 'index.html') {
         const rel = relative(dist, dir).split(sep).filter(Boolean).join('/');
-        pages.push({
-          route: rel ? `/${rel}` : '/',
-          hrefs: internalHrefsFromHtml(readFileSync(full, 'utf8')),
-        });
+        const html = readFileSync(full, 'utf8');
+        pages.push({ route: rel ? `/${rel}` : '/', html, hrefs: internalHrefsFromHtml(html) });
       }
     }
   };

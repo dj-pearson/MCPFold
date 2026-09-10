@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 8
+    "completed": 9
   },
   "items": [
     {
@@ -185,14 +185,21 @@
     {
       "id": "SEO-11",
       "title": "Heading hierarchy audit on prerendered HTML",
-      "status": "todo",
+      "status": "done",
       "impact": "medium",
       "effort": "s",
       "problem": "No guard that each prerendered page has exactly one <h1>, that it is non-empty, that it contains the page's focus keyword, and that heading levels do not skip.",
-      "solution": "Extend the build audit to parse dist HTML for the heading outline and fail on violations.",
+      "solution": "scripts/headings.mjs audits each page's heading outline, scoped to <main> so the shared header, Related block and footer (an <h2> per group on every page) don't drown the signal. Fails the build on a missing or duplicated <h1>, an empty heading at any level, or a level skip. Reuses the single dist read that the link-graph audit already does (readPrerenderedPages now returns the HTML alongside the hrefs). Found and fixed a real violation: /install went h1 -> h3 -> h2, because the install-channel cards had no section heading above them; added 'Choose an install channel' as the h2.",
       "files": [
-        "scripts/seo-audit.mjs"
-      ]
+        "scripts/headings.mjs",
+        "scripts/link-graph.mjs",
+        "scripts/gen-seo.mjs",
+        "src/install/InstallPage.tsx",
+        "package.json"
+      ],
+      "iteration": 9,
+      "deferred": "The h1-contains-focus-keyword check from the original plan was left out — too brittle to fail a build on, and keywordFor() lives in TS that the audit script doesn't import. Revisit as a warning tier if wanted, alongside SEO-15's keyword-coverage report.",
+      "verify": "node scripts/headings.mjs --self-test"
     },
     {
       "id": "SEO-12",
