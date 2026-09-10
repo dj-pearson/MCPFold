@@ -23,6 +23,7 @@ import { DIRECTORY } from '../../../packages/core/dist/index.js';
 import { renderOgSvg, ogPathForRoute } from './gen-og.mjs';
 import { auditMeta, validateJsonLdUrls, validateKeywordPages } from './seo-audit.mjs';
 import { createLastmodResolver } from './lastmod.mjs';
+import { renderFeed } from './feed.mjs';
 
 const SITE_URL = 'https://mcpfold.com';
 // Build date — used as the lastmod fallback only (see createLastmodResolver below). sitemap.xml
@@ -141,16 +142,9 @@ const posts = (existsSync(blogDir) ? readdirSync(blogDir) : [])
   })
   .sort((a, b) => b.date.localeCompare(a.date));
 
-const items = posts
-  .map(
-    (p) =>
-      `    <item>\n      <title>${esc(p.title)}</title>\n      <link>${SITE_URL}/blog/${p.slug}</link>\n      <guid>${SITE_URL}/blog/${p.slug}</guid>\n      <description>${esc(p.description)}</description>\n      <pubDate>${p.date}</pubDate>\n    </item>`,
-  )
-  .join('\n');
-writeFileSync(
-  join(dist, 'feed.xml'),
-  `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title>mcpfold blog</title>\n    <link>${SITE_URL}/blog</link>\n    <description>Launches, deep-dives, and release notes from mcpfold.</description>\n${items}\n  </channel>\n</rss>\n`,
-);
+// SEO-3: RFC-822 dates + channel metadata (atom self link, language, lastBuildDate) so the feed is
+// actually valid RSS 2.0 and orderable by readers. index.html advertises it via <link rel=alternate>.
+writeFileSync(join(dist, 'feed.xml'), renderFeed({ siteUrl: SITE_URL, posts }));
 
 // --- Sitemap at scale (S15.8): a sitemap index + typed child sitemaps, each with lastmod --------
 // Classify every route into a typed bucket by its first segment so the sitemap scales cleanly as

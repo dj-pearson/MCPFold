@@ -36,6 +36,31 @@ test('sitemap.xml is a sitemap index that references typed child sitemaps with l
   }
 });
 
+test('feed.xml is valid RSS with RFC-822 dates and is advertised in <head>', async ({
+  request,
+}) => {
+  // SEO-3: a date-only pubDate is not RSS 2.0 and readers cannot order the feed by it.
+  const feed = await rawText(request, '/feed.xml');
+  expect(feed).toContain('xmlns:atom="http://www.w3.org/2005/Atom"');
+  expect(feed).toContain('rel="self"');
+  expect(feed).toContain('<language>');
+  expect(feed).toContain('<lastBuildDate>');
+
+  const dates = [...feed.matchAll(/<(?:pubDate|lastBuildDate)>([^<]+)</g)].map((m) => m[1]!);
+  expect(dates.length, 'feed carries dates').toBeGreaterThan(0);
+  for (const d of dates) {
+    expect(d, 'RFC-822 date').toMatch(
+      /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/,
+    );
+    expect(Number.isNaN(Date.parse(d)), `"${d}" parses`).toBe(false);
+  }
+
+  // Autodiscovery from an arbitrary page, not just /blog.
+  const html = await rawText(request, '/pricing');
+  expect(html).toContain('type="application/rss+xml"');
+  expect(html).toContain('/feed.xml');
+});
+
 test('sitemap lastmod is per-URL content dating, not one uniform build date', async ({
   request,
 }) => {

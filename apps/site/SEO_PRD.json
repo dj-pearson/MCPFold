@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 2
+    "completed": 3
   },
   "items": [
     {
@@ -48,16 +48,20 @@
     {
       "id": "SEO-3",
       "title": "RSS feed is invalid and undiscoverable",
-      "status": "todo",
+      "status": "done",
       "impact": "medium",
       "effort": "s",
       "problem": "feed.xml emits <pubDate>2026-01-05</pubDate> — RSS 2.0 requires RFC-822 dates, so readers and Google's blog discovery reject or mis-sort the items. The channel also lacks <language>, <lastBuildDate>, <atom:link rel=\"self\">, and nothing in <head> advertises the feed (no <link rel=\"alternate\" type=\"application/rss+xml\">), so it is effectively unlinked.",
-      "solution": "Convert frontmatter dates to RFC-822 in gen-seo.mjs, add the atom self link + language + lastBuildDate, and add the alternate link to index.html (and to the prerendered shell). Add a feed e2e that parses the dates.",
+      "solution": "New scripts/feed.mjs (pure, self-tested) renders the feed: rfc822() converts frontmatter dates to GMT RFC-822 without day-shifting date-only values, an unparseable date drops the pubDate rather than emitting garbage, and the channel now carries atom:link rel=self, language, lastBuildDate (newest post, not the build clock) and guid isPermaLink. index.html adds <link rel=alternate type=application/rss+xml> so the feed is discoverable from every prerendered page, not just /blog.",
       "files": [
+        "scripts/feed.mjs",
         "scripts/gen-seo.mjs",
         "index.html",
-        "test/blog.e2e.ts"
-      ]
+        "test/seo.e2e.ts",
+        "package.json"
+      ],
+      "iteration": 3,
+      "verify": "node scripts/feed.mjs --self-test; e2e 'feed.xml is valid RSS with RFC-822 dates'"
     },
     {
       "id": "SEO-4",

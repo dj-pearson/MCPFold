@@ -10,7 +10,7 @@
     "build": "tsc --noEmit && vite build && vite build --ssr src/ssg/entry-server.tsx --outDir dist-ssr && node scripts/gen-seo.mjs && node scripts/gen-llms.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "seo:audit": "node scripts/seo-audit.mjs --self-test && node scripts/lastmod.mjs --self-test",
+    "seo:audit": "node scripts/seo-audit.mjs --self-test && node scripts/lastmod.mjs --self-test && node scripts/feed.mjs --self-test",
     "indexnow": "node scripts/indexnow.mjs",
     "e2e": "playwright test",
     "e2e:prerender": "playwright test --config playwright.prerender.config.ts",
