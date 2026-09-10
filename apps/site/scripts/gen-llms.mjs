@@ -7,7 +7,8 @@
  */
 import { existsSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { auditLlmsCoverage } from './seo-audit.mjs';
 
 const SITE_URL = 'https://mcpfold.com';
 const here = dirname(fileURLToPath(import.meta.url));
@@ -56,7 +57,32 @@ const LINKS = [
   ],
   ['Adapter coverage', '/docs/coverage.html', 'The 12 supported clients and their formats.'],
   ['Directory', '/directory', 'Curated, community-maintained directory of MCP servers.'],
+  // SEO-14: the generated page types were missing from the map entirely, so an answer engine
+  // reading llms.txt never learned the site had per-client guides or a glossary at all.
+  [
+    'Per-client setup guides',
+    '/guides',
+    'Copy-paste setup for all 18 clients — config path, format, secrets, restart behaviour.',
+  ],
+  [
+    'MCP glossary',
+    '/glossary',
+    'Neutral definitions: MCP server, Model Context Protocol, MCP client, tools, context window.',
+  ],
+  ['Comparisons', '/compare', 'By hand vs hosted gateway vs mcpfold, stated factually.'],
+  ['Features', '/features', 'One config, tool curation, secrets as references, sync/diff/drift.'],
+  ['Use cases', '/use-cases', 'The same product framed for solo developers, teams and power users.'],
+  [
+    'MCP token calculator',
+    '/mcp-token-calculator',
+    'Free client-side estimate of what your MCP servers cost in tool-schema tokens per turn.',
+  ],
   ['Pricing', '/pricing', 'Free CLI (MIT); optional paid cloud team features.'],
+  [
+    'Security & trust',
+    '/security',
+    'Secrets as references, local-first by default, redacted diagnostics, telemetry off.',
+  ],
   [
     'Team config-as-code',
     '/docs/team-config-as-code.html',
@@ -142,4 +168,21 @@ const llmsFull = [
 
 writeFileSync(join(dist, 'llms.txt'), llms);
 writeFileSync(join(dist, 'llms-full.txt'), llmsFull);
+
+// SEO-14: the link map is hand-maintained, so it drifts. Fail the build when a page the keyword
+// map is actively trying to win is unreachable from llms.txt — directly or through its hub.
+const ssrEntry = join(here, '..', 'dist-ssr', 'entry-server.js');
+if (existsSync(ssrEntry)) {
+  const { keywordRows } = await import(pathToFileURL(ssrEntry).href);
+  const gaps = auditLlmsCoverage(
+    llms,
+    keywordRows().map((r) => r.page),
+    { siteUrl: SITE_URL },
+  );
+  if (gaps.length > 0) {
+    console.error(`✗ llms.txt coverage (${gaps.length}):\n  ${gaps.join('\n  ')}`);
+    process.exit(1);
+  }
+}
+
 console.log('✓ generated /llms.txt + /llms-full.txt');

@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 11
+    "completed": 12
   },
   "items": [
     {
@@ -236,16 +236,19 @@
     {
       "id": "SEO-14",
       "title": "GEO: llms.txt completeness and per-page AI answerability",
-      "status": "todo",
+      "status": "done",
       "impact": "medium",
       "effort": "m",
-      "problem": "scripts/gen-llms.mjs exists but its coverage against allRoutes() is unverified, and answer engines favour pages that state a direct answer in the first 200 words with a scannable definition block. FAQ coverage (src/seo/faq.ts) is partial.",
-      "solution": "Audit llms.txt for full route coverage in the build, extend FAQ coverage to every deep page type with real questions from the keyword map, and add a lead-answer paragraph pattern to the page templates.",
+      "problem": "FAQ units existed on five hand-written pages (/, /install, /directory, /pricing, the calculator). The generated pages — 18 client guides, 7 glossary terms, 89 directory entries — had none, and those are exactly the pages an answer engine reaches for. llms.txt was a hand-maintained link list that had drifted: it never mentioned the guides, glossary, compare, features, use-cases or the token calculator at all, so an assistant reading it never learned those page types existed.",
+      "solution": "faqsForPath now derives FAQ units for guide, glossary and directory-entry pages from real adapter and directory data — config path and key, restart behaviour, secret mechanism — so they are true by construction and a new client or server inherits its FAQ automatically. The secrets question is only emitted for the 'shim' and 'native-input' strategies, where the data pins the mechanism down; an 'inline' client gets no invented claim. llms.txt gained the six missing hub links plus /security, and auditLlmsCoverage fails the build when a page the keyword map targets is unreachable from the map (directly or via its listed hub).",
       "files": [
-        "scripts/gen-llms.mjs",
         "src/seo/faq.ts",
+        "scripts/gen-llms.mjs",
         "scripts/seo-audit.mjs"
-      ]
+      ],
+      "iteration": 12,
+      "deferred": "The 'lead-answer paragraph in the first 200 words' page-template pattern from the original plan is content work across every deep template, not a one-iteration change. The FAQ units deliver most of the extractability benefit; revisit the lead-answer pattern as its own item.",
+      "verify": "node scripts/seo-audit.mjs --self-test"
     },
     {
       "id": "SEO-15",

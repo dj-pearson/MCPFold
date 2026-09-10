@@ -6,6 +6,8 @@
  *   - auditMeta: every route must have a non-empty, page-specific title + description, a canonical
  *     that matches its own URL, and no two routes may share a canonical (duplicate-content guard).
  *   - validateKeywordPages: every keyword→page target must be a real, prerendered route.
+ *   - auditLlmsCoverage: every page the keyword map is trying to win must appear in llms.txt —
+ *     the answer engines' map of the site is worthless if it omits the pages that answer things.
  *   - auditKeywordMap: no keyword may be claimed by two different pages (cannibalization written
  *     down), and every page type the site generates should have at least one tracked term.
  *   - auditMetaLength: titles/descriptions must fit the SERP. Hard failures for values so long or
@@ -204,6 +206,44 @@ export function validateRelatedLinks(entries, routes, { expectLinksUnder = [] } 
     }
   }
   return problems;
+}
+
+/**
+ * llms.txt coverage (SEO-14). llms.txt is the map an answer engine reads to learn what this site
+ * can answer. It was hand-maintained, so the generated page types drifted out of it entirely — an
+ * assistant reading it never learned the site had per-client guides or a glossary.
+ *
+ * The rule is not "list every page" (a 90-entry directory dump helps nobody) but "every page we are
+ * actively trying to be the answer for must be reachable from the map, directly or via its hub".
+ *
+ * @param {string} text contents of dist/llms.txt
+ * @param {string[]} targetPages pages the keyword map tracks
+ * @param {{siteUrl: string}} opts
+ * @returns {string[]} problems (empty = clean)
+ */
+export function auditLlmsCoverage(text, targetPages, { siteUrl }) {
+  const listed = new Set(
+    [...text.matchAll(/\]\((https?:\/\/[^)]+)\)/g)]
+      .map((m) => m[1])
+      .filter((u) => u.startsWith(siteUrl))
+      .map((u) => {
+        const path = u.slice(siteUrl.length).replace(/[?#].*$/, '');
+        return path !== '/' && path.endsWith('/') ? path.slice(0, -1) : path || '/';
+      }),
+  );
+
+  const covered = (page) => {
+    if (listed.has(page)) return true;
+    // A deep page counts as covered when its hub is listed — the hub links onward to it. A
+    // single-segment page has no hub, so it must be listed in its own right.
+    const secondSlash = page.indexOf('/', 1);
+    if (secondSlash === -1) return false;
+    return listed.has(page.slice(0, secondSlash));
+  };
+
+  return [...new Set(targetPages)]
+    .filter((page) => !covered(page))
+    .map((page) => `llms.txt: nothing links to "${page}", a page the keyword map targets`);
 }
 
 /**
@@ -481,6 +521,28 @@ if (process.argv.includes('--self-test')) {
     failures.push(`expected 2 length failures, got ${lenFail.problems.length}`);
   }
 
+  // llms.txt coverage: a tracked page must be listed, or reachable via its listed hub.
+  const llms = [
+    '# mcpfold',
+    `- [Install](${siteUrl}/install): x`,
+    `- [Guides](${siteUrl}/guides): x`,
+    `- [GitHub](https://github.com/dj-pearson/MCPFold): x`,
+  ].join('\n');
+  if (auditLlmsCoverage(llms, ['/install', '/guides/cursor'], { siteUrl }).length !== 0) {
+    failures.push('a tracked page reachable via its listed hub should pass');
+  }
+  const llmsGaps = auditLlmsCoverage(llms, ['/glossary/mcp-server', '/pricing'], { siteUrl });
+  if (llmsGaps.length !== 2) {
+    failures.push(`expected 2 llms.txt coverage gaps, got ${llmsGaps.length}`);
+  }
+  // A single-segment page has no hub to inherit coverage from — it must be listed itself.
+  if (auditLlmsCoverage(llms, ['/security'], { siteUrl }).length !== 1) {
+    failures.push('a single-segment page must not be covered by a truncated pseudo-hub');
+  }
+  if (auditLlmsCoverage(llms, ['/install'], { siteUrl }).length !== 0) {
+    failures.push('a directly listed single-segment page should pass');
+  }
+
   // Keyword map: cannibalization fails, an unmeasured page type warns.
   const kwRoutes = ['/', '/guides', '/guides/cursor', '/glossary/mcp-server'];
   const kwClean = auditKeywordMap(
@@ -714,6 +776,6 @@ if (process.argv.includes('--self-test')) {
     process.exit(1);
   }
   console.log(
-    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links,\n     breadcrumb coverage,\n     entity graph,\n     redirect map,\n     keyword cannibalization + coverage)',
+    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links,\n     breadcrumb coverage,\n     entity graph,\n     redirect map,\n     keyword cannibalization + coverage,\n     llms.txt coverage)',
   );
 }

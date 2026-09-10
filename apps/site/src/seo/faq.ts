@@ -1,5 +1,9 @@
+import { DIRECTORY } from '@mcpfold/core';
 import { SITE_URL } from './meta';
 import type { JsonLd } from './jsonld';
+import { guideById, type GuideClient } from '../guides/guides.data';
+import { exampleConfigPath } from '../guides/steps';
+import { termById } from '../glossary/terms';
 
 /**
  * GEO answer layer (S15.2): extraction-friendly FAQ units. Each answer is **self-contained** (it
@@ -59,7 +63,7 @@ const INSTALL: Faq[] = [
   },
 ];
 
-const DIRECTORY: Faq[] = [
+const DIRECTORY_FAQ: Faq[] = [
   {
     question: 'What is the mcpfold MCP server directory?',
     answer:
@@ -113,14 +117,86 @@ const CALCULATOR: Faq[] = [
   },
 ];
 
+/**
+ * Derived FAQs for the deep page types (SEO-14).
+ *
+ * FAQ units existed on five hand-written pages. The generated pages — client guides, glossary
+ * terms, directory entries — had none, and those are exactly the pages an answer engine reaches
+ * for: they answer a specific question a person actually typed. Deriving the units from adapter
+ * facts and directory data means every page gets them, they are true by construction, and a new
+ * client or server inherits its FAQ without anyone writing one.
+ *
+ * Each answer stays self-contained and answer-first, matching the hand-written units above.
+ */
+function guideFaqs(client: GuideClient): Faq[] {
+  const path = exampleConfigPath(client);
+  const faqs: Faq[] = [];
+
+  if (path) {
+    faqs.push({
+      question: `Where does ${client.label} store its MCP config?`,
+      answer:
+        `${client.label} stores its MCP servers at ${path}, under the "${client.configRoot}" key. ` +
+        `mcpfold writes that file for you from one canonical mcp.config.jsonc, so you never edit it by hand.`,
+    });
+  }
+
+  faqs.push({
+    question: `Do I need to restart ${client.label} after adding an MCP server?`,
+    answer: client.needsRestart
+      ? `Yes — ${client.label} reads its MCP config at startup, so restart it after running "mcpfold sync" for the new servers to appear.`
+      : `No — ${client.label} picks up MCP config changes without a restart, so the servers are available as soon as "mcpfold sync" finishes.`,
+  });
+
+  // Only claim a mechanism the adapter data actually pins down. An 'inline' client has no secret
+  // support to describe, and inventing one here would put a false statement in front of an answer
+  // engine — the one place a wrong sentence gets quoted verbatim.
+  if (client.secretStrategy === 'shim' || client.secretStrategy === 'native-input') {
+    faqs.push({
+      question: `How do I keep secrets out of ${client.label}'s config file?`,
+      answer:
+        `Write secrets as references in your mcpfold config — for example \${env:GITHUB_PAT} — rather than as values. ` +
+        (client.secretStrategy === 'shim'
+          ? `${client.label} has no native secret placeholder, so mcpfold resolves the reference through a launch shim and the raw credential is never written into its config file.`
+          : `mcpfold translates the reference into ${client.label}'s own secret input, so the raw credential is never written into its config file.`),
+    });
+  }
+
+  return faqs;
+}
+
 /** The FAQs for a pathname (empty when the page has none). */
 export function faqsForPath(path: string): Faq[] {
   const p = path !== '/' && path.endsWith('/') ? path.slice(0, -1) : path;
   if (p === '/') return HOME;
   if (p === '/install') return INSTALL;
-  if (p === '/directory') return DIRECTORY;
+  if (p === '/directory') return DIRECTORY_FAQ;
   if (p === '/pricing') return PRICING;
   if (p === '/mcp-token-calculator') return CALCULATOR;
+
+  if (p.startsWith('/guides/')) {
+    const guide = guideById(p.slice('/guides/'.length));
+    return guide ? guideFaqs(guide) : [];
+  }
+
+  // A glossary page's H1 already is the question; the definition already is a self-contained
+  // answer. Emitting them as a FAQPage unit costs nothing and is exactly the shape that gets cited.
+  if (p.startsWith('/glossary/')) {
+    const term = termById(p.slice('/glossary/'.length));
+    return term ? [{ question: term.heading, answer: term.short }] : [];
+  }
+
+  if (p.startsWith('/directory/')) {
+    const entry = DIRECTORY.find((e) => e.id === p.slice('/directory/'.length));
+    if (!entry) return [];
+    return [
+      {
+        question: `What is the ${entry.name} MCP server?`,
+        answer: `${entry.description} You can add ${entry.name} to Claude Code, Cursor, VS Code, Windsurf, Zed and every other MCP client from one mcpfold config, with its credentials kept as references rather than values.`,
+      },
+    ];
+  }
+
   return [];
 }
 
