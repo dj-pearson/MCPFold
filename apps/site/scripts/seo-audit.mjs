@@ -9,6 +9,8 @@
  *   - auditMetaLength: titles/descriptions must fit the SERP. Hard failures for values so long or
  *     so short they are broken; warnings for values that merely truncate. Presence and uniqueness
  *     were already guarded — length was not, so data-derived titles silently overflowed at scale.
+ *   - auditEntityGraph: every route must carry the shared Organization + WebSite pair, with the
+ *     stable @id URIs the page-type nodes reference — the graph must have one subject, not many.
  *   - auditBreadcrumbs: every non-home route must emit exactly one BreadcrumbList, rooted at the
  *     home page, with contiguous positions and a last item equal to that page's own canonical.
  *   - validateRelatedLinks: every cross-silo related link must resolve to a real route, so the
@@ -201,6 +203,63 @@ export function validateRelatedLinks(entries, routes, { expectLinksUnder = [] } 
 }
 
 /**
+ * Site-wide entity graph (SEO-5). A crawler landing on any page must be able to resolve who
+ * publishes it; that only works if every route carries the same Organization and WebSite nodes
+ * under stable @id URIs that the page-type nodes reference.
+ *
+ * @param {Array<{route: string, jsonLdNodes: unknown[]}>} entries
+ * @param {{siteUrl: string}} opts
+ * @returns {string[]} problems (empty = clean)
+ */
+export function auditEntityGraph(entries, { siteUrl }) {
+  const expected = {
+    Organization: `${siteUrl}/#organization`,
+    WebSite: `${siteUrl}/#website`,
+  };
+  const problems = [];
+  for (const { route, jsonLdNodes } of entries) {
+    const nodes = jsonLdNodes ?? [];
+    for (const [type, id] of Object.entries(expected)) {
+      const found = nodes.filter((n) => n && n['@type'] === type);
+      if (found.length === 0) {
+        problems.push(`${route}: no ${type} node — the page does not resolve to the site entity`);
+      } else if (found.length > 1) {
+        problems.push(`${route}: ${found.length} ${type} nodes (expected 1)`);
+      } else if (found[0]['@id'] !== id) {
+        problems.push(`${route}: ${type} @id is "${found[0]['@id']}", expected "${id}"`);
+      }
+    }
+    // A reference to an @id that no node in the graph defines is a dangling edge.
+    const defined = new Set(nodes.map((n) => n && n['@id']).filter(Boolean));
+    for (const ref of referencedIds(nodes)) {
+      if (!defined.has(ref)) problems.push(`${route}: references undefined @id "${ref}"`);
+    }
+  }
+  return problems;
+}
+
+/** Every `{'@id': …}` reference nested anywhere in the nodes, excluding the definitions themselves. */
+function referencedIds(nodes) {
+  const refs = [];
+  const visit = (value, isRoot) => {
+    if (Array.isArray(value)) {
+      value.forEach((v) => visit(v, false));
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    // A bare {'@id': …} with no other schema keys is a reference, not a definition.
+    const keys = Object.keys(value);
+    if (!isRoot && keys.length === 1 && keys[0] === '@id') {
+      refs.push(value['@id']);
+      return;
+    }
+    for (const key of keys) if (key !== '@context') visit(value[key], false);
+  };
+  nodes.forEach((n) => visit(n, true));
+  return refs;
+}
+
+/**
  * Breadcrumb coverage and shape (SEO-9). Breadcrumbs drive the path Google shows in place of the
  * raw URL, which matters most on exactly the deep generated pages that had no trail at all.
  *
@@ -259,6 +318,9 @@ export const EXTERNALLY_SERVED = ['/docs'];
 const isExternallyServed = (path) =>
   EXTERNALLY_SERVED.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 
+/** A target with a file extension is an asset (a logo, an OG card), not a route. */
+const isStaticFile = (path) => /\.[a-z0-9]{2,5}$/i.test(path);
+
 export function validateJsonLdUrls(entries, routes, { siteUrl }) {
   const set = new Set(routes);
   const problems = [];
@@ -266,7 +328,7 @@ export function validateJsonLdUrls(entries, routes, { siteUrl }) {
     // Report each dead target once per route, however many nodes repeat it.
     const dead = new Set(
       internalUrlsIn(jsonLdNodes ?? [], siteUrl).filter(
-        (p) => !set.has(p) && !isExternallyServed(p),
+        (p) => !set.has(p) && !isExternallyServed(p) && !isStaticFile(p),
       ),
     );
     for (const p of dead) {
@@ -325,6 +387,42 @@ if (process.argv.includes('--self-test')) {
   ]);
   if (lenFail.problems.length !== 2) {
     failures.push(`expected 2 length failures, got ${lenFail.problems.length}`);
+  }
+
+  // Entity graph: the shared pair must be present with the right @id, and refs must resolve.
+  const entityOk = [
+    {
+      route: '/x',
+      jsonLdNodes: [
+        { '@type': 'Organization', '@id': `${siteUrl}/#organization` },
+        { '@type': 'WebSite', '@id': `${siteUrl}/#website`, publisher: { '@id': `${siteUrl}/#organization` } },
+        { '@type': 'TechArticle', isPartOf: { '@id': `${siteUrl}/#website` } },
+      ],
+    },
+  ];
+  if (auditEntityGraph(entityOk, { siteUrl }).length !== 0) {
+    failures.push(`connected entity graph should pass: ${auditEntityGraph(entityOk, { siteUrl })}`);
+  }
+  const entityBad = [
+    // No WebSite at all, wrong Organization @id, and a reference nothing defines.
+    {
+      route: '/y',
+      jsonLdNodes: [
+        { '@type': 'Organization', '@id': `${siteUrl}/#org` },
+        { '@type': 'TechArticle', isPartOf: { '@id': `${siteUrl}/#website` } },
+      ],
+    },
+  ];
+  const entityProblems = auditEntityGraph(entityBad, { siteUrl });
+  if (entityProblems.length !== 3) {
+    failures.push(`expected 3 entity-graph problems, got ${entityProblems.length}: ${entityProblems}`);
+  }
+  // Organization.logo is a static file, not a route — it must not read as a dead JSON-LD URL.
+  const logoLd = [
+    { route: '/', jsonLdNodes: [{ '@type': 'Organization', logo: `${siteUrl}/apple-touch-icon.png` }] },
+  ];
+  if (validateJsonLdUrls(logoLd, ['/'], { siteUrl }).length !== 0) {
+    failures.push('a static asset URL in JSON-LD must not be flagged as dead');
   }
 
   // Breadcrumbs: coverage, root, ordering and self-terminating trail.
@@ -462,6 +560,6 @@ if (process.argv.includes('--self-test')) {
     process.exit(1);
   }
   console.log(
-    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links,\n     breadcrumb coverage)',
+    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links,\n     breadcrumb coverage,\n     entity graph)',
   );
 }

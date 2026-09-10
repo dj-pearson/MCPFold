@@ -25,6 +25,51 @@ import { legalDocById } from '../legal/legal-content';
 /** A JSON-LD node. `@type` is always present; the rest is schema.org vocabulary. */
 export type JsonLd = Record<string, unknown> & { '@type': string };
 
+/**
+ * Site-wide entity graph (SEO-5).
+ *
+ * The page-type nodes were a bag of disjoint objects: nothing declared who publishes the site, the
+ * only sameAs links sat on /about, and no node carried an @id, so a crawler landing on a directory
+ * entry had no way to tie that page to the mcpfold entity. Stable @id URIs plus an Organization +
+ * WebSite pair on every route give the graph a single subject, and the page-type nodes reference it
+ * through publisher/isPartOf instead of standing alone.
+ */
+const ORG_ID = `${SITE_URL}/#organization`;
+const WEBSITE_ID = `${SITE_URL}/#website`;
+
+/** Reference to the shared entity, for embedding in a page-type node. */
+const orgRef = () => ({ '@id': ORG_ID });
+const siteRef = () => ({ '@id': WEBSITE_ID });
+
+function organization(): JsonLd {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': ORG_ID,
+    name: 'mcpfold',
+    url: SITE_URL,
+    description:
+      'An independent, open-source project: one source of truth for your MCP servers, folded out to every client.',
+    logo: `${SITE_URL}/apple-touch-icon.png`,
+    // Only profiles the project actually controls — an unverifiable sameAs is worse than none.
+    sameAs: ['https://github.com/dj-pearson/MCPFold', 'https://www.npmjs.com/package/mcpfold'],
+  };
+}
+
+function webSite(): JsonLd {
+  // Deliberately no SearchAction: Google retired the sitelinks searchbox rich result in 2023, so
+  // declaring one buys nothing and implies a search surface this site doesn't expose.
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': WEBSITE_ID,
+    name: 'mcpfold',
+    url: SITE_URL,
+    inLanguage: 'en',
+    publisher: orgRef(),
+  };
+}
+
 function softwareApplication(): JsonLd {
   return {
     '@context': 'https://schema.org',
@@ -41,6 +86,8 @@ function softwareApplication(): JsonLd {
     softwareHelp: `${SITE_URL}/docs`,
     license: 'https://opensource.org/licenses/MIT',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    publisher: orgRef(),
+    isPartOf: siteRef(),
   };
 }
 
@@ -55,7 +102,8 @@ function tokenCalculatorApp(): JsonLd {
     description:
       'Estimate how many tokens your MCP servers spend on tool definitions every turn, and how much per-client curation saves. Free and client-side — nothing is uploaded.',
     url: `${SITE_URL}/mcp-token-calculator`,
-    isPartOf: SITE_URL,
+    isPartOf: siteRef(),
+    publisher: orgRef(),
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   };
 }
@@ -219,7 +267,8 @@ function compareArticle(entry: Comparison): JsonLd {
     description: entry.intro,
     about: 'Managing Model Context Protocol (MCP) server configuration',
     url: `${SITE_URL}/compare/${entry.id}`,
-    isPartOf: `${SITE_URL}/compare`,
+    isPartOf: siteRef(),
+    publisher: orgRef(),
   };
 }
 
@@ -232,20 +281,8 @@ function featureArticle(feature: Feature): JsonLd {
     description: feature.tagline,
     about: 'mcpfold — MCP configuration management',
     url: `${SITE_URL}/features/${feature.id}`,
-    isPartOf: `${SITE_URL}/features`,
-  };
-}
-
-/** Organization node for the About page (S13.12) — the project behind mcpfold. */
-function aboutOrganization(): JsonLd {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'Organization',
-    name: 'mcpfold',
-    url: SITE_URL,
-    description:
-      'An independent, open-source project: one source of truth for your MCP servers, folded out to every client.',
-    sameAs: ['https://github.com/dj-pearson/MCPFold', 'https://www.npmjs.com/package/mcpfold'],
+    isPartOf: siteRef(),
+    publisher: orgRef(),
   };
 }
 
@@ -389,12 +426,9 @@ function pageNodes(path: string): JsonLd[] {
     return [featureArticle(feature)];
   }
 
-  // Use-case, directory-entry and blog-post pages carry no page-type schema of their own; they get
-  // their FAQs (if any) from the fall-through below and their trail from crumbsFor().
-  if (p === '/about') return [aboutOrganization(), ...faqNode];
-
-  // /community, /roadmap and /brand carry no page-type schema of their own — just their FAQs and
-  // the derived breadcrumb.
+  // /about, /community, /roadmap, /brand, use-case, directory-entry and blog-post pages carry no
+  // page-type schema of their own — they get their FAQs (if any) from the fall-through below, the
+  // shared Organization/WebSite from jsonLdForPath, and their trail from crumbsFor().
   if (p === '/community' || p === '/roadmap' || p === '/brand') return faqNode;
 
   if (p.startsWith('/directory/category/')) {
@@ -420,8 +454,13 @@ function pageNodes(path: string): JsonLd[] {
  */
 export function jsonLdForPath(path: string): JsonLd[] {
   const crumbs = crumbsFor(path);
-  const nodes = pageNodes(path);
-  return crumbs.length > 0 ? [...nodes, breadcrumb(crumbs)] : nodes;
+  return [
+    // The site-wide entity first, so every page resolves to the same subject however it is reached.
+    organization(),
+    webSite(),
+    ...pageNodes(path),
+    ...(crumbs.length > 0 ? [breadcrumb(crumbs)] : []),
+  ];
 }
 
 /** Serialize the JSON-LD nodes for a path into <script type="application/ld+json"> tags (SSG use). */

@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 7
+    "completed": 8
   },
   "items": [
     {
@@ -84,14 +84,19 @@
     {
       "id": "SEO-5",
       "title": "No Organization/WebSite node with sameAs + SearchAction",
-      "status": "todo",
+      "status": "done",
       "impact": "medium",
       "effort": "s",
-      "problem": "Entity consolidation for a brand query ('mcpfold') depends on a site-wide Organization node with sameAs links (GitHub, npm, X) and a WebSite node carrying @id, publisher, and inLanguage. Verify what jsonld.ts already emits site-wide and fill the gaps.",
-      "solution": "Emit a single Organization + WebSite pair on every route with stable @id URIs, and cross-reference them from the page-type nodes via isPartOf/publisher so the graph is connected rather than a bag of disjoint nodes.",
+      "problem": "The structured data was a bag of disjoint nodes. Nothing declared who publishes the site, the only sameAs links sat on /about, no node carried an @id, and page-type nodes used bare URL strings for isPartOf — so a crawler landing on a directory entry had no way to tie the page to the mcpfold entity.",
+      "solution": "Stable @id URIs (/#organization, /#website) plus an Organization + WebSite pair emitted on every route from jsonLdForPath. Page-type nodes now reference them through publisher/isPartOf instead of standing alone; the /about-only Organization is gone. auditEntityGraph fails the build unless every route carries exactly one of each with the expected @id and every {'@id': …} reference resolves to a node defined in the same graph. validateJsonLdUrls now allows static-asset URLs so Organization.logo doesn't read as dead.",
       "files": [
-        "src/seo/jsonld.ts"
-      ]
+        "src/seo/jsonld.ts",
+        "scripts/seo-audit.mjs",
+        "scripts/gen-seo.mjs"
+      ],
+      "iteration": 8,
+      "decision": "Deliberately no SearchAction/sitelinks searchbox: Google retired that rich result in 2023, so declaring one buys nothing and implies a search surface this site doesn't expose.",
+      "verify": "node scripts/seo-audit.mjs --self-test"
     },
     {
       "id": "SEO-6",
