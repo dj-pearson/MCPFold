@@ -6,6 +6,8 @@
  *   - auditMeta: every route must have a non-empty, page-specific title + description, a canonical
  *     that matches its own URL, and no two routes may share a canonical (duplicate-content guard).
  *   - validateKeywordPages: every keyword→page target must be a real, prerendered route.
+ *   - auditKeywordMap: no keyword may be claimed by two different pages (cannibalization written
+ *     down), and every page type the site generates should have at least one tracked term.
  *   - auditMetaLength: titles/descriptions must fit the SERP. Hard failures for values so long or
  *     so short they are broken; warnings for values that merely truncate. Presence and uniqueness
  *     were already guarded — length was not, so data-derived titles silently overflowed at scale.
@@ -202,6 +204,50 @@ export function validateRelatedLinks(entries, routes, { expectLinksUnder = [] } 
     }
   }
   return problems;
+}
+
+/**
+ * Keyword-map health (SEO-15).
+ *
+ * validateKeywordPages only proves each mapped page exists. It cannot see the two failures that
+ * actually cost rankings: the same query claimed by two pages, which splits the signal and lets
+ * Google pick the wrong one; and a whole generated page type with nothing tracked against it, which
+ * means nobody would notice if it never ranked at all.
+ *
+ * @param {Array<{keyword: string, page: string}>} rows
+ * @param {string[]} routes every prerendered route
+ * @param {{trackedPrefixes?: string[]}} [opts] page-type prefixes that must have ≥1 tracked term
+ * @returns {{problems: string[], warnings: string[]}}
+ */
+export function auditKeywordMap(rows, routes, { trackedPrefixes = [] } = {}) {
+  const problems = [];
+  const warnings = [];
+
+  // Cannibalization: one query, one canonical page.
+  const pagesByKeyword = new Map();
+  for (const { keyword, page } of rows) {
+    const key = keyword.trim().toLowerCase();
+    if (!pagesByKeyword.has(key)) pagesByKeyword.set(key, new Set());
+    pagesByKeyword.get(key).add(page);
+  }
+  for (const [keyword, pages] of pagesByKeyword) {
+    if (pages.size > 1) {
+      problems.push(
+        `keyword-map: "${keyword}" is claimed by ${pages.size} pages (${[...pages].join(', ')})`,
+      );
+    }
+  }
+
+  // Coverage: a page type the site generates but tracks nothing for.
+  const tracked = new Set(rows.map((r) => r.page));
+  for (const prefix of trackedPrefixes) {
+    const exists = routes.some((r) => r.startsWith(prefix));
+    const covered = [...tracked].some((p) => p.startsWith(prefix));
+    if (exists && !covered) {
+      warnings.push(`keyword-map: nothing tracked under "${prefix}" — that page type is unmeasured`);
+    }
+  }
+  return { problems, warnings };
 }
 
 /**
@@ -435,6 +481,37 @@ if (process.argv.includes('--self-test')) {
     failures.push(`expected 2 length failures, got ${lenFail.problems.length}`);
   }
 
+  // Keyword map: cannibalization fails, an unmeasured page type warns.
+  const kwRoutes = ['/', '/guides', '/guides/cursor', '/glossary/mcp-server'];
+  const kwClean = auditKeywordMap(
+    [
+      { keyword: 'mcp config', page: '/' },
+      { keyword: 'cursor mcp setup', page: '/guides/cursor' },
+      { keyword: 'what is an mcp server', page: '/glossary/mcp-server' },
+    ],
+    kwRoutes,
+    { trackedPrefixes: ['/guides/', '/glossary/'] },
+  );
+  if (kwClean.problems.length !== 0 || kwClean.warnings.length !== 0) {
+    failures.push(`clean keyword map should pass, got ${JSON.stringify(kwClean)}`);
+  }
+  const kwDirty = auditKeywordMap(
+    [
+      // Same query, two pages — and case/whitespace must not hide it.
+      { keyword: 'mcp config manager', page: '/' },
+      { keyword: '  MCP Config Manager ', page: '/compare/mcp-config-manager' },
+      { keyword: 'cursor mcp setup', page: '/guides/cursor' },
+    ],
+    kwRoutes,
+    { trackedPrefixes: ['/guides/', '/glossary/'] },
+  );
+  if (kwDirty.problems.length !== 1) {
+    failures.push(`expected 1 cannibalization problem, got ${kwDirty.problems.length}`);
+  }
+  if (kwDirty.warnings.length !== 1) {
+    failures.push(`expected 1 coverage warning for /glossary/, got ${kwDirty.warnings.length}`);
+  }
+
   // Redirects: targets must resolve, sources must not shadow live pages.
   const redirectRoutes = ['/', '/install', '/directory'];
   const cleanRedirects = auditRedirects(
@@ -637,6 +714,6 @@ if (process.argv.includes('--self-test')) {
     process.exit(1);
   }
   console.log(
-    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links,\n     breadcrumb coverage,\n     entity graph,\n     redirect map)',
+    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links,\n     breadcrumb coverage,\n     entity graph,\n     redirect map,\n     keyword cannibalization + coverage)',
   );
 }

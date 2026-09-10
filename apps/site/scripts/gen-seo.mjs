@@ -28,6 +28,7 @@ import {
   auditMeta,
   auditBreadcrumbs,
   auditEntityGraph,
+  auditKeywordMap,
   auditRedirects,
   auditMetaLength,
   validateJsonLdUrls,
@@ -55,7 +56,9 @@ if (!existsSync(ssrEntry)) {
   process.exit(1);
 }
 
-const { render, allRoutes, mappedPaths } = await import(pathToFileURL(ssrEntry).href);
+const { render, allRoutes, keywordRows, mappedPaths } = await import(
+  pathToFileURL(ssrEntry).href,
+);
 
 const esc = (s) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -129,13 +132,30 @@ const prerendered = readPrerenderedPages(dist);
 const redirectsFile = join(dist, '_redirects');
 // SEO-6: length is a separate tier — a value past the SERP cut is a warning, one so long or short
 // that the snippet is unusable fails the build.
-const { problems: lengthProblems, warnings } = auditMetaLength(metaByRoute);
+const { problems: lengthProblems, warnings: lengthWarnings } = auditMetaLength(metaByRoute);
+// SEO-15: cannibalization is a build failure; an unmeasured page type is a warning to act on.
+const { problems: keywordProblems, warnings: keywordWarnings } = auditKeywordMap(
+  keywordRows(),
+  routes,
+  {
+    trackedPrefixes: [
+      '/guides/',
+      '/glossary/',
+      '/compare/',
+      '/features/',
+      '/use-cases/',
+      '/directory/category/',
+    ],
+  },
+);
+const warnings = [...lengthWarnings, ...keywordWarnings];
 if (warnings.length > 0) {
-  console.warn(`⚠ SEO length warnings (${warnings.length}):\n  ${warnings.join('\n  ')}`);
+  console.warn(`⚠ SEO warnings (${warnings.length}):\n  ${warnings.join('\n  ')}`);
 }
 
 const problems = [
   ...lengthProblems,
+  ...keywordProblems,
   ...auditMeta(metaByRoute, { siteUrl: SITE_URL }),
   ...validateKeywordPages(mappedPaths(), routes),
   // SEO-4: structured data that advertises a 404 is worse than emitting none at all.

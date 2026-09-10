@@ -13,7 +13,7 @@ import { relatedFor } from '../seo/related';
  */
 export { allRoutes } from '../seo/meta';
 // S15.8: exposed to the build (gen-seo.mjs) so the keyword→page map is validated against real routes.
-export { mappedPaths } from '../seo/keyword-map';
+export { keywordRows, mappedPaths } from '../seo/keyword-map';
 
 export interface RenderResult {
   /** Rendered app HTML to drop into <div id="root">. */

@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 10
+    "completed": 11
   },
   "items": [
     {
@@ -250,15 +250,20 @@
     {
       "id": "SEO-15",
       "title": "Keyword map → page coverage gaps and cannibalization",
-      "status": "todo",
+      "status": "done",
       "impact": "medium",
       "effort": "m",
-      "problem": "validateKeywordPages only proves each mapped page exists. It does not prove the reverse — that every meaningful keyword cluster in src/seo/keyword-map.ts has a page — nor does it detect two pages targeting the same primary keyword (cannibalization).",
-      "solution": "Invert the check: report clusters with no page, and fail on two routes sharing a primary keyword. Produce a build-time coverage report to drive the next content batch.",
+      "problem": "The keyword map still said guide/glossary/compare rows 'get added when those routes land' — they landed long ago. 20 rows covered 10 pages, leaving the guides, glossary, features, use-cases and category collection pages entirely unmeasured. And validateKeywordPages only proved each mapped page exists; nothing detected the same query claimed by two pages.",
+      "solution": "Added 29 rows covering the shipped page types (7 client guides + the hub, 7 glossary terms + the hub, 4 features, 3 personas, 7 category collections) — 49 rows over 40 pages. auditKeywordMap fails the build when one query (case- and whitespace-normalized) is claimed by two pages, and warns when a generated page type has nothing tracked against it at all. Recorded the deliberate three-way split of the 'mcp config manager' cluster in the map: / owns the commercial head term, /glossary/mcp-config-manager the definitional phrasing, /compare/mcp-config-manager the comparison phrasing.",
       "files": [
         "src/seo/keyword-map.ts",
-        "scripts/seo-audit.mjs"
-      ]
+        "src/ssg/entry-server.tsx",
+        "scripts/seo-audit.mjs",
+        "scripts/gen-seo.mjs"
+      ],
+      "iteration": 11,
+      "note": "Volumes are order-of-magnitude planning estimates, consistent with the existing rows' convention — they are not measured data and should be replaced from a real keyword tool before driving decisions.",
+      "verify": "node scripts/seo-audit.mjs --self-test"
     }
   ]
 }
