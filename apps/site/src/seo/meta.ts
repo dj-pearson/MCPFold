@@ -28,8 +28,64 @@ export interface RouteMeta {
 const HOME_DESC =
   'Manage MCP servers from one config, folded out to every MCP client — Claude Code, Cursor, VS Code, Windsurf, Zed. Secret references, not hardcoded values.';
 
+/**
+ * Meta descriptions must fit the SERP snippet (SEO-6). Most per-page copy on this site is authored
+ * as page-body prose — feature taglines, comparison intros, glossary definitions — and was being
+ * used verbatim as the description. Several ran 200-590 characters, well past the ~155 Google
+ * renders, so the snippet was either cut mid-sentence or discarded and rewritten from the page.
+ *
+ * Clamp on a sentence boundary so the description ends on a complete thought, falling back to a
+ * word boundary with an ellipsis when even the first sentence overruns. The full prose still
+ * renders in the page body and in the JSON-LD; only the <meta> tag is trimmed.
+ */
+const DESCRIPTION_MAX = 155;
+/** Below this a clamped snippet wastes the SERP line; fall back to a word-boundary cut instead. */
+const MIN_USEFUL = 100;
+
+export function clampDescription(text: string, max: number = DESCRIPTION_MAX): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) return trimmed;
+
+  // Keep whole sentences while they fit. Sentence ends are `.`/`?`/`!` followed by a space, which
+  // avoids splitting on decimals, `e.g.`-style abbreviations sit rare enough in this copy to ignore.
+  let kept = '';
+  const sentenceEnd = /[.?!](?=\s|$)/g;
+  let match: RegExpExecArray | null;
+  while ((match = sentenceEnd.exec(trimmed)) !== null) {
+    const candidate = trimmed.slice(0, match.index + 1);
+    if (candidate.length > max) break;
+    kept = candidate;
+  }
+  // A short opening sentence ("mcpfold aims to conform to WCAG 2.2 Level AA.") would otherwise
+  // throw away half the snippet, so only accept the sentence cut when it still fills one.
+  if (kept.length >= MIN_USEFUL) return kept;
+
+  // Nothing usable on a sentence boundary: cut on the last word boundary before the limit.
+  const hard = trimmed.slice(0, max - 1);
+  const lastSpace = hard.lastIndexOf(' ');
+  return `${(lastSpace > 0 ? hard.slice(0, lastSpace) : hard).replace(/[\s,;:—-]+$/, '')}…`;
+}
+
 function meta(title: string, description: string, path: string): RouteMeta {
-  return { title, description, canonical: `${SITE_URL}${path}` };
+  // Every route goes through here, so the clamp cannot be forgotten on a new page type.
+  return { title, description: clampDescription(description), canonical: `${SITE_URL}${path}` };
+}
+
+/**
+ * Titles must survive the SERP (SEO-6). Google cuts at roughly 60 characters, and several
+ * data-derived titles were already at 61 before the brand suffix pushed them past 70 — so the
+ * suffix truncated the very words it was meant to sit behind.
+ *
+ * Append "· mcpfold" only when it fits and the title doesn't already say "mcpfold". A title that
+ * already names the product loses nothing by dropping the suffix, and one that would overflow is
+ * better off ending on its own last word. scripts/seo-audit.mjs enforces the ceiling at build time.
+ */
+const BRAND_SUFFIX = ' · mcpfold';
+const TITLE_MAX = 60;
+
+export function withBrand(title: string): string {
+  if (/mcpfold/i.test(title)) return title;
+  return title.length + BRAND_SUFFIX.length <= TITLE_MAX ? `${title}${BRAND_SUFFIX}` : title;
 }
 
 /** Resolve the canonical <title>/description/canonical for a pathname. Never throws. */
@@ -70,9 +126,11 @@ export function resolveMeta(path: string): RouteMeta {
     const id = p.slice('/directory/'.length);
     const entry = DIRECTORY.find((e) => e.id === id);
     if (entry) {
+      // Entry descriptions run as short as ~29 chars — too thin to serve as a SERP snippet on
+      // their own, so the page's own value proposition completes them.
       return meta(
-        `${entry.name} — MCP server · mcpfold`,
-        entry.description,
+        withBrand(`${entry.name} — MCP server`),
+        `${entry.description} Add ${entry.name} to Claude Code, Cursor, VS Code, and every other MCP client from one mcpfold config.`,
         `/directory/${entry.id}`,
       );
     }
@@ -89,7 +147,7 @@ export function resolveMeta(path: string): RouteMeta {
     const guide = guideById(p.slice('/guides/'.length));
     if (guide) {
       return meta(
-        `Add MCP servers to ${guide.label} · mcpfold`,
+        withBrand(`Add MCP servers to ${guide.label}`),
         `Set up MCP servers in ${guide.label} with mcpfold: one canonical config folded into ${guide.label}'s own format, secrets kept as references. Config paths straight from the adapter.`,
         `/guides/${guide.id}`,
       );
@@ -106,7 +164,7 @@ export function resolveMeta(path: string): RouteMeta {
   if (p.startsWith('/glossary/')) {
     const entry = termById(p.slice('/glossary/'.length));
     if (entry) {
-      return meta(`${entry.heading} · mcpfold glossary`, entry.short, `/glossary/${entry.id}`);
+      return meta(withBrand(entry.heading), entry.short, `/glossary/${entry.id}`);
     }
     return meta('Term not found — mcpfold glossary', 'No such glossary entry.', p);
   }
@@ -120,7 +178,7 @@ export function resolveMeta(path: string): RouteMeta {
   if (p.startsWith('/compare/')) {
     const entry = comparisonById(p.slice('/compare/'.length));
     if (entry) {
-      return meta(`${entry.metaTitle} · mcpfold`, entry.intro, `/compare/${entry.id}`);
+      return meta(withBrand(entry.metaTitle), entry.intro, `/compare/${entry.id}`);
     }
     return meta('Comparison not found — mcpfold', 'No such comparison.', p);
   }
@@ -141,7 +199,7 @@ export function resolveMeta(path: string): RouteMeta {
   if (p.startsWith('/features/')) {
     const feature = featureById(p.slice('/features/'.length));
     if (feature) {
-      return meta(`${feature.metaTitle}`, feature.tagline, `/features/${feature.id}`);
+      return meta(withBrand(feature.metaTitle), feature.tagline, `/features/${feature.id}`);
     }
     return meta('Feature not found — mcpfold', 'No such feature.', p);
   }
@@ -155,7 +213,7 @@ export function resolveMeta(path: string): RouteMeta {
   if (p.startsWith('/use-cases/')) {
     const uc = useCaseById(p.slice('/use-cases/'.length));
     if (uc) {
-      return meta(`${uc.metaTitle}`, uc.tagline, `/use-cases/${uc.id}`);
+      return meta(withBrand(uc.metaTitle), uc.tagline, `/use-cases/${uc.id}`);
     }
     return meta('Use case not found — mcpfold', 'No such use case.', p);
   }

@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 3
+    "completed": 4
   },
   "items": [
     {
@@ -95,15 +95,18 @@
     {
       "id": "SEO-6",
       "title": "Title/description length guards in the build audit",
-      "status": "todo",
+      "status": "done",
       "impact": "medium",
       "effort": "s",
-      "problem": "auditMeta checks presence and uniqueness but not length. Data-derived titles (directory entry names, comparison metaTitles) can exceed the ~60-char SERP truncation point and descriptions the ~155-char point, silently, at pSEO scale.",
-      "solution": "Add length bounds to auditMeta (warn/fail thresholds), report the worst offenders, and fix the templates that overflow. Keep it a build failure so it cannot regress.",
+      "problem": "auditMeta checked presence and uniqueness but not length. Measured against the real data: comparison intros ran to 591 chars, feature taglines to 298, use-case taglines to 213, glossary definitions to 195 — all used verbatim as <meta name=description> against a ~155-char SERP budget. Comparison titles hit 71 chars once the ' · mcpfold' suffix was appended to an already-61-char metaTitle.",
+      "solution": "clampDescription() in meta.ts trims to the last whole sentence that fits 155 chars, falling back to a word-boundary cut with an ellipsis when the opening sentence overruns or is too short to fill the snippet (MIN_USEFUL=100). Applied inside meta() so no new page type can skip it; full prose still renders in the page body and JSON-LD. withBrand() appends the brand suffix only when it fits within 60 chars and the title does not already say mcpfold. auditMetaLength() enforces both at build time with a warn tier (>60 title, >155 description) and a fail tier (>70/>180/<50). Verified: every description now lands in 104-154 chars.",
       "files": [
+        "src/seo/meta.ts",
         "scripts/seo-audit.mjs",
-        "src/seo/meta.ts"
-      ]
+        "scripts/gen-seo.mjs"
+      ],
+      "iteration": 4,
+      "verify": "node scripts/seo-audit.mjs --self-test"
     },
     {
       "id": "SEO-7",

@@ -9,8 +9,9 @@
  *      per-page OG card (dist/og/<route>.svg) wired into og:image / twitter:image,
  *   3. writes dist/<route>/index.html (the client hydrates it in place),
  *   4. AUDITS every route (S15.8): fails the build on a route missing/duplicating meta, a
- *      keyword→page target that isn't a real route, or JSON-LD that links to a non-route
- *      (index-bloat + dead-tracking + dead-structured-data guard),
+ *      keyword→page target that isn't a real route, JSON-LD that links to a non-route, or a
+ *      title/description outside the SERP length budget (index-bloat + dead-tracking +
+ *      dead-structured-data + truncated-snippet guards),
  *   5. regenerates feed.xml (blog RSS) and a scaled sitemap index + typed child sitemaps, each URL
  *      dated by the content behind it (scripts/lastmod.mjs), not by the build clock.
  * robots.txt ships from public/.
@@ -21,7 +22,12 @@ import { fileURLToPath } from 'node:url';
 import { pathToFileURL } from 'node:url';
 import { DIRECTORY } from '../../../packages/core/dist/index.js';
 import { renderOgSvg, ogPathForRoute } from './gen-og.mjs';
-import { auditMeta, validateJsonLdUrls, validateKeywordPages } from './seo-audit.mjs';
+import {
+  auditMeta,
+  auditMetaLength,
+  validateJsonLdUrls,
+  validateKeywordPages,
+} from './seo-audit.mjs';
 import { createLastmodResolver } from './lastmod.mjs';
 import { renderFeed } from './feed.mjs';
 
@@ -108,7 +114,15 @@ for (const route of routes) {
 }
 
 // --- Technical-SEO guards (S15.8): fail the build on meta/tracking problems ------------------
+// SEO-6: length is a separate tier — a value past the SERP cut is a warning, one so long or short
+// that the snippet is unusable fails the build.
+const { problems: lengthProblems, warnings } = auditMetaLength(metaByRoute);
+if (warnings.length > 0) {
+  console.warn(`⚠ SEO length warnings (${warnings.length}):\n  ${warnings.join('\n  ')}`);
+}
+
 const problems = [
+  ...lengthProblems,
   ...auditMeta(metaByRoute, { siteUrl: SITE_URL }),
   ...validateKeywordPages(mappedPaths(), routes),
   // SEO-4: structured data that advertises a 404 is worse than emitting none at all.

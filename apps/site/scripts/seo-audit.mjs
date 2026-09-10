@@ -6,6 +6,9 @@
  *   - auditMeta: every route must have a non-empty, page-specific title + description, a canonical
  *     that matches its own URL, and no two routes may share a canonical (duplicate-content guard).
  *   - validateKeywordPages: every keyword→page target must be a real, prerendered route.
+ *   - auditMetaLength: titles/descriptions must fit the SERP. Hard failures for values so long or
+ *     so short they are broken; warnings for values that merely truncate. Presence and uniqueness
+ *     were already guarded — length was not, so data-derived titles silently overflowed at scale.
  *   - validateJsonLdUrls: every internal URL a route's JSON-LD advertises (url, isPartOf,
  *     softwareHelp, ItemList item URLs, breadcrumb items, …) must be a real, prerendered route.
  *     Structured data that points at a 404 is worse than none — it tells a crawler the page exists.
@@ -60,6 +63,57 @@ export function validateKeywordPages(mapped, routes) {
   return mapped
     .filter((p) => !set.has(p))
     .map((p) => `keyword-map: "${p}" is not a prerendered route (renamed or removed?)`);
+}
+
+/**
+ * SERP length budgets. Google renders titles to roughly 580px and descriptions to roughly 920px;
+ * character counts are the practical proxy. The WARN bounds are where truncation starts, the FAIL
+ * bounds are where the value is broken rather than merely trimmed — so a build can't ship a title
+ * that gets cut mid-word on every SERP, while ordinary near-the-line copy stays a warning.
+ */
+export const LENGTH_BUDGET = {
+  title: { warnOver: 60, failOver: 70, warnUnder: 25 },
+  description: { warnOver: 155, failOver: 180, warnUnder: 70, failUnder: 50 },
+};
+
+/**
+ * @param {Array<{route: string, meta: {title:string, description:string}}>} entries
+ * @param {typeof LENGTH_BUDGET} [budget]
+ * @returns {{problems: string[], warnings: string[]}}
+ */
+export function auditMetaLength(entries, budget = LENGTH_BUDGET) {
+  const problems = [];
+  const warnings = [];
+  for (const { route, meta } of entries) {
+    const title = (meta?.title ?? '').trim();
+    const description = (meta?.description ?? '').trim();
+
+    if (title.length > budget.title.failOver) {
+      problems.push(`${route}: title is ${title.length} chars (>${budget.title.failOver}) — "${title}"`);
+    } else if (title.length > budget.title.warnOver) {
+      warnings.push(`${route}: title is ${title.length} chars, will truncate in the SERP`);
+    }
+    if (title.length > 0 && title.length < budget.title.warnUnder) {
+      warnings.push(`${route}: title is only ${title.length} chars — thin for a SERP headline`);
+    }
+
+    if (description.length > budget.description.failOver) {
+      problems.push(
+        `${route}: description is ${description.length} chars (>${budget.description.failOver})`,
+      );
+    } else if (description.length > budget.description.warnOver) {
+      warnings.push(`${route}: description is ${description.length} chars, will truncate`);
+    }
+    if (description.length > 0 && description.length < budget.description.failUnder) {
+      problems.push(
+        `${route}: description is only ${description.length} chars (<${budget.description.failUnder}) — ` +
+          'too thin to serve as a snippet',
+      );
+    } else if (description.length > 0 && description.length < budget.description.warnUnder) {
+      warnings.push(`${route}: description is only ${description.length} chars — thin snippet`);
+    }
+  }
+  return { problems, warnings };
 }
 
 /**
@@ -147,6 +201,30 @@ if (process.argv.includes('--self-test')) {
     failures.push('validateKeywordPages should pass a real route');
   }
 
+  // Length budgets: a fine value passes, an overflow fails, a near-the-line value only warns.
+  const ok = 'x'.repeat(50);
+  const lenGood = auditMetaLength([
+    { route: '/a', meta: { title: 'A perfectly reasonable page title', description: ok + ok } },
+  ]);
+  if (lenGood.problems.length !== 0 || lenGood.warnings.length !== 0) {
+    failures.push(
+      `in-budget meta should be clean, got ${JSON.stringify(lenGood)}`,
+    );
+  }
+  const lenWarn = auditMetaLength([
+    { route: '/a', meta: { title: 'T'.repeat(65), description: 'd'.repeat(160) } },
+  ]);
+  if (lenWarn.problems.length !== 0) failures.push('near-the-line meta should warn, not fail');
+  if (lenWarn.warnings.length !== 2) {
+    failures.push(`expected 2 length warnings, got ${lenWarn.warnings.length}`);
+  }
+  const lenFail = auditMetaLength([
+    { route: '/a', meta: { title: 'T'.repeat(80), description: 'short' } },
+  ]);
+  if (lenFail.problems.length !== 2) {
+    failures.push(`expected 2 length failures, got ${lenFail.problems.length}`);
+  }
+
   // JSON-LD URL guard: catches a dead internal link, ignores external ones and @context.
   const routes = ['/', '/install', '/guides'];
   const cleanLd = [
@@ -197,6 +275,6 @@ if (process.argv.includes('--self-test')) {
     process.exit(1);
   }
   console.log(
-    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages, dead JSON-LD URLs)',
+    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets)',
   );
 }
