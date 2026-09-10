@@ -3,7 +3,7 @@ import { renderToString } from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom/server';
 import { App } from '../App';
 import { resolveMeta } from '../seo/meta';
-import { jsonLdScriptTags } from '../seo/jsonld';
+import { jsonLdForPath, jsonLdScriptTags, type JsonLd } from '../seo/jsonld';
 
 /**
  * SSG entry (S15.1). Built as a separate Vite SSR bundle and driven by scripts/prerender.mjs to
@@ -21,6 +21,12 @@ export interface RenderResult {
   meta: { title: string; description: string; canonical: string };
   /** JSON-LD <script> tags (already escaped) to inject before </head>. */
   jsonLd: string;
+  /**
+   * The same JSON-LD as structured nodes. Handed to the build audit (SEO-4) so every internal URL
+   * the structured data advertises can be checked against the real route list, rather than the
+   * audit having to re-parse the serialized tags.
+   */
+  jsonLdNodes: JsonLd[];
 }
 
 /** Render one route to HTML + the head data the prerender script injects. `url` is a pathname. */
@@ -33,5 +39,10 @@ export function render(url: string): RenderResult {
     </StrictMode>,
   );
 
-  return { appHtml, meta: resolveMeta(url), jsonLd: jsonLdScriptTags(url) };
+  return {
+    appHtml,
+    meta: resolveMeta(url),
+    jsonLd: jsonLdScriptTags(url),
+    jsonLdNodes: jsonLdForPath(url),
+  };
 }

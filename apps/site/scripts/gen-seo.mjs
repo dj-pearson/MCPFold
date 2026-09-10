@@ -8,8 +8,9 @@
  *      canonical (single source of truth: resolveMeta), injects per-page-type JSON-LD, and writes a
  *      per-page OG card (dist/og/<route>.svg) wired into og:image / twitter:image,
  *   3. writes dist/<route>/index.html (the client hydrates it in place),
- *   4. AUDITS every route (S15.8): fails the build on a route missing/duplicating meta or a
- *      keyword→page target that isn't a real route (index-bloat + dead-tracking guard),
+ *   4. AUDITS every route (S15.8): fails the build on a route missing/duplicating meta, a
+ *      keyword→page target that isn't a real route, or JSON-LD that links to a non-route
+ *      (index-bloat + dead-tracking + dead-structured-data guard),
  *   5. regenerates feed.xml (blog RSS) and a scaled sitemap index + typed child sitemaps, each URL
  *      dated by the content behind it (scripts/lastmod.mjs), not by the build clock.
  * robots.txt ships from public/.
@@ -20,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { pathToFileURL } from 'node:url';
 import { DIRECTORY } from '../../../packages/core/dist/index.js';
 import { renderOgSvg, ogPathForRoute } from './gen-og.mjs';
-import { auditMeta, validateKeywordPages } from './seo-audit.mjs';
+import { auditMeta, validateJsonLdUrls, validateKeywordPages } from './seo-audit.mjs';
 import { createLastmodResolver } from './lastmod.mjs';
 
 const SITE_URL = 'https://mcpfold.com';
@@ -72,9 +73,11 @@ function pageHtml(route, meta, appHtml, jsonLd, ogUrl) {
 
 const routes = allRoutes();
 const metaByRoute = [];
+const jsonLdByRoute = [];
 for (const route of routes) {
-  const { appHtml, meta, jsonLd } = render(route);
+  const { appHtml, meta, jsonLd, jsonLdNodes } = render(route);
   metaByRoute.push({ route, meta });
+  jsonLdByRoute.push({ route, jsonLdNodes });
 
   // Per-page OG card, wired into this page's og:image / twitter:image.
   const ogRel = ogPathForRoute(route);
@@ -107,6 +110,8 @@ for (const route of routes) {
 const problems = [
   ...auditMeta(metaByRoute, { siteUrl: SITE_URL }),
   ...validateKeywordPages(mappedPaths(), routes),
+  // SEO-4: structured data that advertises a 404 is worse than emitting none at all.
+  ...validateJsonLdUrls(jsonLdByRoute, routes, { siteUrl: SITE_URL }),
 ];
 if (problems.length > 0) {
   console.error(`✗ SEO audit failed (${problems.length}):\n  ${problems.join('\n  ')}`);

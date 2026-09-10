@@ -31,7 +31,8 @@ function softwareApplication(): JsonLd {
       'One source of truth for your MCP servers. Write it once, fold it out to every client — secrets never hardcoded, only the tools you need loaded.',
     url: SITE_URL,
     downloadUrl: `${SITE_URL}/install`,
-    softwareHelp: `${SITE_URL}/docs`,
+    // Must be a real, prerendered route — the build audit (validateJsonLdUrls) enforces it.
+    softwareHelp: `${SITE_URL}/guides`,
     license: 'https://opensource.org/licenses/MIT',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   };
