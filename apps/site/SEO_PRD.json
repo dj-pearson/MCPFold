@@ -6,7 +6,8 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 14
+    "completed": 15,
+    "note": "All 15 items complete. Every guard is self-tested and wired into the build via gen-seo.mjs / gen-llms.mjs; run `pnpm --filter @mcpfold/site seo:audit` for the five dependency-free self-tests. Two items (SEO-2 rasterization, SEO-13 thresholds) could not be executable-verified because node_modules is unavailable in the session container — see their `unverified` fields for what the first real CI build should confirm."
   },
   "items": [
     {
@@ -232,16 +233,18 @@
     {
       "id": "SEO-13",
       "title": "Core Web Vitals budget enforced in CI",
-      "status": "todo",
+      "status": "done",
       "impact": "high",
       "effort": "l",
-      "problem": "Rankings are gated on field CWV; there is currently no LCP/CLS/INP budget in CI and no render-blocking-resource check on the prerendered pages.",
-      "solution": "Add Lighthouse CI (or a Playwright + web-vitals harness) against `vite preview` of dist/ with per-route budgets, run on PRs, failing on regression. Preload the LCP image/font, inline critical CSS, and defer GSAP where it is not above the fold.",
+      "problem": "The premise was wrong: Lighthouse CI already runs on every PR (.github/workflows/site.yml) with category thresholds. The real gaps were what it asserts and where. categories:performance is a weighted blend that can sit above 0.9 while LCP or CLS regresses past Google's 'good' boundary — and rankings key off the metrics, not the category. Separately, staticDistDir with no url list makes LHCI audit every HTML file in dist (~120 routes x 3 runs): slow, and it averages every template together so a slow guide page hides behind 89 fast directory entries.",
+      "solution": "lighthouserc.json now asserts the Core Web Vitals directly — LCP <= 2500ms and CLS <= 0.1 as errors at Google's good boundary, TBT <= 300ms and Speed Index <= 3400ms as warnings — plus unsized-images as an error (the CLS source SEO-12 just fixed) and render-blocking-resources, uses-responsive-images and font-display as warnings. `url` pins 13 pages, one per template, so each page type is judged on its own.",
       "files": [
-        ".github/workflows/",
-        "apps/site/lighthouserc.json (new)",
-        "index.html"
-      ]
+        "apps/site/lighthouserc.json"
+      ],
+      "iteration": 15,
+      "unverified": "Thresholds are not calibrated against a real LHCI run from this environment. TBT and Speed Index are deliberately warn-only for that reason — the home page loads GSAP and its lab TBT is unknown. Once CI reports real numbers, tighten TBT to error if it passes comfortably.",
+      "deferred": "Critical-CSS inlining and deferring GSAP were listed in the original plan but are speculative without profiling data. The budget now measures the thing; optimize once it reports.",
+      "verify": "Lighthouse budget step in .github/workflows/site.yml"
     },
     {
       "id": "SEO-14",

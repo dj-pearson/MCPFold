@@ -1,8 +1,36 @@
 {
+  "//": [
+    "Lighthouse CI budget for the marketing site (S15.x; SEO-13).",
+    "",
+    "Two changes over asserting category scores alone. First, categories:performance is a weighted",
+    "blend — it can sit comfortably above 0.9 while LCP or CLS regresses past the point Google",
+    "counts as 'good'. Rankings key off the Core Web Vitals metrics, so the metrics are asserted",
+    "directly, at Google's own good/needs-improvement boundaries.",
+    "",
+    "Second, `url` pins one page per template. Without it LHCI audits every HTML file in dist —",
+    "roughly 120 prerendered routes times 3 runs — which is slow and averages every template",
+    "together, so a slow guide page can hide behind 89 fast directory entries. One representative",
+    "page per type means each template is judged on its own."
+  ],
   "ci": {
     "collect": {
       "staticDistDir": "apps/site/dist",
-      "numberOfRuns": 3
+      "numberOfRuns": 3,
+      "url": [
+        "/index.html",
+        "/install/index.html",
+        "/pricing/index.html",
+        "/directory/index.html",
+        "/directory/filesystem/index.html",
+        "/directory/category/database/index.html",
+        "/guides/cursor/index.html",
+        "/glossary/mcp-server/index.html",
+        "/compare/reduce-mcp-token-usage/index.html",
+        "/features/tool-curation/index.html",
+        "/use-cases/teams/index.html",
+        "/blog/introducing-mcpfold/index.html",
+        "/mcp-token-calculator/index.html"
+      ]
     },
     "assert": {
       "assertMatrix": [
@@ -13,7 +41,17 @@
             "categories:performance": ["error", { "minScore": 0.9 }],
             "categories:accessibility": ["error", { "minScore": 0.95 }],
             "categories:best-practices": ["warn", { "minScore": 0.9 }],
-            "categories:seo": ["error", { "minScore": 0.95 }]
+            "categories:seo": ["error", { "minScore": 0.95 }],
+
+            "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
+            "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+            "total-blocking-time": ["warn", { "maxNumericValue": 300 }],
+            "speed-index": ["warn", { "maxNumericValue": 3400 }],
+
+            "unsized-images": ["error", { "minScore": 1 }],
+            "render-blocking-resources": ["warn", { "minScore": 1 }],
+            "uses-responsive-images": "warn",
+            "font-display": "warn"
           }
         }
       ]
