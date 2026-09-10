@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 9
+    "completed": 10
   },
   "items": [
     {
@@ -172,15 +172,19 @@
     {
       "id": "SEO-10",
       "title": "Canonical/trailing-slash and host normalization at the edge",
-      "status": "todo",
+      "status": "done",
       "impact": "medium",
       "effort": "s",
-      "problem": "The prerender writes /x/index.html, so both /x and /x/ serve 200 with the same canonical. Duplicate URLs still burn crawl budget even when the canonical is right. www vs apex and http vs https need a single 301 target too.",
-      "solution": "Add Cloudflare Pages _redirects (or a Worker) normalizing trailing slashes, www→apex, http→https with 301s, and an e2e that asserts the redirect chain is at most one hop.",
+      "problem": "The premise in this item was partly wrong. The site deploys to Cloudflare Pages (.github/workflows/pages.yml), which already 308-normalizes a trailing slash and enforces HTTPS on custom domains — so those needed no rule. What was genuinely missing was www -> apex, which Pages does NOT collapse by default while every canonical tag points at https://mcpfold.com. Separately, nothing verified that the existing legacy redirects still resolve.",
+      "solution": "Added a www -> apex 301 to public/_redirects with a comment recording what Pages handles on its own, so nobody re-adds redundant rules. Added auditRedirects to the build: every rule's internal target must resolve to a route (or /docs, or a static file), no rule may shadow a live route, statuses must be 301/302/308, and duplicate sources fail. Verified the shipped rules pass.",
       "files": [
-        "public/_redirects (new)",
-        "test/seo.e2e.ts"
-      ]
+        "public/_redirects",
+        "scripts/seo-audit.mjs",
+        "scripts/gen-seo.mjs"
+      ],
+      "iteration": 10,
+      "deferred": "The 'redirect chain is at most one hop' e2e from the original plan needs a real deployed host to assert against; the build guard covers the failure mode that is checkable offline.",
+      "verify": "node scripts/seo-audit.mjs --self-test"
     },
     {
       "id": "SEO-11",

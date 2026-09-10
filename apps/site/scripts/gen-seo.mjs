@@ -12,7 +12,8 @@
  *      keyword→page target that isn't a real route, JSON-LD that links to a non-route, or a
  *      title/description outside the SERP length budget, and then re-reads the written HTML to
  *      audit the internal link graph (dead links, orphans, pages with no links) and each page's
- *      heading outline (one h1, no empty headings, no skipped levels),
+ *      heading outline (one h1, no empty headings, no skipped levels), and the shipped _redirects
+ *      map (targets resolve, no rule shadows a live route),
  *   5. regenerates feed.xml (blog RSS) and a scaled sitemap index + typed child sitemaps, each URL
  *      dated by the content behind it (scripts/lastmod.mjs), not by the build clock.
  * robots.txt ships from public/.
@@ -27,6 +28,7 @@ import {
   auditMeta,
   auditBreadcrumbs,
   auditEntityGraph,
+  auditRedirects,
   auditMetaLength,
   validateJsonLdUrls,
   validateRelatedLinks,
@@ -123,6 +125,8 @@ for (const route of routes) {
 
 // --- Technical-SEO guards (S15.8): fail the build on meta/tracking problems ------------------
 const prerendered = readPrerenderedPages(dist);
+// public/_redirects is copied into dist by Vite; audit the copy that actually ships.
+const redirectsFile = join(dist, '_redirects');
 // SEO-6: length is a separate tier — a value past the SERP cut is a warning, one so long or short
 // that the snippet is unusable fails the build.
 const { problems: lengthProblems, warnings } = auditMetaLength(metaByRoute);
@@ -157,6 +161,10 @@ const problems = [
   // page nothing links to, a link the shell emits to a dead path, or a broken heading outline.
   ...auditLinkGraph(prerendered, routes),
   ...auditHeadings(prerendered),
+  // SEO-10: a redirect whose target was renamed 301s into a 404 and spends the link equity on the way.
+  ...(existsSync(redirectsFile)
+    ? auditRedirects(readFileSync(redirectsFile, 'utf8'), routes)
+    : ['_redirects is missing from dist/ — host and legacy-path canonicalization will not ship']),
 ];
 if (problems.length > 0) {
   console.error(`✗ SEO audit failed (${problems.length}):\n  ${problems.join('\n  ')}`);

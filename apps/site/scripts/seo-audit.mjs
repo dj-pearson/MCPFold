@@ -9,6 +9,8 @@
  *   - auditMetaLength: titles/descriptions must fit the SERP. Hard failures for values so long or
  *     so short they are broken; warnings for values that merely truncate. Presence and uniqueness
  *     were already guarded — length was not, so data-derived titles silently overflowed at scale.
+ *   - auditRedirects: every _redirects rule must send traffic somewhere the site still serves, and
+ *     must not shadow a live route. A redirect whose target was renamed 301s into a 404 silently.
  *   - auditEntityGraph: every route must carry the shared Organization + WebSite pair, with the
  *     stable @id URIs the page-type nodes reference — the graph must have one subject, not many.
  *   - auditBreadcrumbs: every non-home route must emit exactly one BreadcrumbList, rooted at the
@@ -203,6 +205,50 @@ export function validateRelatedLinks(entries, routes, { expectLinksUnder = [] } 
 }
 
 /**
+ * Redirect-map sanity (SEO-10). A redirect is a promise that an old URL still leads somewhere; when
+ * its target is renamed the rule quietly starts 301ing into a 404, which is worse than no rule at
+ * all because the link equity is spent on the way.
+ *
+ * @param {string} text contents of public/_redirects
+ * @param {string[]} routes every prerendered route
+ * @returns {string[]} problems (empty = clean)
+ */
+export function auditRedirects(text, routes) {
+  const set = new Set(routes);
+  const problems = [];
+  const seen = new Set();
+
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const [from, to, status] = trimmed.split(/\s+/);
+    if (!from || !to) {
+      problems.push(`_redirects: cannot parse "${trimmed}"`);
+      continue;
+    }
+    if (status && !/^30[128]!?$/.test(status)) {
+      problems.push(`_redirects: "${from}" uses status "${status}" — use 301, 302 or 308`);
+    }
+    if (seen.has(from)) problems.push(`_redirects: duplicate rule for "${from}"`);
+    seen.add(from);
+
+    // A rule whose source is itself a live route shadows that page — the page becomes unreachable.
+    if (set.has(from)) {
+      problems.push(`_redirects: "${from}" is a live route; the rule shadows it`);
+    }
+
+    // Only internal, non-splat targets can be checked against the route list. A :splat target
+    // depends on the request, and an absolute URL leaves the site.
+    if (!to.startsWith('/') || to.includes(':splat')) continue;
+    if (!set.has(to) && !isExternallyServed(to) && !isStaticFile(to)) {
+      problems.push(`_redirects: "${from}" points at "${to}", which is not a route`);
+    }
+  }
+  return problems;
+}
+
+/**
  * Site-wide entity graph (SEO-5). A crawler landing on any page must be able to resolve who
  * publishes it; that only works if every route carries the same Organization and WebSite nodes
  * under stable @id URIs that the page-type nodes reference.
@@ -389,6 +435,37 @@ if (process.argv.includes('--self-test')) {
     failures.push(`expected 2 length failures, got ${lenFail.problems.length}`);
   }
 
+  // Redirects: targets must resolve, sources must not shadow live pages.
+  const redirectRoutes = ['/', '/install', '/directory'];
+  const cleanRedirects = auditRedirects(
+    [
+      '# a comment',
+      '',
+      'https://www.example.com/*   https://example.com/:splat   301!',
+      '/download          /install           301',
+      '/server/*          /directory/:splat  301',
+      '/docs.html         /docs              301',
+    ].join('\n'),
+    redirectRoutes,
+  );
+  if (cleanRedirects.length !== 0) {
+    failures.push(`clean _redirects should pass, got ${JSON.stringify(cleanRedirects)}`);
+  }
+  const badRedirects = auditRedirects(
+    [
+      '/old               /renamed-away      301',
+      '/install           /                  301',
+      '/download          /install           404',
+      '/download          /install           301',
+    ].join('\n'),
+    redirectRoutes,
+  );
+  const redirectHas = (needle) => badRedirects.some((x) => x.includes(needle));
+  if (!redirectHas('"/renamed-away"')) failures.push('should flag a dead redirect target');
+  if (!redirectHas('shadows it')) failures.push('should flag a rule shadowing a live route');
+  if (!redirectHas('status "404"')) failures.push('should flag a non-redirect status');
+  if (!redirectHas('duplicate rule')) failures.push('should flag a duplicate rule');
+
   // Entity graph: the shared pair must be present with the right @id, and refs must resolve.
   const entityOk = [
     {
@@ -560,6 +637,6 @@ if (process.argv.includes('--self-test')) {
     process.exit(1);
   }
   console.log(
-    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links,\n     breadcrumb coverage,\n     entity graph)',
+    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links,\n     breadcrumb coverage,\n     entity graph,\n     redirect map)',
   );
 }
