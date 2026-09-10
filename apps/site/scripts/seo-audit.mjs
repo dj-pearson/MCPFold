@@ -9,9 +9,12 @@
  *   - auditMetaLength: titles/descriptions must fit the SERP. Hard failures for values so long or
  *     so short they are broken; warnings for values that merely truncate. Presence and uniqueness
  *     were already guarded — length was not, so data-derived titles silently overflowed at scale.
+ *   - validateRelatedLinks: every cross-silo related link must resolve to a real route, so the
+ *     internal-link mesh can never point somewhere the site doesn't serve.
  *   - validateJsonLdUrls: every internal URL a route's JSON-LD advertises (url, isPartOf,
- *     softwareHelp, ItemList item URLs, breadcrumb items, …) must be a real, prerendered route.
- *     Structured data that points at a 404 is worse than none — it tells a crawler the page exists.
+ *     softwareHelp, ItemList item URLs, breadcrumb items, …) must be a real, prerendered route or
+ *     live under a prefix served by a sibling static build (see EXTERNALLY_SERVED). Structured data
+ *     that points at a 404 is worse than none — it tells a crawler the page exists.
  *
  * Run `node scripts/seo-audit.mjs --self-test` to prove the guards actually catch a bad route.
  */
@@ -159,13 +162,60 @@ export function internalUrlsIn(node, siteUrl) {
  * @param {{siteUrl: string}} opts
  * @returns {string[]} problems (empty = clean)
  */
+/**
+ * Fail the build when the related-links mesh (SEO-7) points at a path the site doesn't serve, and
+ * when a page type that should carry the block renders none.
+ *
+ * @param {Array<{route: string, relatedHrefs: string[]}>} entries
+ * @param {string[]} routes every prerendered route
+ * @param {{expectLinksUnder?: string[]}} [opts] path prefixes that MUST produce related links
+ * @returns {string[]} problems (empty = clean)
+ */
+export function validateRelatedLinks(entries, routes, { expectLinksUnder = [] } = {}) {
+  const set = new Set(routes);
+  const problems = [];
+  const covered = new Set();
+  for (const { route, relatedHrefs } of entries) {
+    const hrefs = relatedHrefs ?? [];
+    for (const href of new Set(hrefs)) {
+      if (!set.has(href) && !isExternallyServed(href)) {
+        problems.push(`${route}: related link "${href}" is not a route`);
+      }
+      if (href === route) problems.push(`${route}: related link points at itself`);
+    }
+    const prefix = expectLinksUnder.find((x) => route.startsWith(x));
+    if (prefix) {
+      if (hrefs.length === 0) problems.push(`${route}: expected related links, got none`);
+      else covered.add(prefix);
+    }
+  }
+  // A whole page type silently losing its block is the regression worth catching, not one page.
+  for (const prefix of expectLinksUnder) {
+    if (!covered.has(prefix) && entries.some((e) => e.route.startsWith(prefix))) {
+      problems.push(`no page under "${prefix}" produced related links`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * Path prefixes this site serves that are NOT prerendered SPA routes. /docs is its own static build
+ * (S8.1) deployed alongside dist/, so its URLs are live even though allRoutes() never lists them.
+ */
+export const EXTERNALLY_SERVED = ['/docs'];
+
+const isExternallyServed = (path) =>
+  EXTERNALLY_SERVED.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+
 export function validateJsonLdUrls(entries, routes, { siteUrl }) {
   const set = new Set(routes);
   const problems = [];
   for (const { route, jsonLdNodes } of entries) {
     // Report each dead target once per route, however many nodes repeat it.
     const dead = new Set(
-      internalUrlsIn(jsonLdNodes ?? [], siteUrl).filter((p) => !set.has(p)),
+      internalUrlsIn(jsonLdNodes ?? [], siteUrl).filter(
+        (p) => !set.has(p) && !isExternallyServed(p),
+      ),
     );
     for (const p of dead) {
       problems.push(`${route}: JSON-LD links to "${siteUrl}${p}", which is not a prerendered route`);
@@ -225,6 +275,37 @@ if (process.argv.includes('--self-test')) {
     failures.push(`expected 2 length failures, got ${lenFail.problems.length}`);
   }
 
+  // Related-links mesh: dead targets, self-links and a page type losing its block all fail.
+  const relOk = [
+    { route: '/directory/a', relatedHrefs: ['/guides', '/install'] },
+    { route: '/guides/x', relatedHrefs: ['/directory'] },
+  ];
+  const relRoutes = ['/directory/a', '/guides/x', '/guides', '/install', '/directory'];
+  if (
+    validateRelatedLinks(relOk, relRoutes, { expectLinksUnder: ['/directory/', '/guides/'] })
+      .length !== 0
+  ) {
+    failures.push('clean related links should pass');
+  }
+  const relBad = [
+    { route: '/directory/a', relatedHrefs: ['/nope', '/directory/a'] },
+    { route: '/guides/x', relatedHrefs: [] },
+  ];
+  const relProblems = validateRelatedLinks(relBad, relRoutes, {
+    expectLinksUnder: ['/directory/', '/guides/'],
+  });
+  // dead target + self-link + empty block + the whole /guides/ type uncovered
+  if (relProblems.length !== 4) {
+    failures.push(`expected 4 related-link problems, got ${relProblems.length}`);
+  }
+  // /docs is served by the docs build, so it is a legal related target too.
+  if (
+    validateRelatedLinks([{ route: '/x', relatedHrefs: ['/docs/secrets.html'] }], ['/x'], {}).length !==
+    0
+  ) {
+    failures.push('/docs/* should be a legal related target');
+  }
+
   // JSON-LD URL guard: catches a dead internal link, ignores external ones and @context.
   const routes = ['/', '/install', '/guides'];
   const cleanLd = [
@@ -249,9 +330,9 @@ if (process.argv.includes('--self-test')) {
   const deadLd = [
     {
       route: '/',
-      // /docs is not a route; the nested breadcrumb item is dead too. External URLs must not flag.
+      // Neither path exists anywhere; the nested breadcrumb item is dead too.
       jsonLdNodes: [
-        { '@type': 'SoftwareApplication', softwareHelp: `${siteUrl}/docs` },
+        { '@type': 'SoftwareApplication', softwareHelp: `${siteUrl}/handbook` },
         {
           '@type': 'BreadcrumbList',
           itemListElement: [{ '@type': 'ListItem', item: `${siteUrl}/nope` }],
@@ -259,6 +340,18 @@ if (process.argv.includes('--self-test')) {
       ],
     },
   ];
+  // /docs is served by the sibling docs build, so it must NOT be reported as dead.
+  const docsLd = [{ route: '/', jsonLdNodes: [{ '@type': 'X', softwareHelp: `${siteUrl}/docs` }] }];
+  if (validateJsonLdUrls(docsLd, routes, { siteUrl }).length !== 0) {
+    failures.push('/docs is served by the docs build and must not be flagged');
+  }
+  const docsDeep = [
+    { route: '/', jsonLdNodes: [{ '@type': 'X', url: `${siteUrl}/docs/secrets.html` }] },
+  ];
+  if (validateJsonLdUrls(docsDeep, routes, { siteUrl }).length !== 0) {
+    failures.push('/docs/* is served by the docs build and must not be flagged');
+  }
+
   const deadProblems = validateJsonLdUrls(deadLd, routes, { siteUrl });
   if (deadProblems.length !== 2) {
     failures.push(`validateJsonLdUrls should flag 2 dead URLs, got ${deadProblems.length}`);
@@ -275,6 +368,6 @@ if (process.argv.includes('--self-test')) {
     process.exit(1);
   }
   console.log(
-    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets)',
+    '✓ seo-audit self-test passed (guards catch missing/duplicate meta, dead keyword pages,\n     dead JSON-LD URLs, SERP length budgets,\n     broken related links)',
   );
 }

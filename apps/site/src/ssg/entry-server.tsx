@@ -4,6 +4,7 @@ import { StaticRouter } from 'react-router-dom/server';
 import { App } from '../App';
 import { resolveMeta } from '../seo/meta';
 import { jsonLdForPath, jsonLdScriptTags, type JsonLd } from '../seo/jsonld';
+import { relatedFor } from '../seo/related';
 
 /**
  * SSG entry (S15.1). Built as a separate Vite SSR bundle and driven by scripts/prerender.mjs to
@@ -27,6 +28,8 @@ export interface RenderResult {
    * audit having to re-parse the serialized tags.
    */
   jsonLdNodes: JsonLd[];
+  /** Cross-silo related-link targets for this route, for the build's link-mesh guard (SEO-7). */
+  relatedHrefs: string[];
 }
 
 /** Render one route to HTML + the head data the prerender script injects. `url` is a pathname. */
@@ -44,5 +47,6 @@ export function render(url: string): RenderResult {
     meta: resolveMeta(url),
     jsonLd: jsonLdScriptTags(url),
     jsonLdNodes: jsonLdForPath(url),
+    relatedHrefs: relatedFor(url).map((l) => l.href),
   };
 }

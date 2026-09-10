@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { RouteHead } from './seo/Seo';
 import { Header } from './nav/Header';
 import { Footer } from './nav/Footer';
+import { RelatedLinks } from './seo/RelatedLinks';
 
 /**
  * Site shell (S13.1; full IA S13.9). A skip-to-content link, the responsive header (single-source
@@ -20,6 +21,9 @@ export function Layout() {
       <main id="main" tabIndex={-1}>
         <Outlet />
       </main>
+      {/* SEO-7: cross-silo related links, resolved per route. Mounted here so no page type can
+          forget it; renders nothing on hubs and transactional pages. */}
+      <RelatedLinks />
       <Footer />
     </>
   );

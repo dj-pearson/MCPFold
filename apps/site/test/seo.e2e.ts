@@ -36,6 +36,29 @@ test('sitemap.xml is a sitemap index that references typed child sitemaps with l
   }
 });
 
+test('deep pages carry a cross-silo related-links block', async ({ request }) => {
+  // SEO-7: directory entries used to link only back to /directory and their category tags. The
+  // block must be in the prerendered HTML (no JS) and must reach outside the page's own silo.
+  const index = await rawText(request, '/sitemap-directory.xml');
+  const entry = locsFromXml(index)
+    .map((u: string) => u.replace(SITE, ''))
+    .find((p: string) => p.startsWith('/directory/') && !p.startsWith('/directory/category/'));
+  expect(entry, 'a directory entry page exists').toBeTruthy();
+
+  const html = await rawText(request, entry!);
+  expect(html, 'related block is prerendered').toContain('data-testid="related-links"');
+
+  const hrefs = [...html.matchAll(/data-testid="related-links"[\s\S]*?<\/nav>/g)]
+    .flatMap((m) => [...m[0].matchAll(/href="(\/[^"]*)"/g)].map((h) => h[1]!));
+  expect(hrefs.length, 'related links render').toBeGreaterThanOrEqual(3);
+  // At least one link must leave /directory — that is the whole point of the mesh.
+  expect(
+    hrefs.some((h) => !h.startsWith('/directory')),
+    `related links should cross silos, got ${JSON.stringify(hrefs)}`,
+  ).toBe(true);
+  expect(hrefs.includes(entry!), 'no self-link').toBe(false);
+});
+
 test('feed.xml is valid RSS with RFC-822 dates and is advertised in <head>', async ({
   request,
 }) => {

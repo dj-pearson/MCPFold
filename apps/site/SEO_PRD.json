@@ -6,7 +6,7 @@
   "createdAt": "2026-09-10",
   "loop": {
     "total": 15,
-    "completed": 4
+    "completed": 5
   },
   "items": [
     {
@@ -78,7 +78,8 @@
         "scripts/gen-seo.mjs"
       ],
       "iteration": 2,
-      "verify": "node scripts/seo-audit.mjs --self-test"
+      "verify": "node scripts/seo-audit.mjs --self-test",
+      "note": "CORRECTION (iteration 5): /docs is NOT a 404 — it is a sibling static build (S8.1) deployed alongside dist/, so it is served even though allRoutes() never lists it. softwareHelp restored to /docs and the guard now carries an EXTERNALLY_SERVED allowlist for /docs*. The guard itself remains correct and useful."
     },
     {
       "id": "SEO-5",
@@ -111,16 +112,22 @@
     {
       "id": "SEO-7",
       "title": "Internal linking: no programmatic related-pages mesh",
-      "status": "todo",
+      "status": "done",
       "impact": "high",
       "effort": "m",
-      "problem": "Directory entries, guides, glossary terms, comparisons, features and use-cases are separate silos. Deep pSEO pages get little internal PageRank and no topical cross-linking, which is the single biggest lever on a large generated site.",
-      "solution": "Build a related-links resolver (category siblings, glossary terms mentioned on a page, the guide for a client referenced by a directory entry, the feature a use-case leans on) rendered as a 'Related' block on every deep page. Add a build guard for orphan routes: every route in allRoutes() must be reachable by at least one in-body internal link from another prerendered page.",
+      "problem": "Every deep page type linked only within its own silo: a directory entry (89 of them, the most numerous page type) carried just 3 links — back to /directory and its category tags. No topical path existed between directory, guides, glossary, compare, features and use-cases.",
+      "solution": "src/seo/related.ts derives up to 6 cross-silo links per route from existing data — a directory entry now reaches its category, two siblings, the guide for installing it, the glossary term explaining it, and the token calculator. Siblings rotate deterministically by page id so the mesh spreads rather than pointing every page at the same few. RelatedLinks.tsx renders it once in Layout so no page type can forget it, and it is prerendered (not behind an effect) so crawlers see it without JS. validateRelatedLinks fails the build on a dead target, a self-link, or a whole page type losing its block.",
       "files": [
-        "src/seo/related.ts (new)",
-        "src/design/components.tsx",
-        "scripts/seo-audit.mjs"
-      ]
+        "src/seo/related.ts",
+        "src/seo/RelatedLinks.tsx",
+        "src/Layout.tsx",
+        "src/ssg/entry-server.tsx",
+        "scripts/seo-audit.mjs",
+        "scripts/gen-seo.mjs",
+        "test/seo.e2e.ts"
+      ],
+      "iteration": 5,
+      "verify": "node scripts/seo-audit.mjs --self-test; e2e 'deep pages carry a cross-silo related-links block'"
     },
     {
       "id": "SEO-8",
@@ -136,7 +143,8 @@
       "files": [
         "scripts/seo-audit.mjs",
         "scripts/gen-seo.mjs"
-      ]
+      ],
+      "note": "Partly covered by SEO-7's validateRelatedLinks (dead targets, self-links, page types losing their block). Still to do: parse the prerendered dist HTML for the full <a href> graph, catch true orphans and pages with zero outbound internal links. NOTE: site-structure.ts PRIMARY_NAV links to /docs and /docs/*.html — legal (sibling docs build), so the graph walker needs the same EXTERNALLY_SERVED allowlist."
     },
     {
       "id": "SEO-9",

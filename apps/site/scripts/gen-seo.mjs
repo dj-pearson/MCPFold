@@ -26,6 +26,7 @@ import {
   auditMeta,
   auditMetaLength,
   validateJsonLdUrls,
+  validateRelatedLinks,
   validateKeywordPages,
 } from './seo-audit.mjs';
 import { createLastmodResolver } from './lastmod.mjs';
@@ -81,10 +82,12 @@ function pageHtml(route, meta, appHtml, jsonLd, ogUrl) {
 const routes = allRoutes();
 const metaByRoute = [];
 const jsonLdByRoute = [];
+const relatedByRoute = [];
 for (const route of routes) {
-  const { appHtml, meta, jsonLd, jsonLdNodes } = render(route);
+  const { appHtml, meta, jsonLd, jsonLdNodes, relatedHrefs } = render(route);
   metaByRoute.push({ route, meta });
   jsonLdByRoute.push({ route, jsonLdNodes });
+  relatedByRoute.push({ route, relatedHrefs });
 
   // Per-page OG card, wired into this page's og:image / twitter:image.
   const ogRel = ogPathForRoute(route);
@@ -127,6 +130,19 @@ const problems = [
   ...validateKeywordPages(mappedPaths(), routes),
   // SEO-4: structured data that advertises a 404 is worse than emitting none at all.
   ...validateJsonLdUrls(jsonLdByRoute, routes, { siteUrl: SITE_URL }),
+  // SEO-7: the cross-silo mesh must resolve. Every deep page type carries the block, so losing one
+  // wholesale is a regression the build should catch, not something to notice in Search Console.
+  ...validateRelatedLinks(relatedByRoute, routes, {
+    expectLinksUnder: [
+      '/directory/',
+      '/guides/',
+      '/glossary/',
+      '/compare/',
+      '/features/',
+      '/use-cases/',
+      '/blog/',
+    ],
+  }),
 ];
 if (problems.length > 0) {
   console.error(`✗ SEO audit failed (${problems.length}):\n  ${problems.join('\n  ')}`);

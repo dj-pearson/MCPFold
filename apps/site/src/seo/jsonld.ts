@@ -31,8 +31,9 @@ function softwareApplication(): JsonLd {
       'One source of truth for your MCP servers. Write it once, fold it out to every client — secrets never hardcoded, only the tools you need loaded.',
     url: SITE_URL,
     downloadUrl: `${SITE_URL}/install`,
-    // Must be a real, prerendered route — the build audit (validateJsonLdUrls) enforces it.
-    softwareHelp: `${SITE_URL}/guides`,
+    // /docs is the sibling static docs build (S8.1), not an SPA route — the build audit knows it is
+    // served (seo-audit.mjs EXTERNALLY_SERVED) and still fails on genuinely dead URLs.
+    softwareHelp: `${SITE_URL}/docs`,
     license: 'https://opensource.org/licenses/MIT',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   };
