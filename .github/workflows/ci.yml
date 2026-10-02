@@ -20,7 +20,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # GitHub-hosted minutes are used up. Linux runs on the self-hosted box
+        # (vars.RUNNER_LINUX); the macOS and Windows legs come back as soon as a
+        # runner is registered and its label set as vars.RUNNER_MACOS / RUNNER_WINDOWS.
+        os: ${{ fromJSON(format('["{0}"{1}{2}]', vars.RUNNER_LINUX || 'ubuntu-latest', vars.RUNNER_MACOS != '' && format(',"{0}"', vars.RUNNER_MACOS) || '', vars.RUNNER_WINDOWS != '' && format(',"{0}"', vars.RUNNER_WINDOWS) || '')) }}
         node: [20]
     steps:
       - uses: actions/checkout@v7
@@ -57,7 +60,7 @@ jobs:
   # independently of the lint job so a lint-config regression can't hide a breach.
   core-purity:
     name: core purity
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -87,7 +90,7 @@ jobs:
   # the same build, so a green docs job means the site is publishable.
   docs:
     name: docs
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -150,7 +153,7 @@ jobs:
   # before it can reach the Coolify deployment.
   db:
     name: db integration
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -203,7 +206,7 @@ jobs:
   # authenticated push/pull round-trip) before it can ship.
   edge-container:
     name: edge container (side service)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -226,7 +229,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # GitHub-hosted minutes are used up. Linux runs on the self-hosted box
+        # (vars.RUNNER_LINUX); the macOS and Windows legs come back as soon as a
+        # runner is registered and its label set as vars.RUNNER_MACOS / RUNNER_WINDOWS.
+        os: ${{ fromJSON(format('["{0}"{1}]', vars.RUNNER_LINUX || 'ubuntu-latest', vars.RUNNER_WINDOWS != '' && format(',"{0}"', vars.RUNNER_WINDOWS) || '')) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7

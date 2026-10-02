@@ -11,7 +11,7 @@ on:
 jobs:
   build-and-deploy:
     name: build + preview deploy
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     env:
       CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:

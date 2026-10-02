@@ -26,7 +26,7 @@ on:
 jobs:
   publish:
     name: publish to Marketplace
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
 

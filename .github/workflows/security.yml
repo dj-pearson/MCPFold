@@ -17,7 +17,7 @@ jobs:
   # allowlisted in .gitleaks.toml; a real credential is not.
   secret-scan:
     name: secret scan (gitleaks)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -31,7 +31,7 @@ jobs:
   # that actually ships). Dev-only tooling is excluded to keep the gate signal, not noise.
   dependency-audit:
     name: dependency audit (pnpm)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
 

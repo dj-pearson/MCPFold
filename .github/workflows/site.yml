@@ -16,7 +16,7 @@ jobs:
   # Build + Playwright + a Lighthouse performance/accessibility budget on every PR.
   build:
     name: build + budget
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -43,7 +43,7 @@ jobs:
   # Gated on the Cloudflare secrets — skipped (not failed) until they're configured.
   deploy:
     name: deploy (Cloudflare Pages)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
     needs: build
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
